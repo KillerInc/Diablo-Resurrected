@@ -20,3 +20,23 @@ The first pass uses existing SDL2/SDL3 + SDL_image. It does not yet offer a dedi
 **Known limitation:** this is an opt-in HD compositor over the old framebuffer, not yet a completely independent isometric renderer. HD pieces and characters can overlap classic objects incorrectly. LOS-aware foreground cutouts, lighting/shader parity, GPU compression, 4x atlases, tile ordering, and animation-specific variants remain subsequent work. Suppressing the classic player sprite is only done when an HD replacement is loaded; otherwise the old sprite remains visible.
 
 No Blizzard artwork is committed to this project.
+
+## Scene ordering milestone
+
+The HD compositor now records sprite and tile draw commands per world frame and sorts by screen-space ground-contact Y. At a shared ground depth, terrain draws before actors; otherwise draw submission order stays stable. This corrects overlap **among HD replacements** but does not yet interleave HD draws with non-HD classic artwork.
+
+The GPU pass now uses the same 2x source-to-destination mapping as DevilutionX's original Zoom() (including the left side panel offset), and clips the output to the world viewport so it does not cover the classic bottom/side UI. The F10 toggle also unloads cached replacements, allowing an asset to be updated while in Classic mode.
+
+The command sort, 2x zoom offset and stable tie ordering have standalone C++ regression tests. We still need a unified GPU scene that includes classic and HD graphics to solve *mixed-asset occlusion* correctly.
+
+## Hands-on F10 smoke test without finished HD artwork
+
+From the game working directory, run:
+
+```bash
+python3 tools/generate_hd_test_pack.py --out .
+```
+
+This creates `hd/players/0.png`, a **synthetic**, high-resolution (384x512) Warrior stand-in. The script does not extract or distribute Blizzard artwork. Start the game with your legally obtained Diablo data, select a Warrior, then press F10. HD mode has a small green marker and displays the deliberately bright placeholder where the original Warrior animation would appear. Press F10 again to return to the original art. This test checks texture loading, anchoring, and switching, **not** animation/lighting parity. Use a fresh working directory or remove the placeholder before adding your own art.
+
+No in-game rendering has been visually verified in CI yet: the automated Linux check builds the engine, while the separate tests validate command sorting, logical dimensions and zoom mapping.

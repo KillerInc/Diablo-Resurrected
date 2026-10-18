@@ -482,32 +482,35 @@ void DrawPlayer(const Surface &out, const Player &player, Point tilePosition, Po
 
 	const ClxSprite sprite = player.currentSprite();
 	const Point spriteBufferPosition = targetBufferPosition + player.getRenderingOffset(sprite);
+bool hdSprite = false;
 #ifndef USE_SDL1
-	if (reincarnated::QueueHdPlayer(static_cast<int>(player._pClass),
-	        static_cast<int>(player._pdir),
-	        player.AnimInfo.getFrameToUseForRendering(),
-	        spriteBufferPosition.x, spriteBufferPosition.y,
-	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1))
-		return;
+	hdSprite = reincarnated::QueueHdPlayer(static_cast<int>(player._pClass),
+	    static_cast<int>(player._pdir),
+	    player.AnimInfo.getFrameToUseForRendering(),
+	    spriteBufferPosition.x, spriteBufferPosition.y,
+	    sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1);
 #endif
 
 	if (&player == PlayerUnderCursor)
 		ClxDrawOutlineSkipColorZero(out, GetPlayerOutlineColor(player.getId()), spriteBufferPosition, sprite);
 
 	if (&player == MyPlayer && IsNoneOf(leveltype, DTYPE_NEST, DTYPE_CRYPT)) {
-		ClxDraw(out, spriteBufferPosition, sprite);
+		if (!hdSprite)
+			ClxDraw(out, spriteBufferPosition, sprite);
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 		return;
 	}
 
 	if (!IsTileLit(tilePosition) || ((MyPlayer->_pInfraFlag || MyPlayer->isOnArenaLevel()) && lightTableIndex > 8)) {
-		ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN());
+		if (!hdSprite)
+			ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN());
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/true, lightTableIndex);
 		return;
 	}
 
 	lightTableIndex = std::max(lightTableIndex - 5, 0);
-	ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex);
+	if (!hdSprite)
+		ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex);
 	DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 }
 
@@ -1262,6 +1265,16 @@ void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 	if (CanPanelsCoverView() && (IsLeftPanelOpen() || IsRightPanelOpen())) {
 		columns -= (*GetOptions().Graphics.zoom) ? 2 : 4;
 	}
+
+#ifndef USE_SDL1
+	const bool leftCovered = CanPanelsCoverView() && IsLeftPanelOpen();
+	const bool rightCovered = CanPanelsCoverView() && IsRightPanelOpen();
+	const int clipLeft = leftCovered ? SidePanelSize.width : 0;
+	const int clipRight = rightCovered ? SidePanelSize.width : 0;
+	reincarnated::BeginHdWorldFrame(*GetOptions().Graphics.zoom ? 2 : 1,
+	    *GetOptions().Graphics.zoom ? clipLeft : 0,
+	    clipLeft, gnScreenWidth - clipLeft - clipRight, gnViewportHeight);
+#endif
 
 	UpdateMissilesRendererData();
 
