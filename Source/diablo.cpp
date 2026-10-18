@@ -97,6 +97,7 @@
 #include "qol/visual_store.h"
 #include "qol/xpbar.h"
 #include "quick_messages.hpp"
+#include "reincarnated/hd_renderer.hpp"
 #include "restrict.h"
 #include "stores.h"
 #include "storm/storm_net.hpp"
@@ -778,6 +779,22 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 
 	switch (event.type) {
 	case SDL_EVENT_KEY_DOWN:
+		// F10 is an application-level renderer hotkey, never a held action.
+		if (SDLC_EventKey(event) == SDLK_F10) {
+#ifndef USE_SDL1
+			if (!event.key.repeat) {
+				if (renderer == nullptr) {
+					GetOptions().Graphics.upscale.SetValue(true);
+					ReinitializeRenderer();
+				}
+				if (renderer != nullptr) {
+					reincarnated::GetRendererSwitch().onF10KeyDown(false);
+					RedrawEverything();
+				}
+			}
+#endif
+			return;
+		}
 		PressKey(SDLC_EventKey(event), modState);
 		return;
 	case SDL_EVENT_KEY_UP:
@@ -2024,7 +2041,7 @@ void InitKeymapActions()
 		    "QuickMessage{}",
 		    N_("Quick Message {}"),
 		    N_("Use Quick Message in chat."),
-		    (i < 4) ? static_cast<uint32_t>(SDLK_F9) + i : static_cast<uint32_t>(SDLK_UNKNOWN),
+		    (i < 4 && i != 1) ? static_cast<uint32_t>(SDLK_F9) + i : static_cast<uint32_t>(SDLK_UNKNOWN),
 		    [i]() { DiabloHotkeyMsg(i); },
 		    nullptr,
 		    nullptr,

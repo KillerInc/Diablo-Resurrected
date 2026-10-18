@@ -75,6 +75,9 @@ set(libdevilutionx_SRCS
   engine/backbuffer_state.cpp
   engine/dx.cpp
   engine/events.cpp
+  reincarnated/renderer_switch.cpp
+  reincarnated/sprite_layout.cpp
+  reincarnated/hd_renderer.cpp
   engine/palette.cpp
   engine/sound_position.cpp
   engine/trn.cpp

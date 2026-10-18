@@ -46,6 +46,7 @@
 #include "controls/touch/gamepad.h"
 #include "engine/backbuffer_state.hpp"
 #include "engine/dx.h"
+#include "reincarnated/hd_renderer.hpp"
 #include "headless_mode.hpp"
 #include "options.h"
 #include "utils/log.hpp"
@@ -748,6 +749,9 @@ void ReinitializeRenderer()
 {
 	if (ghMainWnd == nullptr)
 		return;
+#ifndef USE_SDL1
+	reincarnated::ResetHdAssets();
+#endif
 
 #ifdef USE_SDL1
 	const SDL_Surface *surface = SDL_GetVideoSurface();

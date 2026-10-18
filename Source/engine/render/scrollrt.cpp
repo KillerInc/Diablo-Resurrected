@@ -53,6 +53,7 @@
 #include "missiles.h"
 #include "nthread.h"
 #include "options.h"
+#include "reincarnated/hd_renderer.hpp"
 #include "panels/charpanel.hpp"
 #include "panels/console.hpp"
 #include "panels/partypanel.hpp"
@@ -473,6 +474,14 @@ void DrawPlayer(const Surface &out, const Player &player, Point tilePosition, Po
 
 	const ClxSprite sprite = player.currentSprite();
 	const Point spriteBufferPosition = targetBufferPosition + player.getRenderingOffset(sprite);
+#ifndef USE_SDL1
+	if (reincarnated::QueueHdPlayer(static_cast<int>(player._pClass),
+	        static_cast<int>(player._pdir),
+	        player.AnimInfo.getFrameToUseForRendering(),
+	        spriteBufferPosition.x, spriteBufferPosition.y,
+	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1))
+		return;
+#endif
 
 	if (&player == PlayerUnderCursor)
 		ClxDrawOutlineSkipColorZero(out, GetPlayerOutlineColor(player.getId()), spriteBufferPosition, sprite);
@@ -549,6 +558,11 @@ static void DrawDungeon(const Surface & /*out*/, const Lightmap & /*lightmap*/, 
 void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, Point targetBufferPosition, int lightTableIndex)
 {
 	const uint16_t levelPieceId = dPiece[tilePosition.x][tilePosition.y];
+#ifndef USE_SDL1
+	reincarnated::QueueHdTile(static_cast<int>(leveltype), levelPieceId,
+	    targetBufferPosition.x, targetBufferPosition.y,
+	    TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
+#endif
 	const MICROS *pMap = &DPieceMicros[levelPieceId];
 
 	const uint8_t *tbl = LightTables[lightTableIndex].data();
