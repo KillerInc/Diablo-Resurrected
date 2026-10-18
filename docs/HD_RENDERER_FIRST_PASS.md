@@ -8,6 +8,7 @@ These PNG files are **optional**. If absent, the original graphics render as bef
 
 - `hd/players/<class>/<direction>_<frame>.png`: animated player frame, with zero-based DevilutionX frame numbers.
 - `hd/players/<class>.png`: static class image fallback.
+- `hd/monsters/<monster-type>/<direction>_<frame>.png`: animated monster frame, or `hd/monsters/<monster-type>.png` for static fallback.
 - `hd/tiles/<dungeon-type>/<piece-id>.png`: optional dungeon tile replacement.
 
 Numbers in file paths are the current DevilutionX enum/piece IDs. Assets are relative to the game's working directory.

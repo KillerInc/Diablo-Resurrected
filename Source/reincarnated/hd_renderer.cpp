@@ -105,6 +105,18 @@ bool QueueHdPlayer(int heroClass, int direction, int frame,
         || Queue(base + ".png", left, bottom, width, height, zoom);
 }
 
+bool QueueHdMonster(int monsterType, int direction, int frame,
+    int left, int bottom, int width, int height, int zoom)
+{
+    if (!GetRendererSwitch().usesHdRenderer())
+        return false;
+    const std::string base = "hd/monsters/" + std::to_string(monsterType);
+    return Queue(base + "/" + std::to_string(direction) + "_"
+            + std::to_string(frame) + ".png",
+            left, bottom, width, height, zoom)
+        || Queue(base + ".png", left, bottom, width, height, zoom);
+}
+
 bool QueueHdTile(int dungeonType, unsigned pieceId,
     int left, int bottom, int width, int height, int zoom)
 {
@@ -152,6 +164,7 @@ void ResetHdAssets()
 }
 #else
 bool QueueHdPlayer(int, int, int, int, int, int, int, int) { return false; }
-bool QueueHdTile(int, unsigned, int, int, int, int, int, int) { return false; }
+bool QueueHdMonster(int, int, int, int, int, int, int, int) { return false; }
+bool QueueHdTile(int, unsigned, int, int, int, int, int) { return false; }
 #endif
 } // namespace reincarnated

@@ -384,6 +384,14 @@ void DrawMonster(const Surface &out, Point tilePosition, Point targetBufferPosit
 	}
 
 	const ClxSprite sprite = monster.animInfo.currentSprite();
+#ifndef USE_SDL1
+	if (reincarnated::QueueHdMonster(static_cast<int>(monster.type().type),
+	        static_cast<int>(monster.direction),
+	        monster.animInfo.getFrameToUseForRendering(),
+	        targetBufferPosition.x, targetBufferPosition.y,
+	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1))
+		return;
+#endif
 
 	if (!IsTileLit(tilePosition)) {
 		ClxDrawTRN(out, targetBufferPosition, sprite, GetInfravisionTRN());
