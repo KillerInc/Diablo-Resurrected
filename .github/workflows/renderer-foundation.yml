@@ -1,0 +1,21 @@
+name: Renderer foundation
+on:
+  push:
+    paths:
+      - "Source/reincarnated/**"
+      - ".github/workflows/renderer-foundation.yml"
+  pull_request:
+    paths:
+      - "Source/reincarnated/**"
+      - ".github/workflows/renderer-foundation.yml"
+jobs:
+  standalone-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S Source/reincarnated -B build/renderer-foundation
+      - name: Build
+        run: cmake --build build/renderer-foundation -j 2
+      - name: Test
+        run: ctest --test-dir build/renderer-foundation --output-on-failure
