@@ -1,0 +1,41 @@
+name: Import DevilutionX upstream
+
+# One-shot bootstrap on the dedicated integration branch.
+# Subsequent pushes by GITHUB_TOKEN do not retrigger this workflow.
+on:
+  push:
+    branches:
+      - feature/import-devilutionx
+    paths:
+      - .github/workflows/import-devilutionx.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge pinned DevilutionX revision retaining history
+        env:
+          UPSTREAM_SHA: a927236209828a1f1dcb7ef32bdd03a288710c29
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/diasurgical/DevilutionX.git
+          git fetch --no-tags upstream master
+          git cat-file -e "${UPSTREAM_SHA}^{commit}"
+          git merge --allow-unrelated-histories --no-edit -X ours "$UPSTREAM_SHA"
+          test -f LICENSE.md
+          test -f CMakeLists.txt
+          test -f Source/engine/render/scrollrt.cpp
+          test -f Source/reincarnated/renderer_switch.cpp
+          grep -q "Sustainable Use License" LICENSE.md
+          echo "Merged upstream ${UPSTREAM_SHA}"
+          git push origin HEAD:feature/import-devilutionx
