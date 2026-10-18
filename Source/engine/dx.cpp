@@ -27,6 +27,7 @@
 #include "headless_mode.hpp"
 #include "init.hpp"
 #include "options.h"
+#include "reincarnated/hd_renderer.hpp"
 #include "utils/display.h"
 #include "utils/log.hpp"
 #include "utils/sdl_wrap.h"
@@ -137,6 +138,9 @@ void dx_cleanup()
 #endif
 
 	PalSurface = nullptr;
+#ifndef USE_SDL1
+	reincarnated::ResetHdAssets();
+#endif
 	PinnedPalSurface = nullptr;
 	Palette = nullptr;
 	RendererTextureSurface = nullptr;
@@ -315,6 +319,7 @@ void RenderPresent()
 		if (SDL_RenderCopy(renderer, texture.get(), nullptr, nullptr) <= -1) ErrSdl();
 #endif
 
+		reincarnated::PresentHdOverlay(renderer);
 		if (ControlMode == ControlTypes::VirtualGamepad) {
 			RenderVirtualGamepad(renderer);
 		}
