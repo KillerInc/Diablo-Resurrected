@@ -1263,6 +1263,16 @@ void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 		columns -= (*GetOptions().Graphics.zoom) ? 2 : 4;
 	}
 
+#ifndef USE_SDL1
+	const bool leftCovered = CanPanelsCoverView() && IsLeftPanelOpen();
+	const bool rightCovered = CanPanelsCoverView() && IsRightPanelOpen();
+	const int clipLeft = leftCovered ? SidePanelSize.width : 0;
+	const int clipRight = rightCovered ? SidePanelSize.width : 0;
+	reincarnated::BeginHdWorldFrame(*GetOptions().Graphics.zoom ? 2 : 1,
+	    *GetOptions().Graphics.zoom ? clipLeft : 0,
+	    clipLeft, gnScreenWidth - clipLeft - clipRight, gnViewportHeight);
+#endif
+
 	UpdateMissilesRendererData();
 
 	// Draw areas moving in and out of the screen
