@@ -1,0 +1,13 @@
+cmake_minimum_required(VERSION 3.16)
+project(diablo_reincarnated_renderer_foundation LANGUAGES CXX)
+
+add_library(reincarnated_renderer_foundation STATIC renderer_switch.cpp sprite_layout.cpp)
+target_include_directories(reincarnated_renderer_foundation PUBLIC .)
+target_compile_features(reincarnated_renderer_foundation PUBLIC cxx_std_17)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(reincarnated_renderer_foundation_test renderer_foundation_test.cpp)
+    target_link_libraries(reincarnated_renderer_foundation_test PRIVATE reincarnated_renderer_foundation)
+    add_test(NAME renderer_switch_and_hd_sprite_layout COMMAND reincarnated_renderer_foundation_test)
+endif()
