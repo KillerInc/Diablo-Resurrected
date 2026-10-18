@@ -31,12 +31,11 @@ struct Asset {
     float w = 0, h = 0, pivotX = 0, pivotY = 0;
     bool customLayout = false;
 };
-struct DrawCommand {
-    SDL_Texture *texture;
-    float x, y, w, h;
-};
 std::unordered_map<std::string, Asset> assets;
-std::vector<DrawCommand> commands;
+HdSceneCommands commands;
+std::vector<SDL_Texture *> frameTextures;
+PresentationTransform transform;
+SDL_Rect sceneClip { 0, 0, 0, 0 };
 SDL_Renderer *owner = nullptr;
 
 Asset *LoadAsset(const std::string &name)
@@ -70,7 +69,7 @@ Asset *LoadAsset(const std::string &name)
     return inserted->second.texture == nullptr ? nullptr : &inserted->second;
 }
 
-bool Queue(const std::string &path, int left, int bottom, int nominalW, int nominalH, int zoom)
+bool Queue(const std::string &path, int left, int bottom, int nominalW, int nominalH, int zoom, SceneRole role)
 {
     if (!GetRendererSwitch().usesHdRenderer() || devilution::renderer == nullptr
         || nominalW <= 0 || nominalH <= 0 || zoom <= 0)
@@ -87,11 +86,23 @@ bool Queue(const std::string &path, int left, int bottom, int nominalW, int nomi
     const float px = image->customLayout ? image->pivotX : w * 0.5f;
     const float py = image->customLayout ? image->pivotY : h;
     const float groundX = left + nominalW * 0.5f;
-    commands.push_back({
-        image->texture, (groundX - px) * zoom, (bottom - py) * zoom, w * zoom, h * zoom});
-    return true;
+    frameTextures.push_back(image->texture);
+    const bool accepted = commands.append(frameTextures.size() - 1,
+        { groundX - px, static_cast<float>(bottom) - py, w, h },
+        static_cast<float>(bottom), role, transform);
+    if (!accepted)
+        frameTextures.pop_back();
+    return accepted;
 }
 } // namespace
+
+void BeginHdWorldFrame(int zoom, int offsetX, int clipX, int clipWidth, int clipHeight)
+{
+    commands.clear();
+    frameTextures.clear();
+    transform = { static_cast<float>(zoom), static_cast<float>(offsetX), 0.0f };
+    sceneClip = { clipX, 0, clipWidth, clipHeight };
+}
 
 bool QueueHdPlayer(int heroClass, int direction, int frame,
     int left, int bottom, int width, int height, int zoom)
@@ -101,8 +112,8 @@ bool QueueHdPlayer(int heroClass, int direction, int frame,
     const std::string base = "hd/players/" + std::to_string(heroClass);
     const std::string animated = base + "/" + std::to_string(direction)
         + "_" + std::to_string(frame) + ".png";
-    return Queue(animated, left, bottom, width, height, zoom)
-        || Queue(base + ".png", left, bottom, width, height, zoom);
+    return Queue(animated, left, bottom, width, height, zoom, SceneRole::Actor)
+        || Queue(base + ".png", left, bottom, width, height, zoom, SceneRole::Actor);
 }
 
 bool QueueHdMonster(int monsterType, int direction, int frame,
@@ -113,8 +124,8 @@ bool QueueHdMonster(int monsterType, int direction, int frame,
     const std::string base = "hd/monsters/" + std::to_string(monsterType);
     return Queue(base + "/" + std::to_string(direction) + "_"
             + std::to_string(frame) + ".png",
-            left, bottom, width, height, zoom)
-        || Queue(base + ".png", left, bottom, width, height, zoom);
+            left, bottom, width, height, zoom, SceneRole::Actor)
+        || Queue(base + ".png", left, bottom, width, height, zoom, SceneRole::Actor);
 }
 
 bool QueueHdTile(int dungeonType, unsigned pieceId,
@@ -124,24 +135,44 @@ bool QueueHdTile(int dungeonType, unsigned pieceId,
         return false;
     return Queue("hd/tiles/" + std::to_string(dungeonType) + "/"
             + std::to_string(pieceId) + ".png",
-            left, bottom, width, height, zoom);
+            left, bottom, width, height, zoom, SceneRole::Terrain);
 }
 
 void PresentHdOverlay(SDL_Renderer *target)
 {
     if (target == nullptr) {
         commands.clear();
+        frameTextures.clear();
         return;
     }
     if (GetRendererSwitch().usesHdRenderer()) {
-        for (const DrawCommand &command : commands) {
-            const SDL_FRect dst { command.x, command.y, command.w, command.h };
+        commands.sortForPresentation();
+        if (sceneClip.w > 0 && sceneClip.h > 0) {
 #ifdef USE_SDL3
-            SDL_RenderTexture(target, command.texture, nullptr, &dst);
+            SDL_SetRenderClipRect(target, &sceneClip);
 #else
-            SDL_RenderCopyF(target, command.texture, nullptr, &dst);
+            SDL_RenderSetClipRect(target, &sceneClip);
 #endif
         }
+        for (const HdDrawCommand &command : commands.items()) {
+            if (command.textureIndex >= frameTextures.size())
+                continue;
+            const Rect &bounds = command.destination;
+            const SDL_FRect dst { bounds.x, bounds.y, bounds.width, bounds.height };
+#ifdef USE_SDL3
+            SDL_RenderTexture(target, frameTextures[command.textureIndex], nullptr, &dst);
+#else
+            SDL_RenderCopyF(target, frameTextures[command.textureIndex], nullptr, &dst);
+#endif
+        }
+        if (sceneClip.w > 0 && sceneClip.h > 0) {
+#ifdef USE_SDL3
+            SDL_SetRenderClipRect(target, nullptr);
+#else
+            SDL_RenderSetClipRect(target, nullptr);
+#endif
+        }
+        // Temporary mode indicator: a visible green stripe in HD mode.
         SDL_SetRenderDrawColor(target, 45, 182, 140, 255);
         const SDL_FRect marker { 4, 4, 5, 22 };
 #ifdef USE_SDL3
@@ -151,11 +182,13 @@ void PresentHdOverlay(SDL_Renderer *target)
 #endif
     }
     commands.clear();
+    frameTextures.clear();
 }
 
 void ResetHdAssets()
 {
     commands.clear();
+    frameTextures.clear();
     for (auto &entry : assets)
         if (entry.second.texture != nullptr)
             SDL_DestroyTexture(entry.second.texture);
@@ -163,6 +196,7 @@ void ResetHdAssets()
     owner = nullptr;
 }
 #else
+void BeginHdWorldFrame(int, int, int, int, int) {}
 bool QueueHdPlayer(int, int, int, int, int, int, int, int) { return false; }
 bool QueueHdMonster(int, int, int, int, int, int, int, int) { return false; }
 bool QueueHdTile(int, unsigned, int, int, int, int, int) { return false; }
