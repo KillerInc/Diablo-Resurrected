@@ -75,6 +75,12 @@ void AssetStore::mount(std::unique_ptr<AssetProvider> provider)
         providers_.push_back(std::move(provider));
 }
 
+void AssetStore::mountFallback(std::unique_ptr<AssetProvider> provider)
+{
+    if (provider != nullptr)
+        providers_.insert(providers_.begin(), std::move(provider));
+}
+
 void AssetStore::mountLoose(std::string root)
 {
     mount(std::make_unique<LooseFileAssetProvider>(std::move(root)));

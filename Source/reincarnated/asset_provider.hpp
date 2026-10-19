@@ -35,6 +35,9 @@ public:
     // Last mounted provider takes precedence: mount base packs first, loose
     // overrides last. A missing asset falls through to the next provider.
     void mount(std::unique_ptr<AssetProvider> provider);
+    // Insert below *all* existing providers. Intended for future archives:
+    // loose content always overrides packaged content even if the pack mounts later.
+    void mountFallback(std::unique_ptr<AssetProvider> provider);
     void mountLoose(std::string root);
 
     [[nodiscard]] bool read(const std::string &assetId, AssetBytes &bytes) const;

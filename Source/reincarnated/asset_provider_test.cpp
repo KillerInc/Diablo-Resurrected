@@ -69,6 +69,9 @@ int main()
     AssetBytes value;
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "high");
+    store.mountFallback(std::make_unique<FakeArchiveProvider>(AssetBytes {'n','e','w'}));
+    assert(store.read(id, value));
+    assert(std::string(value.begin(), value.end()) == "high");
     assert(store.read(id + ".layout", value));
     assert(std::string(value.begin(), value.end()) == "96 128 48 128");
     assert(!store.read("hd/missing.png", value) && value.empty());
