@@ -1,6 +1,7 @@
 #include "hd_renderer.hpp"
 #include <cmath>
-#include <fstream>
+#include <limits>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -15,6 +16,7 @@
 #include <SDL_image.h>
 #endif
 #include "utils/display.h"
+#include "utils/paths.h"
 #endif
 
 namespace reincarnated {
@@ -25,6 +27,22 @@ RendererSwitch &GetRendererSwitch() noexcept
 }
 
 #ifndef USE_SDL1
+AssetStore &GetHdAssetStore()
+{
+    static AssetStore store;
+    static const bool initialized = [&]() {
+        // Later mounts win. Loose project-working-dir art overrides per-user,
+        // executable-adjacent and installed assets (no extraction needed).
+        store.mountLoose(devilution::paths::AssetsPath());
+        store.mountLoose(devilution::paths::BasePath());
+        store.mountLoose(devilution::paths::PrefPath());
+        store.mountLoose(".");
+        return true;
+    }();
+    (void)initialized;
+    return store;
+}
+
 namespace {
 struct Asset {
     SDL_Texture *texture = nullptr;
@@ -45,25 +63,45 @@ Asset *LoadAsset(const std::string &name)
         return it->second.texture == nullptr ? nullptr : &it->second;
 
     Asset asset;
-    SDL_Surface *surface = IMG_Load(name.c_str());
-    if (surface != nullptr) {
-        if (surface->w > 0 && surface->h > 0) {
-            asset.texture = SDL_CreateTextureFromSurface(owner, surface);
-            if (asset.texture != nullptr) {
-                SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
-                std::ifstream layout(name + ".layout");
-                if (layout >> asset.w >> asset.h >> asset.pivotX >> asset.pivotY) {
-                    asset.customLayout = std::isfinite(asset.w) && std::isfinite(asset.h)
-                        && std::isfinite(asset.pivotX) && std::isfinite(asset.pivotY)
-                        && asset.w > 0 && asset.h > 0;
+    AssetBytes imageBytes;
+    AssetBytes layoutBytes;
+    // The PNG and optional layout must originate in the same provider (folder
+    // or future archive) to avoid mixing an override with outdated metadata.
+    if (GetHdAssetStore().readWithSidecar(name, imageBytes, layoutBytes)) {
+        SDL_Surface *surface = nullptr;
+#ifdef USE_SDL3
+        SDL_IOStream *stream = SDL_IOFromConstMem(imageBytes.data(), imageBytes.size());
+        if (stream != nullptr)
+            surface = IMG_Load_IO(stream, true);
+#else
+        if (imageBytes.size() <= static_cast<size_t>(std::numeric_limits<int>::max())) {
+            SDL_RWops *stream = SDL_RWFromConstMem(imageBytes.data(), static_cast<int>(imageBytes.size()));
+            if (stream != nullptr)
+                surface = IMG_Load_RW(stream, 1);
+        }
+#endif
+        if (surface != nullptr) {
+            if (surface->w > 0 && surface->h > 0) {
+                asset.texture = SDL_CreateTextureFromSurface(owner, surface);
+                if (asset.texture != nullptr) {
+                    SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
+                    if (!layoutBytes.empty()) {
+                        const std::string layoutText(layoutBytes.begin(), layoutBytes.end());
+                        std::istringstream layout(layoutText);
+                        if (layout >> asset.w >> asset.h >> asset.pivotX >> asset.pivotY) {
+                            asset.customLayout = std::isfinite(asset.w) && std::isfinite(asset.h)
+                                && std::isfinite(asset.pivotX) && std::isfinite(asset.pivotY)
+                                && asset.w > 0 && asset.h > 0;
+                        }
+                    }
                 }
             }
-        }
 #ifdef USE_SDL3
-        SDL_DestroySurface(surface);
+            SDL_DestroySurface(surface);
 #else
-        SDL_FreeSurface(surface);
+            SDL_FreeSurface(surface);
 #endif
+        }
     }
     auto inserted = assets.emplace(name, asset).first;
     return inserted->second.texture == nullptr ? nullptr : &inserted->second;
