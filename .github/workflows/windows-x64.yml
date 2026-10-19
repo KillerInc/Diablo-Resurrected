@@ -1,0 +1,146 @@
+name: Windows x64 v0.1
+
+on:
+  push:
+    branches:
+      - main
+      - feature/windows-x64-v0.1
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-x64-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-x64:
+    name: Build Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      PACKAGE_NAME: Diablo Reincarnated v0.1
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find vcpkg toolchain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $roots = @($env:VCPKG_INSTALLATION_ROOT, $env:VCPKG_ROOT, 'C:\vcpkg') |
+            Where-Object { $_ -and (Test-Path (Join-Path $_ 'scripts\buildsystems\vcpkg.cmake')) }
+          if ($roots.Count -eq 0) {
+            throw 'GitHub runner vcpkg installation not found.'
+          }
+          $toolchain = Join-Path $roots[0] 'scripts\buildsystems\vcpkg.cmake'
+          "VCPKG_TOOLCHAIN=$toolchain" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Using vcpkg toolchain at $toolchain"
+
+      - name: Configure Windows x64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake -S . -B build-win64 -G 'Visual Studio 17 2022' -A x64 `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_TOOLCHAIN" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>' `
+            -DBUILD_TESTING=OFF `
+            -DDISABLE_ZERO_TIER=ON `
+            -DBUILD_ASSETS_MPQ=OFF `
+            -DDISABLE_LTO=ON
+          if ($LASTEXITCODE -ne 0) { throw 'Windows x64 configure failed' }
+
+      - name: Build game
+        shell: pwsh
+        run: |
+          cmake --build build-win64 --config Release --target devilutionx --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Windows x64 compilation failed' }
+
+      - name: Build and run renderer tests
+        shell: pwsh
+        run: |
+          cmake -S Source/reincarnated -B build-renderer-tests -G 'Visual Studio 17 2022' -A x64 -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw 'Test configure failed' }
+          cmake --build build-renderer-tests --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Test build failed' }
+          ctest --test-dir build-renderer-tests -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Renderer tests failed' }
+
+      - name: Prepare Windows package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $folder = Join-Path $PWD 'windows-package'
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+
+          $exe = Join-Path $PWD 'build-win64\Release\devilutionx.exe'
+          if (-not (Test-Path $exe)) {
+            throw "Expected 64-bit executable missing: $exe"
+          }
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $folder 'devilutionx.exe')
+          $binary = [System.IO.File]::ReadAllBytes($exe)
+          $peOffset = [BitConverter]::ToInt32($binary, 0x3c)
+          $machine = [BitConverter]::ToUInt16($binary, $peOffset + 4)
+          if ($machine -ne 0x8664) {
+            throw ("Build is not AMD64: PE machine 0x{0:X4}" -f $machine)
+          }
+
+          # Static vcpkg dependencies are preferred; copy any generated DLLs
+          # in the executable directory for compatibility.
+          Get-ChildItem -LiteralPath (Split-Path $exe) -Filter '*.dll' -File |
+            Copy-Item -Destination $folder
+
+          Copy-Item -LiteralPath 'LICENSE.md' -Destination $folder
+          @'
+          Diablo Reincarnated v0.1 - Windows 11 / 64-bit test build
+
+          1. Extract this ZIP into its own folder.
+          2. Copy DIABDAT.MPQ from a legally owned Diablo installation beside devilutionx.exe.
+          3. Run devilutionx.exe and start a Warrior.
+          4. Press F10 to toggle Classic / HD rendering.
+          5. The included hd/players/0.png is a deliberately simple test sprite,
+             NOT a detailed remaster and NOT Blizzard artwork.
+          6. Replace the loose PNGs in hd/ with your own HD artwork when ready.
+
+          The support file devilutionx.mpq is included from the official
+          DevilutionX asset distribution. Hellfire is not included.
+          The modified renderer is an early prototype; original/HD draw
+          order and lighting are still under development.
+
+          Project: https://github.com/KillerInc/Diablo-Resurrected
+          '@ | Set-Content -Path (Join-Path $folder 'README-Windows.txt') -Encoding utf8
+
+          # Official open-source project support assets, not the original
+          # Blizzard game data.
+          $mpq = Join-Path $folder 'devilutionx.mpq'
+          Invoke-WebRequest -Uri 'https://github.com/diasurgical/devilutionx-assets/releases/latest/download/devilutionx.mpq' -OutFile $mpq
+          if ((Get-Item $mpq).Length -lt 4096) { throw 'Support MPQ download failed' }
+
+      - name: Add synthetic HD Warrior test sprite
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate non-Blizzard HD test sprite
+        shell: pwsh
+        run: |
+          python tools/generate_hd_test_pack.py --out windows-package
+          if ($LASTEXITCODE -ne 0) { throw 'Synthetic Warrior generation failed' }
+          if (-not (Test-Path 'windows-package/hd/players/0.png')) {
+            throw 'Warrior placeholder was not generated'
+          }
+
+      # GitHub automatically serves downloadable artifacts as .zip files.
+      # The downloaded filename is exactly "Diablo Reincarnated v0.1.zip".
+      - name: Upload Diablo Reincarnated v0.1.zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Diablo Reincarnated v0.1
+          path: windows-package/
+          if-no-files-found: error
+          retention-days: 30
