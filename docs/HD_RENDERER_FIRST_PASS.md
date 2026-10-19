@@ -40,3 +40,7 @@ python3 tools/generate_hd_test_pack.py --out .
 This creates `hd/players/0.png`, a **synthetic**, high-resolution (384x512) Warrior stand-in. The script does not extract or distribute Blizzard artwork. Start the game with your legally obtained Diablo data, select a Warrior, then press F10. HD mode has a small green marker and displays the deliberately bright placeholder where the original Warrior animation would appear. Press F10 again to return to the original art. This test checks texture loading, anchoring, and switching, **not** animation/lighting parity. Use a fresh working directory or remove the placeholder before adding your own art.
 
 No in-game rendering has been visually verified in CI yet: the automated Linux check builds the engine, while the separate tests validate command sorting, logical dimensions and zoom mapping.
+
+## Loose files and future archive support
+
+HD images and `.png.layout` sidecars are now resolved through the byte-based asset-provider interface rather than direct SDL_image file paths. **Loose files are supported now; archives are not yet implemented.** See [HD asset-loading documentation](HD_ASSET_LOADING.md) for search roots, precedence and the future archive adapter. F10 still reloads cached images when switching modes.
