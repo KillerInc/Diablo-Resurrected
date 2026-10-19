@@ -77,6 +77,7 @@ set(libdevilutionx_SRCS
   engine/events.cpp
   reincarnated/renderer_switch.cpp
   reincarnated/sprite_layout.cpp
+  reincarnated/asset_provider.cpp
   reincarnated/hd_renderer.cpp
   engine/palette.cpp
   engine/sound_position.cpp

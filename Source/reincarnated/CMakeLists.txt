@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(diablo_reincarnated_renderer_foundation LANGUAGES CXX)
 
-add_library(reincarnated_renderer_foundation STATIC renderer_switch.cpp sprite_layout.cpp)
+add_library(reincarnated_renderer_foundation STATIC renderer_switch.cpp sprite_layout.cpp asset_provider.cpp)
 target_include_directories(reincarnated_renderer_foundation PUBLIC .)
 target_compile_features(reincarnated_renderer_foundation PUBLIC cxx_std_17)
 
@@ -13,4 +13,7 @@ if(BUILD_TESTING)
     add_executable(reincarnated_scene_commands_test scene_commands_test.cpp)
     target_link_libraries(reincarnated_scene_commands_test PRIVATE reincarnated_renderer_foundation)
     add_test(NAME renderer_depth_ordering_and_zoom_mapping COMMAND reincarnated_scene_commands_test)
+    add_executable(reincarnated_asset_provider_test asset_provider_test.cpp)
+    target_link_libraries(reincarnated_asset_provider_test PRIVATE reincarnated_renderer_foundation)
+    add_test(NAME hd_loose_files_and_archive_provider_fallback COMMAND reincarnated_asset_provider_test)
 endif()
