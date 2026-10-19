@@ -99,4 +99,24 @@ bool AssetStore::read(const std::string &assetId, AssetBytes &bytes) const
     return false;
 }
 
+bool AssetStore::readWithSidecar(const std::string &assetId,
+    AssetBytes &bytes, AssetBytes &sidecar) const
+{
+    bytes.clear();
+    sidecar.clear();
+    if (!IsSafeAssetId(assetId) || !IsSafeAssetId(assetId + ".layout"))
+        return false;
+
+    for (auto it = providers_.rbegin(); it != providers_.rend(); ++it) {
+        if (!(*it)->read(assetId, bytes)) {
+            bytes.clear();
+            continue;
+        }
+        if (!(*it)->read(assetId + ".layout", sidecar))
+            sidecar.clear();
+        return true;
+    }
+    return false;
+}
+
 } // namespace reincarnated

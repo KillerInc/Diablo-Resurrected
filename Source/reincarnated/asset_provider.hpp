@@ -41,6 +41,10 @@ public:
     void mountLoose(std::string root);
 
     [[nodiscard]] bool read(const std::string &assetId, AssetBytes &bytes) const;
+    // Resolve image + optional metadata from the SAME mounted provider.
+    // This avoids mixing an overriding PNG with stale metadata from a base pack.
+    [[nodiscard]] bool readWithSidecar(const std::string &assetId,
+        AssetBytes &bytes, AssetBytes &sidecar) const;
     [[nodiscard]] size_t providerCount() const noexcept { return providers_.size(); }
 private:
     std::vector<std::unique_ptr<AssetProvider>> providers_;

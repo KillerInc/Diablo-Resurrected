@@ -64,9 +64,10 @@ Asset *LoadAsset(const std::string &name)
 
     Asset asset;
     AssetBytes imageBytes;
-    // The renderer reads a virtual asset ID, never a physical filename.
-    // A future archive provider supplies the same compressed image bytes.
-    if (GetHdAssetStore().read(name, imageBytes)) {
+    AssetBytes layoutBytes;
+    // The PNG and optional layout must originate in the same provider (folder
+    // or future archive) to avoid mixing an override with outdated metadata.
+    if (GetHdAssetStore().readWithSidecar(name, imageBytes, layoutBytes)) {
         SDL_Surface *surface = nullptr;
 #ifdef USE_SDL3
         SDL_IOStream *stream = SDL_IOFromConstMem(imageBytes.data(), imageBytes.size());
@@ -84,8 +85,7 @@ Asset *LoadAsset(const std::string &name)
                 asset.texture = SDL_CreateTextureFromSurface(owner, surface);
                 if (asset.texture != nullptr) {
                     SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
-                    AssetBytes layoutBytes;
-                    if (GetHdAssetStore().read(name + ".layout", layoutBytes)) {
+                    if (!layoutBytes.empty()) {
                         const std::string layoutText(layoutBytes.begin(), layoutBytes.end());
                         std::istringstream layout(layoutText);
                         if (layout >> asset.w >> asset.h >> asset.pivotX >> asset.pivotY) {

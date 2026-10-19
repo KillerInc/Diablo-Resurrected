@@ -47,6 +47,8 @@ Asset IDs must be normalized relative paths separated by `/`; absolute paths, `.
 
 A future ZIP, MPQ or custom archive implementation only needs to provide `read()`, supplying exactly the same PNG and layout bytes. Mount it with `GetHdAssetStore().mountFallback(...)` to keep all loose overrides **higher priority**. There is no archive reader or encryption/compression format defined or promised in this patch.
 
+Image and sidecar metadata are loaded as a **pair from one provider**. If you override a PNG in a higher-priority loose folder without providing a sidecar, its metadata defaults to the original game size and pivot rather than borrowing the lower-priority pack's `.layout`.
+
 The bytes flow through SDL_image's in-memory image decoder (`IMG_Load_RW` on SDL2 or `IMG_Load_IO` on SDL3), and layout sidecars are read from the same abstraction. Texture-cache invalidation after mounts is still the caller's responsibility; F10 toggling invokes `ResetHdAssets()`.
 
 ## Verification

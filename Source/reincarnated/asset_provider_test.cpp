@@ -72,6 +72,11 @@ int main()
     store.mountFallback(std::make_unique<FakeArchiveProvider>(AssetBytes {'n','e','w'}));
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "high");
+    AssetBytes pairedImage;
+    AssetBytes pairedLayout;
+    assert(store.readWithSidecar(id, pairedImage, pairedLayout));
+    assert(std::string(pairedImage.begin(), pairedImage.end()) == "high");
+    assert(pairedLayout.empty()); // high-priority override must not inherit base metadata
     assert(store.read(id + ".layout", value));
     assert(std::string(value.begin(), value.end()) == "96 128 48 128");
     assert(!store.read("hd/missing.png", value) && value.empty());
@@ -80,9 +85,15 @@ int main()
     fs::remove(high / id);
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "low");
+    assert(store.readWithSidecar(id, pairedImage, pairedLayout));
+    assert(std::string(pairedLayout.begin(), pairedLayout.end()) == "96 128 48 128");
     fs::remove(low / id);
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "pack");
+    assert(store.readWithSidecar(id, pairedImage, pairedLayout));
+    assert(pairedLayout.empty());
+    assert(!store.readWithSidecar("hd/../players/0.png", pairedImage, pairedLayout));
+    assert(pairedImage.empty() && pairedLayout.empty());
     assert(!store.read("hd/../players/0.png", value) && value.empty());
 
     // Layout metadata is resolved by the same provider chain as image bytes.
