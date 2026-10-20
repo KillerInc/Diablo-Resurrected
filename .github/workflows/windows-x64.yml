@@ -1,9 +1,9 @@
-name: Windows x64 v0.2
+name: Windows x64 v0.3
 
 on:
   push:
     branches:
-      - feature/windows-x64-sdl3-v0.2
+      - feature/windows-x64-sdlgpu-v0.3
   pull_request:
   workflow_dispatch:
 
@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 90
     env:
-      PACKAGE_NAME: Diablo Reincarnated v0.2
+      PACKAGE_NAME: Diablo Reincarnated v0.3
     steps:
       - name: Check out project
         uses: actions/checkout@v4
@@ -87,7 +87,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           # Keep every pre-release file under its own install folder.
-          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.2'
+          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.3'
           New-Item -ItemType Directory -Force -Path $folder | Out-Null
 
           $exe = Join-Path $PWD 'build-win64\Release\Diablo Reincarnated.exe'
@@ -109,9 +109,9 @@ jobs:
 
           Copy-Item -LiteralPath 'LICENSE.md' -Destination $folder
           @'
-          Diablo Reincarnated v0.2 - Windows 11 x64 PRE-RELEASE
+          Diablo Reincarnated v0.3 - Windows 11 x64 PRE-RELEASE
 
-          1. Extract the ZIP: it contains a "Diablo Reincarnated v0.2" folder.
+          1. Extract the ZIP: it contains a "Diablo Reincarnated v0.3" folder.
           2. Keep that folder separate from your existing DevilutionX installation.
           3. Copy DIABDAT.MPQ from a legally owned Diablo installation beside
              "Diablo Reincarnated.exe" in the new folder.
@@ -142,9 +142,9 @@ jobs:
       - name: Generate non-Blizzard HD test sprite
         shell: pwsh
         run: |
-          python tools/generate_hd_test_pack.py --out 'windows-package/Diablo Reincarnated v0.2'
+          python tools/generate_hd_test_pack.py --out 'windows-package/Diablo Reincarnated v0.3'
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic Warrior generation failed' }
-          if (-not (Test-Path 'windows-package/Diablo Reincarnated v0.2/hd/players/0.png')) {
+          if (-not (Test-Path 'windows-package/Diablo Reincarnated v0.3/hd/players/0.png')) {
             throw 'Warrior placeholder was not generated'
           }
 
@@ -152,7 +152,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.2'
+          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.3'
           $process = Start-Process -FilePath (Join-Path $folder 'Diablo Reincarnated.exe') `
             -ArgumentList '--version' -WorkingDirectory $folder -WindowStyle Hidden -PassThru
           if (-not $process.WaitForExit(30000)) {
@@ -169,11 +169,11 @@ jobs:
           Copy-Item 'build-win64/_deps/sdl_mixer-src/LICENSE.txt' (Join-Path $licenses 'SDL3_mixer.txt')
 
       # GitHub automatically serves downloadable artifacts as .zip files.
-      # The downloaded filename is exactly "Diablo Reincarnated v0.2.zip".
-      - name: Upload Diablo Reincarnated v0.2.zip
+      # The downloaded filename is exactly "Diablo Reincarnated v0.3.zip".
+      - name: Upload Diablo Reincarnated v0.3.zip
         uses: actions/upload-artifact@v4
         with:
-          name: Diablo Reincarnated v0.2
+          name: Diablo Reincarnated v0.3
           path: windows-package/
           if-no-files-found: error
           retention-days: 30

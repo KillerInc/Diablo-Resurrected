@@ -1,3 +1,4 @@
+#ifndef USE_SDL3
 #include "hd_renderer.hpp"
 #include <cmath>
 #include <limits>
@@ -258,3 +259,5 @@ bool QueueHdMonster(int, int, int, int, int, int, int, int) { return false; }
 bool QueueHdTile(int, unsigned, int, int, int, int, int) { return false; }
 #endif
 } // namespace reincarnated
+
+#endif

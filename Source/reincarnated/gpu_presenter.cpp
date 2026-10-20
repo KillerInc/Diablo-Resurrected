@@ -1,0 +1,127 @@
+#include "gpu_presenter.hpp"
+#ifdef USE_SDL3
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <SDL3/SDL_gpu.h>
+#include <SDL3/SDL_surface.h>
+#include <SDL3/SDL_video.h>
+#include "options.h"
+#include "utils/display.h"
+#include "utils/log.hpp"
+#include "utils/sdl_wrap.h"
+namespace reincarnated {
+namespace {
+SDL_GPUDevice *device;
+SDL_Window *window;
+SDL_GPUTexture *frame;
+SDL_GPUTransferBuffer *upload;
+int frameWidth, frameHeight;
+SDL_GPUPresentMode presentMode = SDL_GPU_PRESENTMODE_VSYNC;
+struct View { int x, y, w, h; };
+View Viewport(int width, int height)
+{
+    float scale = std::min(float(width) / devilution::gnScreenWidth, float(height) / devilution::gnScreenHeight);
+    if (*devilution::GetOptions().Graphics.integerScaling && scale >= 1) scale = std::floor(scale);
+    const int w = std::max(1, int(devilution::gnScreenWidth * scale));
+    const int h = std::max(1, int(devilution::gnScreenHeight * scale));
+    return { (width - w) / 2, (height - h) / 2, w, h };
+}
+void ReleaseFrame()
+{
+    if (frame) SDL_ReleaseGPUTexture(device, frame);
+    if (upload) SDL_ReleaseGPUTransferBuffer(device, upload);
+    frame = nullptr; upload = nullptr;
+}
+}
+bool HasGpuPresenter() { return device != nullptr; }
+void InitializeGpuPresenter(SDL_Window *target)
+{
+    if (device) return;
+    // A window has exactly one presentation owner. No SDL_Renderer is created
+    // on this window, even in Classic mode or on F10 transitions.
+    device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_DXBC, false, nullptr);
+    if (!device) devilution::ErrSdl();
+    if (!SDL_ClaimWindowForGPUDevice(device, target)) devilution::ErrSdl();
+    window = target;
+    devilution::Log("SDL_GPU shared presenter: {}", SDL_GetGPUDeviceDriver(device));
+}
+void DestroyGpuPresenter()
+{
+    if (!device) return;
+    SDL_WaitForGPUIdle(device);
+    ReleaseFrame();
+    SDL_ReleaseWindowFromGPUDevice(device, window);
+    SDL_DestroyGPUDevice(device);
+    device = nullptr; window = nullptr;
+}
+void GpuWindowToLogical(float &x, float &y, bool inverse)
+{
+    int w, h, pw, ph;
+    if (!SDL_GetWindowSize(window, &w, &h) || !SDL_GetWindowSizeInPixels(window, &pw, &ph)) devilution::ErrSdl();
+    const View v = Viewport(pw, ph);
+    if (inverse) {
+        x = (x * v.w / devilution::gnScreenWidth + v.x) * w / pw;
+        y = (y * v.h / devilution::gnScreenHeight + v.y) * h / ph;
+    } else {
+        x = (x * pw / w - v.x) * devilution::gnScreenWidth / v.w;
+        y = (y * ph / h - v.y) * devilution::gnScreenHeight / v.h;
+    }
+}
+void PresentGpuFrame(SDL_Surface *surface)
+{
+    if (!frame || frameWidth != surface->w || frameHeight != surface->h) {
+        ReleaseFrame();
+        frameWidth = surface->w; frameHeight = surface->h;
+        SDL_GPUTextureCreateInfo info {};
+        info.type = SDL_GPU_TEXTURETYPE_2D;
+        info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+        info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+        info.width = frameWidth; info.height = frameHeight;
+        info.layer_count_or_depth = 1; info.num_levels = 1;
+        frame = SDL_CreateGPUTexture(device, &info);
+        SDL_GPUTransferBufferCreateInfo transfer {};
+        transfer.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+        transfer.size = frameWidth * frameHeight * 4;
+        upload = SDL_CreateGPUTransferBuffer(device, &transfer);
+        if (!frame || !upload) devilution::ErrSdl();
+    }
+    const auto mode = *devilution::GetOptions().Graphics.frameRateControl == devilution::FrameRateControl::VerticalSync
+        ? SDL_GPU_PRESENTMODE_VSYNC : SDL_GPU_PRESENTMODE_IMMEDIATE;
+    if (mode != presentMode && SDL_WindowSupportsGPUPresentMode(device, window, mode)) {
+        if (!SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode)) devilution::ErrSdl();
+        presentMode = mode;
+    }
+    auto *mapped = static_cast<uint8_t *>(SDL_MapGPUTransferBuffer(device, upload, true));
+    if (!mapped) devilution::ErrSdl();
+    if (!SDL_ConvertPixels(surface->w, surface->h, surface->format, surface->pixels, surface->pitch,
+            SDL_PIXELFORMAT_RGBA32, mapped, frameWidth * 4)) devilution::ErrSdl();
+    SDL_UnmapGPUTransferBuffer(device, upload);
+    SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
+    if (!cmd) devilution::ErrSdl();
+    SDL_GPUTexture *swapchain;
+    Uint32 w, h;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchain, &w, &h)) devilution::ErrSdl();
+    if (swapchain) {
+        auto *copy = SDL_BeginGPUCopyPass(cmd);
+        SDL_GPUTextureTransferInfo src {};
+        src.transfer_buffer = upload;
+        SDL_GPUTextureRegion dst {};
+        dst.texture = frame; dst.w = frameWidth; dst.h = frameHeight; dst.d = 1;
+        SDL_UploadToGPUTexture(copy, &src, &dst, true);
+        SDL_EndGPUCopyPass(copy);
+        const View v = Viewport(w, h);
+        SDL_GPUBlitInfo blit {};
+        blit.source.texture = frame; blit.source.w = frameWidth; blit.source.h = frameHeight;
+        blit.destination.texture = swapchain;
+        blit.destination.x = v.x; blit.destination.y = v.y; blit.destination.w = v.w; blit.destination.h = v.h;
+        blit.load_op = SDL_GPU_LOADOP_CLEAR;
+        blit.clear_color = { 0, 0, 0, 1 };
+        blit.filter = *devilution::GetOptions().Graphics.scaleQuality == devilution::ScalingQuality::NearestPixel
+            ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
+        SDL_BlitGPUTexture(cmd, &blit);
+    }
+    if (!SDL_SubmitGPUCommandBuffer(cmd)) devilution::ErrSdl();
+}
+}
+#endif

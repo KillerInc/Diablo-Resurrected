@@ -123,6 +123,7 @@ template <>
 DVL_ALWAYS_INLINE DVL_ATTRIBUTE_HOT void RenderLineOpaque<LightType::FullyDark>(uint8_t *DVL_RESTRICT dst, [[maybe_unused]] const uint8_t *DVL_RESTRICT src, uint_fast8_t n, [[maybe_unused]] const uint8_t *DVL_RESTRICT tbl, [[maybe_unused]] const Lightmap *lightmap)
 {
 	FillBytesUpTo32(dst, n, 0);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, n);
 }
 
 template <>
@@ -130,6 +131,7 @@ DVL_ALWAYS_INLINE DVL_ATTRIBUTE_HOT void RenderLineOpaque<LightType::FullyLit>(u
 {
 #ifndef DEBUG_RENDER_COLOR
 	CopyBytesUpTo32(dst, src, n);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, n);
 #else
 	BlitFillDirect(dst, n, DBGCOLOR);
 #endif

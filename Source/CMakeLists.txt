@@ -79,6 +79,8 @@ set(libdevilutionx_SRCS
   reincarnated/sprite_layout.cpp
   reincarnated/asset_provider.cpp
   reincarnated/hd_renderer.cpp
+  reincarnated/hd_renderer_sdl3.cpp
+  reincarnated/gpu_presenter.cpp
   engine/palette.cpp
   engine/sound_position.cpp
   engine/trn.cpp

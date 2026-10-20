@@ -102,6 +102,7 @@ void DrawHorizontalLine(const Surface &out, Point from, int width, std::uint8_t 
 void UnsafeDrawHorizontalLine(const Surface &out, Point from, int width, std::uint8_t colorIndex)
 {
 	std::memset(&out[from], colorIndex, width);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(&out[from], width);
 }
 
 void DrawVerticalLine(const Surface &out, Point from, int height, std::uint8_t colorIndex)
@@ -123,6 +124,7 @@ void UnsafeDrawVerticalLine(const Surface &out, Point from, int height, std::uin
 	const auto pitch = out.pitch();
 	while (height-- > 0) {
 		*dst = colorIndex;
+		if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, 1);
 		dst += pitch;
 	}
 }
@@ -181,6 +183,8 @@ void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, in
 		height = out.h() - sy;
 	}
 
+    if (reincarnated::HdCaptureActive && width > 0 && height > 0)
+        for (int y = sy; y < sy + height; ++y) reincarnated::MirrorBlend(out.at(sx, y), width, nullptr, 0);
 	DrawHalfTransparentBlendedRectTo(out, sx, sy, width, height);
 }
 
@@ -209,6 +213,8 @@ void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, in
 		height = out.h() - sy;
 	}
 
+    if (reincarnated::HdCaptureActive && width > 0 && height > 0)
+        for (int y = sy; y < sy + height; ++y) reincarnated::MirrorBlend(out.at(sx, y), width, nullptr, color);
 	DrawHalfTransparentUnalignedBlendedRectTo(out, sx, sy, width, height, color);
 }
 
@@ -216,6 +222,7 @@ void SetHalfTransparentPixel(const Surface &out, Point position, uint8_t color)
 {
 	if (out.InBounds(position)) {
 		uint8_t *pix = out.at(position.x, position.y);
+		if (reincarnated::HdCaptureActive) reincarnated::MirrorBlend(pix, 1, nullptr, color);
 		const auto &lookupTable = paletteTransparencyLookup[color];
 		*pix = lookupTable[*pix];
 	}

@@ -412,6 +412,7 @@ void RenderClxOutline(const Surface &out, Point position, ClxSprite sprite, uint
 	    && position.y >= 0 && position.y + sprite.height() + 2 < out.h()) {
 		for (const auto &[x, y] : OutlinePixelsCache.outlinePixels) {
 			*out.at(position.x + x, position.y + y) = color;
+			if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(out.at(position.x + x, position.y + y), 1);
 		}
 	} else {
 		for (const auto &[x, y] : OutlinePixelsCache.outlinePixels) {

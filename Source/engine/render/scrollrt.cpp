@@ -385,12 +385,12 @@ void DrawMonster(const Surface &out, Point tilePosition, Point targetBufferPosit
 
 	const ClxSprite sprite = monster.animInfo.currentSprite();
 #ifndef USE_SDL1
-	if (reincarnated::QueueHdMonster(static_cast<int>(monster.type().type),
+	const bool hdMonster = reincarnated::QueueHdMonster(static_cast<int>(monster.type().type),
 	        static_cast<int>(monster.direction),
 	        monster.animInfo.getFrameToUseForRendering(),
 	        targetBufferPosition.x, targetBufferPosition.y,
-	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1))
-		return;
+	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1);
+	reincarnated::ClassicSpriteScope hdMonsterScope(hdMonster);
 #endif
 
 	if (!IsTileLit(tilePosition)) {
@@ -495,22 +495,19 @@ bool hdSprite = false;
 		ClxDrawOutlineSkipColorZero(out, GetPlayerOutlineColor(player.getId()), spriteBufferPosition, sprite);
 
 	if (&player == MyPlayer && IsNoneOf(leveltype, DTYPE_NEST, DTYPE_CRYPT)) {
-		if (!hdSprite)
-			ClxDraw(out, spriteBufferPosition, sprite);
+		{ reincarnated::ClassicSpriteScope scope(hdSprite); ClxDraw(out, spriteBufferPosition, sprite); }
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 		return;
 	}
 
 	if (!IsTileLit(tilePosition) || ((MyPlayer->_pInfraFlag || MyPlayer->isOnArenaLevel()) && lightTableIndex > 8)) {
-		if (!hdSprite)
-			ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN());
+		{ reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN()); }
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/true, lightTableIndex);
 		return;
 	}
 
 	lightTableIndex = std::max(lightTableIndex - 5, 0);
-	if (!hdSprite)
-		ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex);
+	{ reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex); }
 	DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 }
 
@@ -569,11 +566,7 @@ static void DrawDungeon(const Surface & /*out*/, const Lightmap & /*lightmap*/, 
 void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, Point targetBufferPosition, int lightTableIndex)
 {
 	const uint16_t levelPieceId = dPiece[tilePosition.x][tilePosition.y];
-#ifndef USE_SDL1
-	reincarnated::QueueHdTile(static_cast<int>(leveltype), levelPieceId,
-	    targetBufferPosition.x, targetBufferPosition.y,
-	    TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
-#endif
+
 	const MICROS *pMap = &DPieceMicros[levelPieceId];
 
 	const uint8_t *tbl = LightTables[lightTableIndex].data();
@@ -704,6 +697,12 @@ void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, P
  */
 void DrawFloorTile(const Surface &out, const Lightmap &lightmap, Point tilePosition, Point targetBufferPosition)
 {
+#ifdef USE_SDL3
+    const bool hdFloor = reincarnated::QueueHdTile(static_cast<int>(leveltype), dPiece[tilePosition.x][tilePosition.y],
+        targetBufferPosition.x, targetBufferPosition.y, TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
+    reincarnated::ClassicSpriteScope floorScope(hdFloor);
+#endif
+
 	const int lightTableIndex = dLight[tilePosition.x][tilePosition.y];
 
 	const uint8_t *tbl = LightTables[lightTableIndex].data();
@@ -1320,6 +1319,9 @@ void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 	if (*GetOptions().Graphics.zoom) {
 		Zoom(fullOut.subregionY(0, gnViewportHeight));
 	}
+#ifdef USE_SDL3
+	reincarnated::EndHdWorldFrame();
+#endif
 
 #ifdef DUN_RENDER_STATS
 	std::vector<std::pair<DunRenderType, size_t>> sortedStats(DunRenderStats.begin(), DunRenderStats.end());

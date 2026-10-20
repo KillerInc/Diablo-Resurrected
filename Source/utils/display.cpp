@@ -47,6 +47,7 @@
 #include "engine/backbuffer_state.hpp"
 #include "engine/dx.h"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_presenter.hpp"
 #include "headless_mode.hpp"
 #include "options.h"
 #include "utils/log.hpp"
@@ -635,11 +636,7 @@ bool SpawnWindow(const char *lpWindowName)
 	}
 
 #ifdef USE_SDL3
-	if (*GetOptions().Graphics.upscale) {
-		if (!SDL_CreateWindowAndRenderer(lpWindowName, windowSize.width, windowSize.height, flags, &ghMainWnd, &renderer)) ErrSdl();
-	} else {
-		ghMainWnd = SDL_CreateWindow(lpWindowName, windowSize.width, windowSize.height, flags);
-	}
+    ghMainWnd = SDL_CreateWindow(lpWindowName, windowSize.width, windowSize.height, flags);
 #else
 	ghMainWnd = SDL_CreateWindow(lpWindowName, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowSize.width, windowSize.height, flags);
 #endif
@@ -764,6 +761,10 @@ void ReinitializeRenderer()
 		ErrSdl();
 	}
 	AdjustToScreenGeometry(Size(surface->w, surface->h));
+#elif defined(USE_SDL3)
+    reincarnated::InitializeGpuPresenter(ghMainWnd);
+    RendererTextureSurface.reset(SDL_CreateSurface(gnScreenWidth, gnScreenHeight, SDL_PIXELFORMAT_RGBA32));
+    if (!RendererTextureSurface) ErrSdl();
 #else
 
 	if (*GetOptions().Graphics.upscale) {
@@ -898,7 +899,11 @@ void ResizeWindow()
 	}
 
 	// Handle switching between "fake fullscreen" and "true fullscreen" when upscale is toggled
-	const bool upscaleChanged = *GetOptions().Graphics.upscale != (renderer != nullptr);
+	#ifdef USE_SDL3
+    const bool upscaleChanged = false; // GPU owns both scaled and 1:1 presentation.
+#else
+    const bool upscaleChanged = *GetOptions().Graphics.upscale != (renderer != nullptr);
+#endif
 	if (upscaleChanged && *GetOptions().Graphics.fullscreen) {
 #ifdef USE_SDL3
 		if (!SDL_SetWindowFullscreen(ghMainWnd, *GetOptions().Graphics.fullscreen)) ErrSdl();
@@ -918,7 +923,7 @@ void ResizeWindow()
 
 #ifndef USE_SDL1
 #ifdef USE_SDL3
-	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr);
+	SDL_SetWindowResizable(ghMainWnd, reincarnated::HasGpuPresenter());
 #else
 	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr ? SDL_TRUE : SDL_FALSE);
 #endif
@@ -937,8 +942,11 @@ SDL_Surface *GetOutputSurface()
 		ErrSdl();
 	return ret;
 #else
-	if (renderer != nullptr)
-		return RendererTextureSurface.get();
+	#ifdef USE_SDL3
+    if (reincarnated::HasGpuPresenter()) return RendererTextureSurface.get();
+#endif
+    if (renderer != nullptr)
+        return RendererTextureSurface.get();
 	SDL_Surface *ret = SDL_GetWindowSurface(ghMainWnd);
 	if (ret == nullptr)
 		ErrSdl();

@@ -4,6 +4,7 @@
 #include "scene_commands.hpp"
 #ifndef USE_SDL1
 struct SDL_Renderer;
+struct SDL_Surface;
 #endif
 namespace reincarnated {
 RendererSwitch &GetRendererSwitch() noexcept;
@@ -23,5 +24,9 @@ bool QueueHdTile(int dungeonType, unsigned pieceId,
 #ifndef USE_SDL1
 void PresentHdOverlay(SDL_Renderer *renderer);
 void ResetHdAssets();
+#ifdef USE_SDL3
+void EndHdWorldFrame();
+SDL_Surface *ComposeHdFrame(SDL_Surface *classic);
+#endif
 #endif
 } // namespace reincarnated

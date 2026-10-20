@@ -28,6 +28,7 @@
 #include "init.hpp"
 #include "options.h"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_presenter.hpp"
 #include "utils/display.h"
 #include "utils/log.hpp"
 #include "utils/sdl_wrap.h"
@@ -85,7 +86,10 @@ bool CanRenderDirectlyToOutputSurface()
 	    && outputSurface->format->BitsPerPixel == 8);
 #endif
 #else // !USE_SDL1
-	if (renderer != nullptr) return false;
+	#ifdef USE_SDL3
+    if (reincarnated::HasGpuPresenter()) return false;
+#endif
+    if (renderer != nullptr) return false;
 	SDL_Surface *outputSurface = GetOutputSurface();
 	// Assumes double-buffering is available.
 	return outputSurface->w == static_cast<int>(gnScreenWidth)
@@ -149,6 +153,9 @@ void dx_cleanup()
 	FreeVirtualGamepadTextures();
 	if (*GetOptions().Graphics.upscale)
 		SDL_DestroyRenderer(renderer);
+#endif
+#ifdef USE_SDL3
+    reincarnated::DestroyGpuPresenter();
 #endif
 	SDL_DestroyWindow(ghMainWnd);
 }
@@ -305,7 +312,11 @@ void RenderPresent()
 		return;
 	}
 
-#ifndef USE_SDL1
+#ifdef USE_SDL3
+    if (ControlMode == ControlTypes::VirtualGamepad) RenderVirtualGamepad(surface);
+    reincarnated::PresentGpuFrame(reincarnated::ComposeHdFrame(surface));
+    if (*GetOptions().Graphics.frameRateControl != FrameRateControl::VerticalSync) LimitFrameRate();
+#elif !defined(USE_SDL1)
 	if (renderer != nullptr) {
 #ifdef USE_SDL3
 		if (!SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)) ErrSdl();
