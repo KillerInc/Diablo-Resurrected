@@ -19,6 +19,14 @@ struct PresentationTransform {
 // identical depth and role. This is an HD-only first pass at scene ordering.
 enum class SceneRole : uint8_t { Terrain = 0, Actor = 1, Foreground = 2 };
 
+// A temporary UI-depth policy until the classic UI is a separate composited
+// GPU pass: an in-game menu must always be above world graphics.
+// Return false to draw the original classic world sprite under the menu.
+[[nodiscard]] constexpr bool ShouldDrawHdWorld(bool hdMode, bool menuOpen) noexcept
+{
+    return hdMode && !menuOpen;
+}
+
 struct HdDrawCommand {
     size_t textureIndex = 0;
     Rect destination {};

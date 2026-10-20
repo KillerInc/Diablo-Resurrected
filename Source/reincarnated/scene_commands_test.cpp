@@ -7,6 +7,12 @@ static bool near(float a,float b) { return std::abs(a-b) < 0.001f; }
 
 int main()
 {
+    // Escape/options menus have to own the foreground draw layer.
+    assert(!ShouldDrawHdWorld(false, false));
+    assert(!ShouldDrawHdWorld(false, true));
+    assert(ShouldDrawHdWorld(true, false));
+    assert(!ShouldDrawHdWorld(true, true));
+
     HdSceneCommands q;
     // Sprite source resolution does not affect its logical draw rectangle.
     assert(q.append(10, {912,412,96,128}, 540, SceneRole::Actor, {}));

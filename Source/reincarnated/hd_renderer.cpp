@@ -15,6 +15,7 @@
 #include <SDL.h>
 #include <SDL_image.h>
 #endif
+#include "gmenu.h"
 #include "utils/display.h"
 #include "utils/paths.h"
 #endif
@@ -76,8 +77,13 @@ Asset *LoadAsset(const std::string &name)
 #else
         if (imageBytes.size() <= static_cast<size_t>(std::numeric_limits<int>::max())) {
             SDL_RWops *stream = SDL_RWFromConstMem(imageBytes.data(), static_cast<int>(imageBytes.size()));
-            if (stream != nullptr)
-                surface = IMG_Load_RW(stream, 1);
+            if (stream != nullptr) {
+                // DevilutionX's bundled SDL2_image intentionally exposes only
+                // PNG decoding, not the generic IMG_Load_RW entry point.
+                // This works with both that minimal library and full SDL2_image.
+                surface = IMG_LoadPNG_RW(stream);
+                SDL_RWclose(stream);
+            }
         }
 #endif
         if (surface != nullptr) {
@@ -109,7 +115,12 @@ Asset *LoadAsset(const std::string &name)
 
 bool Queue(const std::string &path, int left, int bottom, int nominalW, int nominalH, int zoom, SceneRole role)
 {
-    if (!GetRendererSwitch().usesHdRenderer() || devilution::renderer == nullptr
+    // The classic game draws its Esc/options menu into the CPU framebuffer
+    // before the GPU HD overlay. Since the menu has no separate GPU layer
+    // yet, prefer the classic world sprites whenever the menu is open so
+    // they cannot cover menu text or sliders.
+    if (!ShouldDrawHdWorld(GetRendererSwitch().usesHdRenderer(), devilution::gmenu_is_active())
+        || devilution::renderer == nullptr
         || nominalW <= 0 || nominalH <= 0 || zoom <= 0)
         return false;
     if (owner != devilution::renderer) {
@@ -192,16 +203,20 @@ void PresentHdOverlay(SDL_Renderer *target)
             SDL_RenderSetClipRect(target, &sceneClip);
 #endif
         }
-        for (const HdDrawCommand &command : commands.items()) {
-            if (command.textureIndex >= frameTextures.size())
-                continue;
-            const Rect &bounds = command.destination;
-            const SDL_FRect dst { bounds.x, bounds.y, bounds.width, bounds.height };
+        // Guard presentation as well as queueing: a menu opened after world
+        // traversal must never leave queued HD sprites above that menu.
+        if (!devilution::gmenu_is_active()) {
+            for (const HdDrawCommand &command : commands.items()) {
+                if (command.textureIndex >= frameTextures.size())
+                    continue;
+                const Rect &bounds = command.destination;
+                const SDL_FRect dst { bounds.x, bounds.y, bounds.width, bounds.height };
 #ifdef USE_SDL3
-            SDL_RenderTexture(target, frameTextures[command.textureIndex], nullptr, &dst);
+                SDL_RenderTexture(target, frameTextures[command.textureIndex], nullptr, &dst);
 #else
-            SDL_RenderCopyF(target, frameTextures[command.textureIndex], nullptr, &dst);
+                SDL_RenderCopyF(target, frameTextures[command.textureIndex], nullptr, &dst);
 #endif
+            }
         }
         if (sceneClip.w > 0 && sceneClip.h > 0) {
 #ifdef USE_SDL3

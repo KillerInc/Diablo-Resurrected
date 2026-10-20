@@ -507,9 +507,13 @@ void LoadCoreArchives()
 	auto paths = GetMPQSearchPaths();
 
 #if !(defined(__ANDROID__) && !defined(TERMUX)) && !defined(__APPLE__) && !defined(__3DS__) && !defined(__SWITCH__)
-	// Load devilutionx.mpq first to get the font file for error messages
+	// Load the support MPQ first to get the font file for error messages.
+	// The Windows preview uses its own MPQ filename so it cannot depend on
+	// or accidentally pick up an existing DevilutionX support archive.
 #ifdef __DJGPP__
 	LoadMPQ(paths, "devx", DevilutionXMpqPriority);
+#elif defined(_WIN32)
+	LoadMPQ(paths, "d1reincarnated", DevilutionXMpqPriority);
 #else
 	LoadMPQ(paths, "devilutionx", DevilutionXMpqPriority);
 #endif

@@ -281,11 +281,13 @@ else()
   if(BUILD_ASSETS_MPQ)
     if(TARGET_PLATFORM STREQUAL "dos")
       set(DEVILUTIONX_MPQ "${CMAKE_CURRENT_BINARY_DIR}/devx.mpq")
+    elseif(WIN32)
+      set(DEVILUTIONX_MPQ "${CMAKE_CURRENT_BINARY_DIR}/d1reincarnated.mpq")
     else()
       set(DEVILUTIONX_MPQ "${CMAKE_CURRENT_BINARY_DIR}/devilutionx.mpq")
     endif()
     add_custom_command(
-      COMMENT "Building devilutionx.mpq"
+      COMMENT "Building ${DEVILUTIONX_MPQ}"
       OUTPUT "${DEVILUTIONX_MPQ}"
       COMMAND ${CMAKE_COMMAND} -E remove -f "${DEVILUTIONX_MPQ}"
       COMMAND ${SMPQ} -A -M 1 -C BZIP2 -c "${DEVILUTIONX_MPQ}" ${DEVILUTIONX_MPQ_FILES}

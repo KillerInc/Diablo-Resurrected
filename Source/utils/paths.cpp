@@ -110,6 +110,9 @@ const std::string &PrefPath()
 		prefPath = FromSDL(IOSGetPrefPath());
 #elif defined(NXDK)
 		prefPath = NxdkGetPrefPath();
+#elif defined(_WIN32)
+		// Use distinct Windows saves/preferences; ignore nearby DevilutionX diablo.ini.
+		prefPath = FromSDL(SDL_GetPrefPath("KillerInc", "Diablo Reincarnated"));
 #else
 		prefPath = FromSDL(SDL_GetPrefPath("diasurgical", "devilution"));
 #if !defined(__amigaos__) && !defined(__DJGPP__)
@@ -131,6 +134,9 @@ const std::string &ConfigPath()
 		configPath = FromSDL(IOSGetPrefPath());
 #elif defined(NXDK)
 		configPath = NxdkGetPrefPath();
+#elif defined(_WIN32)
+		// The rebranded Windows build must never share DevilutionX config files.
+		configPath = FromSDL(SDL_GetPrefPath("KillerInc", "Diablo Reincarnated"));
 #else
 		configPath = FromSDL(SDL_GetPrefPath("diasurgical", "devilution"));
 #if !defined(__amigaos__) && !defined(__DJGPP__)
