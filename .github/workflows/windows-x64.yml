@@ -75,14 +75,15 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $folder = Join-Path $PWD 'windows-package'
+          # Keep every pre-release file under its own install folder.
+          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.1'
           New-Item -ItemType Directory -Force -Path $folder | Out-Null
 
-          $exe = Join-Path $PWD 'build-win64\Release\devilutionx.exe'
+          $exe = Join-Path $PWD 'build-win64\Release\Diablo Reincarnated.exe'
           if (-not (Test-Path $exe)) {
             throw "Expected 64-bit executable missing: $exe"
           }
-          Copy-Item -LiteralPath $exe -Destination (Join-Path $folder 'devilutionx.exe')
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $folder 'Diablo Reincarnated.exe')
           $binary = [System.IO.File]::ReadAllBytes($exe)
           $peOffset = [BitConverter]::ToInt32($binary, 0x3c)
           $machine = [BitConverter]::ToUInt16($binary, $peOffset + 4)
@@ -97,20 +98,22 @@ jobs:
 
           Copy-Item -LiteralPath 'LICENSE.md' -Destination $folder
           @'
-          Diablo Reincarnated v0.1 - Windows 11 / 64-bit test build
+          Diablo Reincarnated v0.1 - Windows 11 x64 PRE-RELEASE
 
-          1. Extract this ZIP into its own folder.
-          2. Copy DIABDAT.MPQ from a legally owned Diablo installation beside devilutionx.exe.
-          3. Run devilutionx.exe and start a Warrior.
-          4. Press F10 to toggle Classic / HD rendering.
-          5. The included hd/players/0.png is a deliberately simple test sprite,
-             NOT a detailed remaster and NOT Blizzard artwork.
-          6. Replace the loose PNGs in hd/ with your own HD artwork when ready.
+          1. Extract the ZIP: it contains a "Diablo Reincarnated v0.1" folder.
+          2. Keep that folder separate from your existing DevilutionX installation.
+          3. Copy DIABDAT.MPQ from a legally owned Diablo installation beside
+             "Diablo Reincarnated.exe" in the new folder.
+          4. Run "Diablo Reincarnated.exe" and start a Warrior.
+          5. Press F10 to toggle Classic / experimental HD mode.
+          6. hd/players/0.png is a deliberately simple synthetic test sprite,
+             NOT detailed remastered art or Blizzard artwork.
 
-          The support file devilutionx.mpq is included from the official
-          DevilutionX asset distribution. Hellfire is not included.
-          The modified renderer is an early prototype; original/HD draw
-          order and lighting are still under development.
+          This build uses separate Windows settings and save paths, so your
+          existing DevilutionX settings and saves are not overwritten.
+          The support archive must remain named "devilutionx.mpq" because the
+          engine requires that name. It is inside this build's separate folder.
+          Hellfire is not included. HD draw order and lighting are unfinished.
 
           Project: https://github.com/KillerInc/Diablo-Resurrected
           '@ | Set-Content -Path (Join-Path $folder 'README-Windows.txt') -Encoding utf8
@@ -129,9 +132,9 @@ jobs:
       - name: Generate non-Blizzard HD test sprite
         shell: pwsh
         run: |
-          python tools/generate_hd_test_pack.py --out windows-package
+          python tools/generate_hd_test_pack.py --out 'windows-package/Diablo Reincarnated v0.1'
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic Warrior generation failed' }
-          if (-not (Test-Path 'windows-package/hd/players/0.png')) {
+          if (-not (Test-Path 'windows-package/Diablo Reincarnated v0.1/hd/players/0.png')) {
             throw 'Warrior placeholder was not generated'
           }
 
@@ -144,3 +147,60 @@ jobs:
           path: windows-package/
           if-no-files-found: error
           retention-days: 30
+
+  # Only tested branch PUSH builds publish; PR checks and main never release.
+  publish-prerelease:
+    name: Publish Windows v0.1 pre-release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/windows-x64-v0.1'
+    needs: windows-x64
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified Windows x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Diablo Reincarnated v0.1
+          path: release-content
+
+      - name: Publish GitHub pre-release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'v0.1-pre'
+          $title = 'Diablo Reincarnated v0.1 (Pre-release)'
+          $folder = Join-Path $PWD 'release-content/Diablo Reincarnated v0.1'
+          $zip = Join-Path $PWD 'Diablo Reincarnated v0.1.zip'
+          if (-not (Test-Path (Join-Path $folder 'Diablo Reincarnated.exe'))) {
+            throw 'Verified pre-release executable is missing.'
+          }
+          Compress-Archive -LiteralPath $folder -DestinationPath $zip -CompressionLevel Optimal -Force
+          if ((Get-Item -LiteralPath $zip).Length -lt 4096) {
+            throw 'Pre-release ZIP creation failed.'
+          }
+          $notes = @'
+          Windows 11 x64 preview of the 2D HD renderer prototype.
+
+          - Separate "Diablo Reincarnated.exe" executable and install folder.
+          - Independent settings and save directory; no DevilutionX overwrites.
+          - F10 switches between Classic and experimental HD mode.
+          - Synthetic Warrior placeholder included. Original Diablo DIABDAT.MPQ is NOT included.
+          - Unfinished pre-release: HD draw ordering and lighting remain in development.
+          '@
+          $existing = gh release list --repo $env:GH_REPO --limit 100 --json tagName --jq '.[] | select(.tagName == "v0.1-pre") | .tagName'
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to inspect releases' }
+          if ($existing -eq $tag) {
+            gh release upload $tag $zip --repo $env:GH_REPO --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Updating pre-release ZIP failed' }
+            gh release edit $tag --repo $env:GH_REPO --title $title --prerelease --notes $notes
+            if ($LASTEXITCODE -ne 0) { throw 'Updating pre-release details failed' }
+            # Mutable preview tag follows the latest SHA that passed Windows CI.
+            gh api --method PATCH "repos/$env:GH_REPO/git/refs/tags/$tag" -f "sha=$env:GITHUB_SHA" -F force=true | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Updating pre-release tag failed' }
+          } else {
+            gh release create $tag $zip --repo $env:GH_REPO --target $env:GITHUB_SHA --title $title --prerelease --latest=false --notes $notes
+            if ($LASTEXITCODE -ne 0) { throw 'Creating GitHub pre-release failed' }
+          }

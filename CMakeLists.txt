@@ -407,6 +407,12 @@ if(TARGET_PLATFORM STREQUAL "dos")
     target_link_libraries(${BIN_TARGET} PRIVATE m)
 endif()
 
+# Keep the Windows prototype executable distinct from installed DevilutionX.
+# Retain the upstream CMake target name for its build dependencies.
+if(WIN32 AND NOT UWP_LIB)
+  set_target_properties(${BIN_TARGET} PROPERTIES OUTPUT_NAME "Diablo Reincarnated")
+endif()
+
 if(NOT UWP_LIB)
   target_link_dependencies(${BIN_TARGET} PRIVATE libdevilutionx)
 endif()
