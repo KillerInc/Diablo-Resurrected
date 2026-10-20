@@ -76,8 +76,13 @@ Asset *LoadAsset(const std::string &name)
 #else
         if (imageBytes.size() <= static_cast<size_t>(std::numeric_limits<int>::max())) {
             SDL_RWops *stream = SDL_RWFromConstMem(imageBytes.data(), static_cast<int>(imageBytes.size()));
-            if (stream != nullptr)
-                surface = IMG_Load_RW(stream, 1);
+            if (stream != nullptr) {
+                // DevilutionX's bundled SDL2_image intentionally exposes only
+                // PNG decoding, not the generic IMG_Load_RW entry point.
+                // This works with both that minimal library and full SDL2_image.
+                surface = IMG_LoadPNG_RW(stream);
+                SDL_RWclose(stream);
+            }
         }
 #endif
         if (surface != nullptr) {
