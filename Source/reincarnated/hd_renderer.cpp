@@ -36,6 +36,7 @@ AssetStore &GetHdAssetStore()
         // Later mounts win. Loose project-working-dir art overrides per-user,
         // executable-adjacent and installed assets (no extraction needed).
         store.mountLoose(devilution::paths::AssetsPath());
+        store.mountLoose(devilution::paths::ExecutablePath());
         store.mountLoose(devilution::paths::BasePath());
         store.mountLoose(devilution::paths::PrefPath());
         store.mountLoose(".");

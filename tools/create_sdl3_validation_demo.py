@@ -3,7 +3,7 @@
 
 Uses the upstream shareware Warrior save fixture, never an installed user's
 save. Game data is not copied. Run the packaged game with --spawn --demo 1
---save-dir OUTPUT --config-dir OUTPUT --data-dir YOUR_DIABLO_FOLDER -n.
+--diablo --save-dir OUTPUT --config-dir OUTPUT --data-dir YOUR_DIABLO_FOLDER -n.
 Without --timedemo each phase lasts 15 seconds for visual inspection:
 Classic, HD Warrior, Escape menu over HD, HD again, then Classic and exit.
 """
