@@ -1138,6 +1138,11 @@ else()
   set(CONFIG_PATH config.h)
   target_include_directories(libdevilutionx_config INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 endif()
+if(WIN32 AND USE_SDL3)
+  # Keep upstream protocol/save format versions, but identify our executable.
+  set(PROJECT_NAME "Diablo Reincarnated")
+  set(PROJECT_VERSION_WITH_SUFFIX "0.2.0-pre")
+endif()
 file(GENERATE OUTPUT ${CONFIG_PATH} CONTENT
 "#pragma once
 #define PROJECT_NAME \"${PROJECT_NAME}\"
