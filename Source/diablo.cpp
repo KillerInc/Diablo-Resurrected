@@ -1246,11 +1246,21 @@ void CheckArchivesUpToDate()
 	const bool fontsMpqOutOfDate = AreExtraFontsOutOfDate();
 
 	if (devilutionxMpqOutOfDate && fontsMpqOutOfDate) {
+#ifdef _WIN32
+		app_fatal(_("Please update d1reincarnated.mpq and fonts.mpq to the latest version"));
+#else
 		app_fatal(_("Please update devilutionx.mpq and fonts.mpq to the latest version"));
+#endif
 	} else if (devilutionxMpqOutOfDate) {
+#ifdef _WIN32
+		app_fatal(_("Failed to load UI resources.\n"
+		            "\n"
+		            "Make sure d1reincarnated.mpq is in the game folder and that it is up to date."));
+#else
 		app_fatal(_("Failed to load UI resources.\n"
 		            "\n"
 		            "Make sure devilutionx.mpq is in the game folder and that it is up to date."));
+#endif
 	} else if (fontsMpqOutOfDate) {
 		app_fatal(_("Please update fonts.mpq to the latest version"));
 	}

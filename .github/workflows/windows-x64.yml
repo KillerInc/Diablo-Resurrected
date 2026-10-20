@@ -111,8 +111,10 @@ jobs:
 
           This build uses separate Windows settings and save paths, so your
           existing DevilutionX settings and saves are not overwritten.
-          The support archive must remain named "devilutionx.mpq" because the
-          engine requires that name. It is inside this build's separate folder.
+          This build uses "d1reincarnated.mpq" for its support assets.
+          It contains the official DevilutionX open-source support data, just
+          under a different filename. Keep it next to our executable.
+          Do NOT rename it to devilutionx.mpq or replace your existing copy.
           Hellfire is not included. HD draw order and lighting are unfinished.
 
           Project: https://github.com/KillerInc/Diablo-Resurrected
@@ -120,7 +122,7 @@ jobs:
 
           # Official open-source project support assets, not the original
           # Blizzard game data.
-          $mpq = Join-Path $folder 'devilutionx.mpq'
+          $mpq = Join-Path $folder 'd1reincarnated.mpq'
           Invoke-WebRequest -Uri 'https://github.com/diasurgical/devilutionx-assets/releases/latest/download/devilutionx.mpq' -OutFile $mpq
           if ((Get-Item $mpq).Length -lt 4096) { throw 'Support MPQ download failed' }
 
@@ -177,6 +179,9 @@ jobs:
           if (-not (Test-Path (Join-Path $folder 'Diablo Reincarnated.exe'))) {
             throw 'Verified pre-release executable is missing.'
           }
+          if (-not (Test-Path (Join-Path $folder 'd1reincarnated.mpq'))) {
+            throw 'Renamed d1reincarnated.mpq support archive is missing.'
+          }
           Compress-Archive -LiteralPath $folder -DestinationPath $zip -CompressionLevel Optimal -Force
           if ((Get-Item -LiteralPath $zip).Length -lt 4096) {
             throw 'Pre-release ZIP creation failed.'
@@ -185,6 +190,7 @@ jobs:
           Windows 11 x64 preview of the 2D HD renderer prototype.
 
           - Separate "Diablo Reincarnated.exe" executable and install folder.
+          - Includes d1reincarnated.mpq (renamed official support data, not Blizzard assets).
           - Independent settings and save directory; no DevilutionX overwrites.
           - F10 switches between Classic and experimental HD mode.
           - Synthetic Warrior placeholder included. Original Diablo DIABDAT.MPQ is NOT included.
