@@ -148,6 +148,26 @@ jobs:
             throw 'Warrior placeholder was not generated'
           }
 
+      - name: Verify packaged Windows entry point
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.2'
+          $process = Start-Process -FilePath (Join-Path $folder 'Diablo Reincarnated.exe') `
+            -ArgumentList '--version' -WorkingDirectory $folder -WindowStyle Hidden -PassThru
+          if (-not $process.WaitForExit(30000)) {
+            $process.Kill()
+            throw 'Packaged executable startup timed out'
+          }
+          if ($process.ExitCode -ne 0) { throw "Packaged executable failed: $($process.ExitCode)" }
+          # This checks the PE loader and SDL3 Windows entry point only.
+          # A game-launch test with DIABDAT.MPQ is required before publication.
+          $licenses = Join-Path $folder 'licenses'
+          New-Item -ItemType Directory -Force -Path $licenses | Out-Null
+          Copy-Item 'build-win64/_deps/sdl3-src/LICENSE.txt' (Join-Path $licenses 'SDL3.txt')
+          Copy-Item 'build-win64/_deps/sdl_image-src/LICENSE.txt' (Join-Path $licenses 'SDL3_image.txt')
+          Copy-Item 'build-win64/_deps/sdl_mixer-src/LICENSE.txt' (Join-Path $licenses 'SDL3_mixer.txt')
+
       # GitHub automatically serves downloadable artifacts as .zip files.
       # The downloaded filename is exactly "Diablo Reincarnated v0.2.zip".
       - name: Upload Diablo Reincarnated v0.2.zip

@@ -26,6 +26,13 @@ else()
 endif()
 
 set(SDLIMAGE_BACKEND_STB OFF)
+# Dependencies are supplied above (vcpkg on Windows), rather than the
+# optional external/ submodules absent from the SDL_image release archive.
+set(SDLIMAGE_VENDORED OFF)
+if(DEVILUTIONX_STATIC_SDL_IMAGE)
+  set(SDLIMAGE_DEPS_SHARED OFF)
+  set(SDLIMAGE_PNG_SHARED OFF)
+endif()
 set(SDLIMAGE_AVIF OFF)
 set(SDLIMAGE_BMP OFF)
 set(SDLIMAGE_GIF OFF)
