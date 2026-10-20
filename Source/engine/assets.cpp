@@ -513,7 +513,10 @@ void LoadCoreArchives()
 #ifdef __DJGPP__
 	LoadMPQ(paths, "devx", DevilutionXMpqPriority);
 #elif defined(_WIN32)
-	LoadMPQ(paths, "d1reincarnated", DevilutionXMpqPriority);
+	// Support resources belong to this executable, even when --data-dir
+	// points at another installation with an older preview support archive.
+	const std::string supportPaths[] { paths::ExecutablePath() };
+	LoadMPQ(supportPaths, "d1reincarnated", DevilutionXMpqPriority);
 #else
 	LoadMPQ(paths, "devilutionx", DevilutionXMpqPriority);
 #endif

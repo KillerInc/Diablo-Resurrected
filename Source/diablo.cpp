@@ -789,6 +789,7 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 				}
 				if (renderer != nullptr) {
 					reincarnated::GetRendererSwitch().onF10KeyDown(false);
+					Log("Renderer mode: {}", reincarnated::GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic");
 					reincarnated::ResetHdAssets();
 					RedrawEverything();
 				}

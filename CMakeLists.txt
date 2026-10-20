@@ -441,7 +441,7 @@ if(EMSCRIPTEN)
   target_link_options(${BIN_TARGET} PRIVATE --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/Packaging/emscripten/emscripten_pre.js)
 endif()
 
-if(NOT USE_SDL1 AND NOT UWP_LIB)
+if(NOT USE_SDL1 AND NOT USE_SDL3 AND NOT UWP_LIB)
   target_link_libraries(${BIN_TARGET} PUBLIC ${SDL2_MAIN})
 endif()
 

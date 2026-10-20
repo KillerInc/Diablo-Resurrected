@@ -101,6 +101,12 @@ const std::string &BasePath()
 	return *basePath;
 }
 
+const std::string &ExecutablePath()
+{
+	static const std::string path = GetSdlBasePath();
+	return path;
+}
+
 const std::string &PrefPath()
 {
 	if (!prefPath) {

@@ -251,8 +251,17 @@ void WriteSettings(FILE *out)
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 bool CreateSdlEvent(const DemoMsg &dmsg, SDL_Event &event, uint16_t &modState)
 {
+	// Never inherit repeat/window/union fields from the preceding event.
+	event = {};
 	const uint8_t type = dmsg.type;
 	switch (type) {
+	case DemoMsg::QuitEvent:
+#ifdef USE_SDL3
+		event.type = SDL_EVENT_QUIT;
+#else
+		event.type = SDL_QUIT;
+#endif
+		return true;
 	case DemoMsg::MouseMotionEvent:
 #ifdef USE_SDL3
 		event.type = SDL_EVENT_MOUSE_MOTION;

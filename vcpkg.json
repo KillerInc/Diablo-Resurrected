@@ -15,6 +15,10 @@
 		}
 	],
 	"features": {
+		"sdl3": {
+			"description": "Use pinned bundled SDL3, SDL3_image and SDL3_mixer with libpng",
+			"dependencies": ["libpng"]
+		},
 		"sdl1": {
 			"description": "Use SDL1.2 instead of SDL2",
 			"dependencies": [

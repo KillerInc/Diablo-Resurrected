@@ -531,8 +531,13 @@ bool SpawnWindow(const char *lpWindowName)
 #ifdef USE_SDL3
 	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, PROJECT_NAME);
 	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, PROJECT_VERSION);
+#ifdef _WIN32
+	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "com.killerinc.diablo-reincarnated");
+	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/KillerInc/Diablo-Resurrected");
+#else
 	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "org.diasurgical.devilutionx");
 	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://devilutionx.com");
+#endif
 	SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
 	SDL_SetHint(SDL_HINT_RETURN_KEY_HIDES_IME, "1");

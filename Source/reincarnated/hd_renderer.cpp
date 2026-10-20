@@ -18,6 +18,7 @@
 #include "gmenu.h"
 #include "utils/display.h"
 #include "utils/paths.h"
+#include "utils/log.hpp"
 #endif
 
 namespace reincarnated {
@@ -35,6 +36,7 @@ AssetStore &GetHdAssetStore()
         // Later mounts win. Loose project-working-dir art overrides per-user,
         // executable-adjacent and installed assets (no extraction needed).
         store.mountLoose(devilution::paths::AssetsPath());
+        store.mountLoose(devilution::paths::ExecutablePath());
         store.mountLoose(devilution::paths::BasePath());
         store.mountLoose(devilution::paths::PrefPath());
         store.mountLoose(".");
@@ -90,6 +92,7 @@ Asset *LoadAsset(const std::string &name)
             if (surface->w > 0 && surface->h > 0) {
                 asset.texture = SDL_CreateTextureFromSurface(owner, surface);
                 if (asset.texture != nullptr) {
+                    devilution::LogVerbose("Loaded HD texture: {} ({}x{})", name, surface->w, surface->h);
                     SDL_SetTextureBlendMode(asset.texture, SDL_BLENDMODE_BLEND);
                     if (!layoutBytes.empty()) {
                         const std::string layoutText(layoutBytes.begin(), layoutBytes.end());

@@ -7,6 +7,13 @@ target_compile_features(reincarnated_renderer_foundation PUBLIC cxx_std_17)
 
 include(CTest)
 if(BUILD_TESTING)
+    # These tests use assert, including expressions that exercise behavior.
+    # Keep them active in the Release configuration used by Windows CI.
+    if(MSVC)
+        add_compile_options(/UNDEBUG)
+    else()
+        add_compile_options(-UNDEBUG)
+    endif()
     add_executable(reincarnated_renderer_foundation_test renderer_foundation_test.cpp)
     target_link_libraries(reincarnated_renderer_foundation_test PRIVATE reincarnated_renderer_foundation)
     add_test(NAME renderer_switch_and_hd_sprite_layout COMMAND reincarnated_renderer_foundation_test)
