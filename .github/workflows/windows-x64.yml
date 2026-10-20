@@ -71,6 +71,11 @@ jobs:
           ctest --test-dir build-renderer-tests -C Release --output-on-failure
           if ($LASTEXITCODE -ne 0) { throw 'Renderer tests failed' }
 
+      - name: Set up Python for version-matched assets
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Prepare Windows package
         shell: pwsh
         run: |
@@ -111,25 +116,22 @@ jobs:
 
           This build uses separate Windows settings and save paths, so your
           existing DevilutionX settings and saves are not overwritten.
-          This build uses "d1reincarnated.mpq" for its support assets.
-          It contains the official DevilutionX open-source support data, just
-          under a different filename. Keep it next to our executable.
-          Do NOT rename it to devilutionx.mpq or replace your existing copy.
+          This build includes its own d1reincarnated.mpq generated from the
+          exact open-source engine assets used for this build. It is NOT the
+          original Diablo game data. Keep it beside the new executable.
+          Do NOT replace any files in your existing DevilutionX installation.
           Hellfire is not included. HD draw order and lighting are unfinished.
 
           Project: https://github.com/KillerInc/Diablo-Resurrected
           '@ | Set-Content -Path (Join-Path $folder 'README-Windows.txt') -Encoding utf8
 
-          # Official open-source project support assets, not the original
-          # Blizzard game data.
+          # Match the resources to this exact engine source revision.
+          # The supplemental devilutionx-assets release lacks ASSETS_VERSION
+          # and causes the game to fail at startup when repackaged alone.
           $mpq = Join-Path $folder 'd1reincarnated.mpq'
-          Invoke-WebRequest -Uri 'https://github.com/diasurgical/devilutionx-assets/releases/latest/download/devilutionx.mpq' -OutFile $mpq
-          if ((Get-Item $mpq).Length -lt 4096) { throw 'Support MPQ download failed' }
-
-      - name: Add synthetic HD Warrior test sprite
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+          python tools/create_support_mpq.py --assets 'build-win64/assets' --output $mpq
+          if ($LASTEXITCODE -ne 0) { throw 'Building and verifying support MPQ failed' }
+          if ((Get-Item $mpq).Length -lt 4096) { throw 'Support MPQ is too small' }
 
       - name: Generate non-Blizzard HD test sprite
         shell: pwsh
@@ -190,7 +192,7 @@ jobs:
           Windows 11 x64 preview of the 2D HD renderer prototype.
 
           - Separate "Diablo Reincarnated.exe" executable and install folder.
-          - Includes d1reincarnated.mpq (renamed official support data, not Blizzard assets).
+          - Includes d1reincarnated.mpq, built from the matching open-source engine assets.
           - Independent settings and save directory; no DevilutionX overwrites.
           - F10 switches between Classic and experimental HD mode.
           - Synthetic Warrior placeholder included. Original Diablo DIABDAT.MPQ is NOT included.
