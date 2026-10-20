@@ -209,10 +209,10 @@ void PresentHdOverlay(SDL_Renderer *target)
             for (const HdDrawCommand &command : commands.items()) {
                 if (command.textureIndex >= frameTextures.size())
                     continue;
-            const Rect &bounds = command.destination;
-            const SDL_FRect dst { bounds.x, bounds.y, bounds.width, bounds.height };
+                const Rect &bounds = command.destination;
+                const SDL_FRect dst { bounds.x, bounds.y, bounds.width, bounds.height };
 #ifdef USE_SDL3
-            SDL_RenderTexture(target, frameTextures[command.textureIndex], nullptr, &dst);
+                SDL_RenderTexture(target, frameTextures[command.textureIndex], nullptr, &dst);
 #else
                 SDL_RenderCopyF(target, frameTextures[command.textureIndex], nullptr, &dst);
 #endif
