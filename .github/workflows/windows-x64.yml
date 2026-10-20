@@ -1,10 +1,9 @@
-name: Windows x64 v0.1
+name: Windows x64 v0.2
 
 on:
   push:
     branches:
-      - main
-      - feature/windows-x64-v0.1
+      - feature/windows-x64-sdl3-v0.2
   pull_request:
   workflow_dispatch:
 
@@ -21,7 +20,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 90
     env:
-      PACKAGE_NAME: Diablo Reincarnated v0.1
+      PACKAGE_NAME: Diablo Reincarnated v0.2
     steps:
       - name: Check out project
         uses: actions/checkout@v4
@@ -49,6 +48,13 @@ jobs:
             "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_TOOLCHAIN" `
             -DVCPKG_TARGET_TRIPLET=x64-windows-static `
             '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>' `
+            -DUSE_SDL3=ON `
+            -DDEVILUTIONX_SYSTEM_SDL3=OFF `
+            -DDEVILUTIONX_STATIC_SDL3=ON `
+            -DDEVILUTIONX_SYSTEM_SDL_IMAGE=OFF `
+            -DDEVILUTIONX_STATIC_SDL_IMAGE=ON `
+            -DDEVILUTIONX_SYSTEM_SDL_MIXER=OFF `
+            -DDEVILUTIONX_STATIC_SDL_MIXER=ON `
             -DBUILD_TESTING=OFF `
             -DDISABLE_ZERO_TIER=ON `
             -DBUILD_ASSETS_MPQ=OFF `
@@ -81,7 +87,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           # Keep every pre-release file under its own install folder.
-          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.1'
+          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.2'
           New-Item -ItemType Directory -Force -Path $folder | Out-Null
 
           $exe = Join-Path $PWD 'build-win64\Release\Diablo Reincarnated.exe'
@@ -103,9 +109,9 @@ jobs:
 
           Copy-Item -LiteralPath 'LICENSE.md' -Destination $folder
           @'
-          Diablo Reincarnated v0.1 - Windows 11 x64 PRE-RELEASE
+          Diablo Reincarnated v0.2 - Windows 11 x64 PRE-RELEASE
 
-          1. Extract the ZIP: it contains a "Diablo Reincarnated v0.1" folder.
+          1. Extract the ZIP: it contains a "Diablo Reincarnated v0.2" folder.
           2. Keep that folder separate from your existing DevilutionX installation.
           3. Copy DIABDAT.MPQ from a legally owned Diablo installation beside
              "Diablo Reincarnated.exe" in the new folder.
@@ -136,79 +142,19 @@ jobs:
       - name: Generate non-Blizzard HD test sprite
         shell: pwsh
         run: |
-          python tools/generate_hd_test_pack.py --out 'windows-package/Diablo Reincarnated v0.1'
+          python tools/generate_hd_test_pack.py --out 'windows-package/Diablo Reincarnated v0.2'
           if ($LASTEXITCODE -ne 0) { throw 'Synthetic Warrior generation failed' }
-          if (-not (Test-Path 'windows-package/Diablo Reincarnated v0.1/hd/players/0.png')) {
+          if (-not (Test-Path 'windows-package/Diablo Reincarnated v0.2/hd/players/0.png')) {
             throw 'Warrior placeholder was not generated'
           }
 
       # GitHub automatically serves downloadable artifacts as .zip files.
-      # The downloaded filename is exactly "Diablo Reincarnated v0.1.zip".
-      - name: Upload Diablo Reincarnated v0.1.zip
+      # The downloaded filename is exactly "Diablo Reincarnated v0.2.zip".
+      - name: Upload Diablo Reincarnated v0.2.zip
         uses: actions/upload-artifact@v4
         with:
-          name: Diablo Reincarnated v0.1
+          name: Diablo Reincarnated v0.2
           path: windows-package/
           if-no-files-found: error
           retention-days: 30
 
-  # Only tested branch PUSH builds publish; PR checks and main never release.
-  publish-prerelease:
-    name: Publish Windows v0.1 pre-release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/windows-x64-v0.1'
-    needs: windows-x64
-    runs-on: windows-2022
-    permissions:
-      contents: write
-    steps:
-      - name: Download verified Windows x64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: Diablo Reincarnated v0.1
-          path: release-content
-
-      - name: Publish GitHub pre-release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $tag = 'v0.1-pre'
-          $title = 'Diablo Reincarnated v0.1 (Pre-release)'
-          $folder = Join-Path $PWD 'release-content/Diablo Reincarnated v0.1'
-          $zip = Join-Path $PWD 'Diablo Reincarnated v0.1.zip'
-          if (-not (Test-Path (Join-Path $folder 'Diablo Reincarnated.exe'))) {
-            throw 'Verified pre-release executable is missing.'
-          }
-          if (-not (Test-Path (Join-Path $folder 'd1reincarnated.mpq'))) {
-            throw 'Renamed d1reincarnated.mpq support archive is missing.'
-          }
-          Compress-Archive -LiteralPath $folder -DestinationPath $zip -CompressionLevel Optimal -Force
-          if ((Get-Item -LiteralPath $zip).Length -lt 4096) {
-            throw 'Pre-release ZIP creation failed.'
-          }
-          $notes = @'
-          Windows 11 x64 preview of the 2D HD renderer prototype.
-
-          - Separate "Diablo Reincarnated.exe" executable and install folder.
-          - Includes d1reincarnated.mpq, built from the matching open-source engine assets.
-          - Independent settings and save directory; no DevilutionX overwrites.
-          - F10 switches between Classic and experimental HD mode.
-          - Synthetic Warrior placeholder included. Original Diablo DIABDAT.MPQ is NOT included.
-          - Unfinished pre-release: HD draw ordering and lighting remain in development.
-          '@
-          $existing = gh release list --repo $env:GH_REPO --limit 100 --json tagName --jq '.[] | select(.tagName == "v0.1-pre") | .tagName'
-          if ($LASTEXITCODE -ne 0) { throw 'Failed to inspect releases' }
-          if ($existing -eq $tag) {
-            gh release upload $tag $zip --repo $env:GH_REPO --clobber
-            if ($LASTEXITCODE -ne 0) { throw 'Updating pre-release ZIP failed' }
-            gh release edit $tag --repo $env:GH_REPO --title $title --prerelease --notes $notes
-            if ($LASTEXITCODE -ne 0) { throw 'Updating pre-release details failed' }
-            # Mutable preview tag follows the latest SHA that passed Windows CI.
-            gh api --method PATCH "repos/$env:GH_REPO/git/refs/tags/$tag" -f "sha=$env:GITHUB_SHA" -F force=true | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw 'Updating pre-release tag failed' }
-          } else {
-            gh release create $tag $zip --repo $env:GH_REPO --target $env:GITHUB_SHA --title $title --prerelease --latest=false --notes $notes
-            if ($LASTEXITCODE -ne 0) { throw 'Creating GitHub pre-release failed' }
-          }
