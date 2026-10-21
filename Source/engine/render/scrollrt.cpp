@@ -225,6 +225,9 @@ void BlitCursor(uint8_t *dst, uint32_t dstPitch, uint8_t *src, uint32_t srcPitch
  */
 void UndrawCursor(const Surface &out)
 {
+#ifdef USE_SDL3
+    reincarnated::RestoreHdCursorBackground();
+#endif
 	DrawnCursor &cursor = GetDrawnCursor();
 	BlitCursor(&out[cursor.rect.position], out.pitch(), cursor.behindBuffer, cursor.rect.size.width, cursor.rect.size.width, cursor.rect.size.height);
 	PrevCursorRect = cursor.rect;
@@ -327,6 +330,9 @@ void DrawCursor(const Surface &out)
 		return;
 
 	BlitCursor(cursor.behindBuffer, rect.size.width, &out[rect.position], out.pitch(), rect.size.width, rect.size.height);
+#ifdef USE_SDL3
+    reincarnated::SaveHdCursorBackground(rect.position.x, rect.position.y, rect.size.width, rect.size.height);
+#endif
 	DrawSoftwareCursor(out, cursPosition + Displacement { 0, cursSize.height - 1 }, pcurs);
 }
 
@@ -1089,11 +1095,11 @@ void DrawTileContent(const Surface &out, const Lightmap &lightmap, Point tilePos
 
 void DrawDirtTile(const Surface &out, const Lightmap &lightmap, Point tilePosition, Point targetBufferPosition)
 {
-	// This should be the *top-left* of the 2Ã—2 dirt pattern in the actual dungeon.
+	// This should be the *top-left* of the 2Ãƒâ€”2 dirt pattern in the actual dungeon.
 	// You might need to tweak these to where your dirt patch actually lives.
 	constexpr Point base { 0, 0 };
 
-	// Decide which of the 4 tiles of the 2Ã—2 block to use,
+	// Decide which of the 4 tiles of the 2Ãƒâ€”2 block to use,
 	// based on where this OOB tile is in the world grid.
 	const int ox = (tilePosition.x & 1); // 0 or 1
 	const int oy = (tilePosition.y & 1); // 0 or 1

@@ -26,6 +26,8 @@ void PresentHdOverlay(SDL_Renderer *renderer);
 void ResetHdAssets();
 #ifdef USE_SDL3
 void EndHdWorldFrame();
+void SaveHdCursorBackground(int x, int y, int width, int height);
+void RestoreHdCursorBackground();
 SDL_Surface *ComposeHdFrame(SDL_Surface *classic);
 #endif
 #endif

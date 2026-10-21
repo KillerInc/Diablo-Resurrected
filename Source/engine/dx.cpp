@@ -313,8 +313,9 @@ void RenderPresent()
 	}
 
 #ifdef USE_SDL3
-    if (ControlMode == ControlTypes::VirtualGamepad) RenderVirtualGamepad(surface);
-    reincarnated::PresentGpuFrame(reincarnated::ComposeHdFrame(surface));
+    SDL_Surface *presentation = reincarnated::ComposeHdFrame(surface);
+    if (ControlMode == ControlTypes::VirtualGamepad) RenderVirtualGamepad(presentation);
+    reincarnated::PresentGpuFrame(presentation);
     if (*GetOptions().Graphics.frameRateControl != FrameRateControl::VerticalSync) LimitFrameRate();
 #elif !defined(USE_SDL1)
 	if (renderer != nullptr) {

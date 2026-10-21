@@ -28,6 +28,9 @@ struct Asset {
 std::unordered_map<std::string, Asset> assets;
 devilution::SDLSurfaceUniquePtr world, ui, composed;
 std::vector<uint8_t> beforeUi;
+std::vector<uint8_t> cursorBehind;
+SDL_Rect cursorRect {};
+bool cursorSaved = false;
 bool inWorld, ready, suppressed;
 int scale = 1, offsetX;
 SDL_Rect clip;
@@ -187,7 +190,7 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_
 void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clipHeight)
 {
     HdCaptureActive = GetRendererSwitch().usesHdRenderer();
-    ready = false; suppressed = false;
+    ready = false; suppressed = false; cursorSaved = false;
     if (!HdCaptureActive) return;
     EnsureSurface(world); EnsureSurface(ui); EnsureSurface(composed);
     scale = zoom; offsetX = xOffset;
@@ -204,6 +207,30 @@ void EndHdWorldFrame()
     inWorld = false; ready = true;
     auto *pal = devilution::PalSurface;
     beforeUi.assign(static_cast<uint8_t *>(pal->pixels), static_cast<uint8_t *>(pal->pixels) + size_t(pal->pitch) * pal->h);
+}
+// Cursor-only redraws reuse the current world/UI scene. Restore the RGBA UI
+// background as well as Classic's indexed background, so old cursor coverage
+// cannot remain above an HD sprite or erase menu pixels beneath the cursor.
+void SaveHdCursorBackground(int x, int y, int width, int height)
+{
+    cursorSaved = false;
+    if (!HdCaptureActive || !ready || !ui) return;
+    const SDL_Rect requested { x, y, width, height };
+    const SDL_Rect bounds { 0, 0, ui->w, ui->h };
+    if (!SDL_GetRectIntersection(&requested, &bounds, &cursorRect)) return;
+    cursorBehind.resize(size_t(cursorRect.w) * cursorRect.h * 4);
+    for (int row = 0; row < cursorRect.h; ++row)
+        std::memcpy(cursorBehind.data() + size_t(row) * cursorRect.w * 4,
+            static_cast<const uint8_t *>(ui->pixels) + (cursorRect.y + row) * ui->pitch + cursorRect.x * 4, cursorRect.w * 4);
+    cursorSaved = true;
+}
+void RestoreHdCursorBackground()
+{
+    if (!cursorSaved || !ui) return;
+    for (int row = 0; row < cursorRect.h; ++row)
+        std::memcpy(static_cast<uint8_t *>(ui->pixels) + (cursorRect.y + row) * ui->pitch + cursorRect.x * 4,
+            cursorBehind.data() + size_t(row) * cursorRect.w * 4, cursorRect.w * 4);
+    cursorSaved = false;
 }
 bool QueueHdPlayer(int type, int direction, int frame, int left, int bottom, int w, int h, int)
 { return DrawVariants("hd/players/" + std::to_string(type), direction, frame, left, bottom, w, h); }
@@ -241,7 +268,7 @@ void PresentHdOverlay(SDL_Renderer *) {}
 void ResetHdAssets()
 {
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
-    assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear();
+    assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;
 }
 }
 #endif

@@ -66,6 +66,8 @@ The four Release foundation tests cover switching/layout, retained submission
 order/zoom, provider fallback, and DDS decoding/rejection. Generate isolated
 UI coverage with `tools/create_sdl3_validation_demo.py --out <folder> --extended`.
 It adds inventory, character panel and zoom to the Classic/HD/Escape sequence.
+`--gameplay-hd` also prepares demo 0 with F10 after its tenth existing game
+tick, preserving the upstream gameplay and reference-save comparison.
 
 For optional GPU-texture inspection, set `D1R_FRAME_DUMP` to an existing output
 directory before launch. Every 100th gameplay presentation (starting at 50)
