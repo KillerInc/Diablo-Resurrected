@@ -28,5 +28,7 @@
     "Diablo Reincarnated v0.3/licenses/SDL3_image.txt": "7826eca0a0f7e591f38dd844e207a200aac81a59b20d8a30c3af8c6282af13e6",
     "Diablo Reincarnated v0.3/licenses/SDL3_mixer.txt": "e36997fe492c48e7ed873065cc3a694f38e8189a328d3709099ffdc9a8843f4c",
     "Diablo Reincarnated v0.3/README-Windows.txt": "94335b08bfe388c125d594260229548e15b317683231908aa6ad9a3ce17eec3d"
-  }
+  },
+  "publicationAttempt": 2,
+  "publicationTarget": "Publication-record commit, checked for identical game/build inputs against sourceSha"
 }

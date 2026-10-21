@@ -18,6 +18,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Check validation record and source build
         id: validation
         shell: pwsh
@@ -30,6 +32,14 @@ jobs:
           foreach ($test in @('rendererTests', 'packagedStartup', 'warriorReplay', 'classicHdMenuVisual', 'layeredUiVisual', 'foregroundOcclusionVisual', 'ddsFallback', 'gpuReadback', 'hudPersistence', 'existingDataUnchanged')) {
             if ($record.tests.$test -ne $true) { throw "Required validation missing: $test" }
           }
+          # Tag the publication-record commit. Its game/build inputs must be
+          # identical to the independently game-tested source artifact.
+          $changed = @(git diff --name-only $record.sourceSha HEAD)
+          if ($LASTEXITCODE -ne 0) { throw 'Could not compare validated source inputs' }
+          $unvalidated = @($changed | Where-Object {
+            $_ -notmatch '^(docs/|\.github/release-validation/|\.github/workflows/publish-v0\.3\.yml$|tools/validate_hd_frame_captures\.py$)'
+          })
+          if ($unvalidated.Count -ne 0) { throw "Game/build inputs differ from tested source: $unvalidated" }
           $run = gh api "repos/${{ github.repository }}/actions/runs/$($record.runId)" | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'Could not read source build' }
           if ($run.status -ne 'completed' -or $run.conclusion -ne 'success' -or $run.head_sha -ne $record.sourceSha) {
@@ -87,13 +97,14 @@ jobs:
           - Original Diablo DIABDAT.MPQ is required and is NOT included.
           - CPU truecolor world/UI composition follows Classic traversal; SDL_GPU handles upload, scaling and presentation. Replacement artwork/lighting remain experimental.
 
-          Validated source: $($record.sourceSha)
+          Validated game source: $($record.sourceSha)
+          Publication record: $env:GITHUB_SHA
           Build: https://github.com/${{ github.repository }}/actions/runs/$($record.runId)
           SHA256 (ZIP): $zipHash
           "@
           $notes | Set-Content release-notes.md -Encoding utf8
           # Never overwrite an existing v0.3 candidate or touch v0.1.
-          gh release create v0.3-pre $zip --target $record.sourceSha `
+          gh release create v0.3-pre $zip --target $env:GITHUB_SHA `
             --title 'Diablo Reincarnated v0.3 - Windows 11 x64 SDL_GPU (Pre-release)' `
             --prerelease --latest=false --notes-file release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'Publishing v0.3 pre-release failed' }
