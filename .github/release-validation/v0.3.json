@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "tag": "v0.3-pre",
+  "sourceSha": "e90b0d150a8e1ba22f4b302d535c7f7d59bfc99b",
+  "runId": 39529255804,
+  "artifactId": 12314388971,
+  "artifactDigest": "sha256:5b3b055a04ab5339ad4a9ddfb45f83ce4efb14e0bd92750cebb74f5a2cb6f729",
+  "validatedAt": "2026-10-21T02:11:48.406369+00:00",
+  "platform": "Windows 11 x64",
+  "tests": {
+    "rendererTests": true,
+    "packagedStartup": true,
+    "warriorReplay": true,
+    "classicHdMenuVisual": true,
+    "layeredUiVisual": true,
+    "foregroundOcclusionVisual": true,
+    "ddsFallback": true,
+    "gpuReadback": true,
+    "hudPersistence": true,
+    "existingDataUnchanged": true
+  },
+  "files": {
+    "Diablo Reincarnated v0.3/d1reincarnated.mpq": "7a7462a667fbb772ffbb4ee41e13263f25318990c03904e5b030fec31e51e2ce",
+    "Diablo Reincarnated v0.3/Diablo Reincarnated.exe": "44675f9e7b170cca070b8625bc45f34f605c92a79944ffa364f239febfff7f76",
+    "Diablo Reincarnated v0.3/hd/players/0.png": "78c627785cd5afc8d7352b2082ea4e89bcf7f9094407883f7efe1ce54a986769",
+    "Diablo Reincarnated v0.3/LICENSE.md": "049382c17367e384c622369abbeda0cab1d65658c28611717e18afead341e586",
+    "Diablo Reincarnated v0.3/licenses/SDL3.txt": "1c040b8271b37e5076359f8fd54240e371114112924d2df81ef87c7d6a1dfdfd",
+    "Diablo Reincarnated v0.3/licenses/SDL3_image.txt": "7826eca0a0f7e591f38dd844e207a200aac81a59b20d8a30c3af8c6282af13e6",
+    "Diablo Reincarnated v0.3/licenses/SDL3_mixer.txt": "e36997fe492c48e7ed873065cc3a694f38e8189a328d3709099ffdc9a8843f4c",
+    "Diablo Reincarnated v0.3/README-Windows.txt": "94335b08bfe388c125d594260229548e15b317683231908aa6ad9a3ce17eec3d"
+  }
+}

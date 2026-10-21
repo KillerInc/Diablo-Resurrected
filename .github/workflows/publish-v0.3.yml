@@ -27,7 +27,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $record = Get-Content '.github/release-validation/v0.3.json' -Raw | ConvertFrom-Json
           if ($record.schema -ne 1 -or $record.tag -ne 'v0.3-pre') { throw 'Invalid validation record' }
-          foreach ($test in @('rendererTests', 'packagedStartup', 'warriorReplay', 'classicHdMenuVisual', 'layeredUiVisual', 'foregroundOcclusionVisual', 'ddsFallback', 'gpuReadback', 'existingDataUnchanged')) {
+          foreach ($test in @('rendererTests', 'packagedStartup', 'warriorReplay', 'classicHdMenuVisual', 'layeredUiVisual', 'foregroundOcclusionVisual', 'ddsFallback', 'gpuReadback', 'hudPersistence', 'existingDataUnchanged')) {
             if ($record.tests.$test -ne $true) { throw "Required validation missing: $test" }
           }
           $run = gh api "repos/${{ github.repository }}/actions/runs/$($record.runId)" | ConvertFrom-Json

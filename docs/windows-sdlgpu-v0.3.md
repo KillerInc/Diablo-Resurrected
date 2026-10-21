@@ -30,7 +30,9 @@ The completed Classic world framebuffer is never the HD background. The
 indexed buffer remains intact for Classic rendering and game/cursor logic.
 After DrawGame finishes, subsequent raster writes populate a transparent UI
 canvas in output coordinates. Menus, inventory, character panels, HUD and
-cursor are composited above the HD world. Persistent HUD/panel regions are
+cursor are composited above the HD world. Cursor-only redraws restore a saved
+RGBA UI region along with the original indexed cursor backing; touch controls
+are drawn after composition. Persistent HUD/panel regions are
 preserved from indexed UI drawing. Supplemental comparison captures raw UI
 writers; actual raster coverage handles equal-color occluding writes.
 
@@ -75,6 +77,9 @@ downloads the composed texture through an SDL_GPU transfer buffer, waits for
 its GPU fence, and writes a PNG. Normal gameplay performs no readbacks or file
 writes. These images validate GPU texture contents; they are not OS window
 captures and do not independently prove desktop scaling or physical input.
+Run `tools/validate_hd_frame_captures.py --captures <directory>` (Pillow) on
+the extended replay images to compare the zoomed HUD samples with Classic
+restoration.
 
 The executable remains `Diablo Reincarnated.exe`, with matching
 `d1reincarnated.mpq` and isolated KillerInc preferences/saves. Original game
