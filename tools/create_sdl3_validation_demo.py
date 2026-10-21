@@ -16,6 +16,7 @@ import struct
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--extended', action='store_true', help='Include inventory, character panel and zoom in HD')
     args = parser.parse_args()
     fixture = Path(__file__).resolve().parents[1] / 'test/fixtures/timedemo/WarriorLevel1to2'
     # Version 3: version byte, save slot, width/height, 23 gameplay settings.
@@ -32,7 +33,8 @@ def main():
     ticks = bytes((0, 0)) * 300
     f10 = key(0x40000043)
     escape = key(27)
-    replay = header + ticks + f10 + ticks + escape + ticks + escape + ticks + f10 + ticks + bytes((8, 0))
+    tail = (key(ord('i')) + ticks + key(ord('i')) + key(ord('c')) + ticks + key(ord('c')) + key(ord('z')) + ticks + key(ord('z'))) if args.extended else b''
+    replay = header + ticks + f10 + ticks + escape + ticks + escape + ticks + tail + f10 + ticks + bytes((8, 0))
     (args.out / 'demo_1.dmo').write_bytes(replay)
     # This is an isolated test configuration, not the normal per-user config.
     (args.out / 'diablo.ini').write_text(

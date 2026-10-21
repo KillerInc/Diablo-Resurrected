@@ -69,8 +69,14 @@ void Pixel(int x, int y, SDL_Color color, bool blend)
                 // against the HD canvas, not against the indexed actor behind it.
                 if (!inWorld && dst[3] == 0) {
                     // UI transparency is composited over the independently built world.
-                    const auto *background = static_cast<const uint8_t *>(world->pixels) + py * world->pitch + px * 4;
-                    for (int c = 0; c < 3; ++c) dst[c] = background[c];
+                    if (px >= clip.x && px < clip.x + clip.w && py < clip.h) {
+                        const auto *background = static_cast<const uint8_t *>(world->pixels) + py * world->pitch + px * 4;
+                        for (int c = 0; c < 3; ++c) dst[c] = background[c];
+                    } else {
+                        const auto index = *(static_cast<const uint8_t *>(devilution::PalSurface->pixels) + py * devilution::PalSurface->pitch + px);
+                        const auto background = devilution::Palette->colors[index];
+                        dst[0] = background.r; dst[1] = background.g; dst[2] = background.b;
+                    }
                 }
                 dst[0] = (unsigned(dst[0]) + color.r) / 2;
                 dst[1] = (unsigned(dst[1]) + color.g) / 2;

@@ -3,6 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <string>
+#include <SDL3_image/SDL_image.h>
+#include "game_mode.hpp"
+#include "gmenu.h"
+#include "hd_renderer.hpp"
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_video.h>
@@ -102,6 +107,10 @@ void PresentGpuFrame(SDL_Surface *surface)
     SDL_GPUTexture *swapchain;
     Uint32 w, h;
     if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchain, &w, &h)) devilution::ErrSdl();
+    SDL_GPUTransferBuffer *readback = nullptr;
+    static unsigned captureFrame = 0;
+    const char *captureDirectory = SDL_getenv("D1R_FRAME_DUMP");
+    const bool capture = captureDirectory && devilution::gbRunGame && (++captureFrame % 100 == 50);
     if (swapchain) {
         auto *copy = SDL_BeginGPUCopyPass(cmd);
         SDL_GPUTextureTransferInfo src {};
@@ -110,6 +119,18 @@ void PresentGpuFrame(SDL_Surface *surface)
         dst.texture = frame; dst.w = frameWidth; dst.h = frameHeight; dst.d = 1;
         SDL_UploadToGPUTexture(copy, &src, &dst, true);
         SDL_EndGPUCopyPass(copy);
+        if (capture) {
+            SDL_GPUTransferBufferCreateInfo readInfo {};
+            readInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+            readInfo.size = frameWidth * frameHeight * 4;
+            readback = SDL_CreateGPUTransferBuffer(device, &readInfo);
+            if (!readback) devilution::ErrSdl();
+            copy = SDL_BeginGPUCopyPass(cmd);
+            SDL_GPUTextureTransferInfo readDst {};
+            readDst.transfer_buffer = readback;
+            SDL_DownloadFromGPUTexture(copy, &dst, &readDst);
+            SDL_EndGPUCopyPass(copy);
+        }
         const View v = Viewport(w, h);
         SDL_GPUBlitInfo blit {};
         blit.source.texture = frame; blit.source.w = frameWidth; blit.source.h = frameHeight;
@@ -121,7 +142,22 @@ void PresentGpuFrame(SDL_Surface *surface)
             ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
         SDL_BlitGPUTexture(cmd, &blit);
     }
-    if (!SDL_SubmitGPUCommandBuffer(cmd)) devilution::ErrSdl();
+    if (readback) {
+        auto *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+        if (!fence || !SDL_WaitForGPUFences(device, true, &fence, 1)) devilution::ErrSdl();
+        void *pixels = SDL_MapGPUTransferBuffer(device, readback, false);
+        if (!pixels) devilution::ErrSdl();
+        auto *dump = SDL_CreateSurfaceFrom(frameWidth, frameHeight, SDL_PIXELFORMAT_RGBA32, pixels, frameWidth * 4);
+        if (!dump) devilution::ErrSdl();
+        const std::string name = std::string(captureDirectory) + "/gpu-" + std::to_string(captureFrame)
+            + (GetRendererSwitch().usesHdRenderer() ? "-HD" : "-Classic")
+            + (devilution::gmenu_is_active() ? "-menu" : "") + ".png";
+        if (!IMG_SavePNG(dump, name.c_str())) devilution::ErrSdl();
+        SDL_DestroySurface(dump);
+        SDL_UnmapGPUTransferBuffer(device, readback);
+        SDL_ReleaseGPUFence(device, fence);
+        SDL_ReleaseGPUTransferBuffer(device, readback);
+    } else if (!SDL_SubmitGPUCommandBuffer(cmd)) devilution::ErrSdl();
 }
 }
 #endif

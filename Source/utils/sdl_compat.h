@@ -422,9 +422,9 @@ inline bool SDLC_ConvertEventToRenderCoordinates(
 	// No-op in SDL2.
 #else
 	if (event->type == SDL_MOUSEMOTION) {
-		reincarnated::GpuWindowToLogical(event->motion.x, event->motion.y);
+		devilution::OutputToLogical(&event->motion.x, &event->motion.y);
 	} else if (event->type == SDL_MOUSEBUTTONDOWN || event->type == SDL_MOUSEBUTTONUP) {
-		reincarnated::GpuWindowToLogical(event->button.x, event->button.y);
+		devilution::OutputToLogical(&event->button.x, &event->button.y);
 	}
 #endif
 	return true;
