@@ -390,6 +390,9 @@ void DrawMonster(const Surface &out, Point tilePosition, Point targetBufferPosit
 	        monster.animInfo.getFrameToUseForRendering(),
 	        targetBufferPosition.x, targetBufferPosition.y,
 	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1);
+#ifndef USE_SDL3
+    if (hdMonster) return;
+#endif
 	reincarnated::ClassicSpriteScope hdMonsterScope(hdMonster);
 #endif
 
@@ -474,6 +477,16 @@ uint8_t GetPlayerOutlineColor(int id)
  * @param tilePosition dPiece coordinates
  * @param targetBufferPosition Output buffer coordinates
  */
+bool DrawClassicUnderHd(bool hasReplacement)
+{
+#ifdef USE_SDL3
+    (void)hasReplacement;
+    return true;
+#else
+    return !hasReplacement;
+#endif
+}
+
 void DrawPlayer(const Surface &out, const Player &player, Point tilePosition, Point targetBufferPosition, int lightTableIndex)
 {
 	if (!IsTileLit(tilePosition) && !MyPlayer->_pInfraFlag && !MyPlayer->isOnArenaLevel() && leveltype != DTYPE_TOWN) {
@@ -495,19 +508,19 @@ bool hdSprite = false;
 		ClxDrawOutlineSkipColorZero(out, GetPlayerOutlineColor(player.getId()), spriteBufferPosition, sprite);
 
 	if (&player == MyPlayer && IsNoneOf(leveltype, DTYPE_NEST, DTYPE_CRYPT)) {
-		{ reincarnated::ClassicSpriteScope scope(hdSprite); ClxDraw(out, spriteBufferPosition, sprite); }
+		if (DrawClassicUnderHd(hdSprite)) { reincarnated::ClassicSpriteScope scope(hdSprite); ClxDraw(out, spriteBufferPosition, sprite); }
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 		return;
 	}
 
 	if (!IsTileLit(tilePosition) || ((MyPlayer->_pInfraFlag || MyPlayer->isOnArenaLevel()) && lightTableIndex > 8)) {
-		{ reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN()); }
+		if (DrawClassicUnderHd(hdSprite)) { reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN()); }
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/true, lightTableIndex);
 		return;
 	}
 
 	lightTableIndex = std::max(lightTableIndex - 5, 0);
-	{ reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex); }
+	if (DrawClassicUnderHd(hdSprite)) { reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex); }
 	DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 }
 
@@ -566,6 +579,12 @@ static void DrawDungeon(const Surface & /*out*/, const Lightmap & /*lightmap*/, 
 void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, Point targetBufferPosition, int lightTableIndex)
 {
 	const uint16_t levelPieceId = dPiece[tilePosition.x][tilePosition.y];
+
+#if !defined(USE_SDL1) && !defined(USE_SDL3)
+    reincarnated::QueueHdTile(static_cast<int>(leveltype), levelPieceId,
+        targetBufferPosition.x, targetBufferPosition.y,
+        TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
+#endif
 
 	const MICROS *pMap = &DPieceMicros[levelPieceId];
 
@@ -1070,11 +1089,11 @@ void DrawTileContent(const Surface &out, const Lightmap &lightmap, Point tilePos
 
 void DrawDirtTile(const Surface &out, const Lightmap &lightmap, Point tilePosition, Point targetBufferPosition)
 {
-	// This should be the *top-left* of the 2×2 dirt pattern in the actual dungeon.
+	// This should be the *top-left* of the 2Ã—2 dirt pattern in the actual dungeon.
 	// You might need to tweak these to where your dirt patch actually lives.
 	constexpr Point base { 0, 0 };
 
-	// Decide which of the 4 tiles of the 2×2 block to use,
+	// Decide which of the 4 tiles of the 2Ã—2 block to use,
 	// based on where this OOB tile is in the world grid.
 	const int ox = (tilePosition.x & 1); // 0 or 1
 	const int oy = (tilePosition.y & 1); // 0 or 1

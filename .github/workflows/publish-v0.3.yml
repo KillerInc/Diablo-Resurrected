@@ -82,10 +82,10 @@ jobs:
 
           - Preserves the Classic CPU software renderer and F10 Classic/experimental HD switching.
           - Includes the synthetic HD Warrior, matching d1reincarnated.mpq and isolated saves/config.
-          - Validated: Windows x64 build, renderer tests, game launch, Classic/HD/menu replay, new Warrior, movement and save/load.
+          - Validated: Windows x64 build, four renderer tests, packaged game launch, GPU readback images, HD menus/panels/zoom, foreground occlusion, DDS fallback and gameplay replay.
           - Original upstream Warrior gameplay replay matched its reference final save state.
           - Original Diablo DIABDAT.MPQ is required and is NOT included.
-          - Experimental HD draw ordering and lighting remain unfinished. This is not a stable release.
+          - CPU truecolor world/UI composition follows Classic traversal; SDL_GPU handles upload, scaling and presentation. Replacement artwork/lighting remain experimental.
 
           Validated source: $($record.sourceSha)
           Build: https://github.com/${{ github.repository }}/actions/runs/$($record.runId)
@@ -94,6 +94,6 @@ jobs:
           $notes | Set-Content release-notes.md -Encoding utf8
           # Never overwrite an existing v0.3 candidate or touch v0.1.
           gh release create v0.3-pre $zip --target $record.sourceSha `
-            --title 'Diablo Reincarnated v0.3 â€” Windows 11 x64 SDL3 (Pre-release)' `
+            --title 'Diablo Reincarnated v0.3 - Windows 11 x64 SDL_GPU (Pre-release)' `
             --prerelease --latest=false --notes-file release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'Publishing v0.3 pre-release failed' }

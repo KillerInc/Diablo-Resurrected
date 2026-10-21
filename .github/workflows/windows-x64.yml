@@ -126,7 +126,7 @@ jobs:
           exact open-source engine assets used for this build. It is NOT the
           original Diablo game data. Keep it beside the new executable.
           Do NOT replace any files in your existing DevilutionX installation.
-          Hellfire is not included. HD draw order and lighting are unfinished.
+          Hellfire is not included. HD uses Classic traversal with experimental artwork/lighting.
 
           Project: https://github.com/KillerInc/Diablo-Resurrected
           '@ | Set-Content -Path (Join-Path $folder 'README-Windows.txt') -Encoding utf8
