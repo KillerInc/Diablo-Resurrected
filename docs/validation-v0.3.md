@@ -75,3 +75,20 @@ outcomes were tested directly.
 SDL logged a missing optional `WinPixEventRuntime.dll` debug-marker diagnostic.
 It did not prevent GPU creation, presentation, readback, or successful replay
 completion; no PIX debug-marker calls are required by this implementation.
+
+## Published pre-release
+
+[Diablo Reincarnated v0.3 - Windows 11 x64 SDL_GPU (Pre-release)](https://github.com/KillerInc/Diablo-Resurrected/releases/tag/v0.3-pre)
+was published by [workflow 39531920970](https://github.com/KillerInc/Diablo-Resurrected/actions/runs/39531920970).
+The public ZIP was independently downloaded and all eight file hashes matched
+the game-tested CI artifact. ZIP SHA256:
+`e6f5882d65bad82703b3b10dafbe2dd514012a39240aad0096951d419a79113b`.
+
+The first publication attempt passed artifact/file verification but GitHub
+rejected release creation with HTTP 403. The successful publisher tags the
+validation-record commit `8b2c1fcb21b5fc4838de7234456c42de6d671f24`,
+after checking that its game/build inputs are identical to tested source
+`e90b0d150a8e1ba22f4b302d535c7f7d59bfc99b`. Only documentation,
+validation metadata and the standalone image checker may differ. The package
+is the original tested artifact; publication does not rebuild the executable.
+The v0.1/v0.2 baselines remain unchanged and PR #8 remains unmerged.
