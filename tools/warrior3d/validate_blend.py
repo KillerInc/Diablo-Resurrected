@@ -24,16 +24,25 @@ for name,count in [('Warrior_idle',10),('Warrior_walk',8)]:
     action=bpy.data.actions.get(name)
     assert action and action['sprite_frame_count']==count
     rig.animation_data.action=action
-    sampled=[]
+    sampled=[]; wrists=[]; feet=[]
     for frame in range(1,count+2):
         bpy.context.scene.frame_set(frame)
         values=[value for bone in rig.pose.bones for row in bone.matrix for value in row]
         assert all(math.isfinite(value) for value in values)
         sampled.append(values)
+        wrists.append(rig.pose.bones['hand.L'].head.copy())
+        feet.append(rig.pose.bones['foot.L'].head.copy())
     loop_error=max(abs(a-b) for a,b in zip(sampled[0],sampled[-1]))
     motion=max(abs(a-b) for sample in sampled[1:-1] for a,b in zip(sampled[0],sample))
     assert loop_error<1e-4,(name,loop_error)
     assert motion>1e-5,(name,'static animation')
+    fore_aft=max(v.y for v in wrists)-min(v.y for v in wrists)
+    vertical=max(v.z for v in wrists)-min(v.z for v in wrists)
+    if name=='Warrior_idle':
+        assert max(v.z for v in wrists)<1.0, 'Idle hands should hang beside hips'
+    else:
+        assert fore_aft>3*vertical, 'Arm swing must travel mainly forward/back'
+        assert sum((w.y-sum(v.y for v in wrists)/len(wrists))*(f.y-sum(v.y for v in feet)/len(feet)) for w,f in zip(wrists,feet))<0, 'Arm must oppose same-side leg'
     bpy.context.scene.frame_set(1)
     results[name]={'frames':count,'maximum_loop_matrix_error':loop_error,'motion_detected':True,
                    'first_left_wrist':list(rig.pose.bones['hand.L'].head)}

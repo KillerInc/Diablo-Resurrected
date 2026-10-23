@@ -33,3 +33,5 @@ Next art milestone: refine one idle pose in all eight views before expanding equ
 Direction contract (confirmed by the user): columns 1-8 are South/Down, South West/Down Left, West/Left, North West/Up Left, North/Up, North East/Up Right, East/Right, South East/Down Right. Rows advance the animation from top to bottom. South uses model yaw 0 degrees; each next column subtracts 45 degrees. Do not infer facing from silhouette aspect ratios.
 
 The light-armor model uses one pauldron on the Warrior's left shoulder (viewer-right in the South-facing view), as corrected against the local reference. Both forearm bracers remain.
+
+Animation refinement: idle hands now hang near the hips with slight breathing sway. Walk uses fixed-length arm segments, a shoulder pendulum opposite the same-side leg, and a gentle elbow bend. Validation checks idle hand height and fore/aft dominance of walking arm travel. Original sheet frame counts remain unchanged.

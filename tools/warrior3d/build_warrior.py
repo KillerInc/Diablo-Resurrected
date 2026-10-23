@@ -371,14 +371,18 @@ def pose(action,phase):
         targets[f'thigh.{side}']=(hip,knee); targets[f'shin.{side}']=(knee,foot)
         targets[f'foot.{side}']=(foot,foot+Vector((0,-.20,-.055)))
         shoulder=Vector((sign*.265,.006,1.47+bob))
-        wrist=Vector((sign*(.26 if walk else .38),
-                      (-.23+.17*math.sin(p+math.pi) if walk else -.38+.005*math.sin(p)),
-                      (1.13 if walk else 1.20)+bob))
         upper=(Vector(rest[f'upper_arm.{side}'][1])-Vector(rest[f'upper_arm.{side}'][0])).length
         lower=(Vector(rest[f'forearm.{side}'][1])-Vector(rest[f'forearm.{side}'][0])).length
-        elbow=solve_joint(shoulder,wrist,upper,lower,(sign*.7,.1,-.2))
+        # Shoulder pendulum in the sagittal plane, opposite the same-side leg.
+        # Fixed segment lengths prevent the previous wrist-target pumping motion.
+        swing=.38*math.sin(p) if walk else .015*math.sin(phase)
+        flex=.19+.06*max(0,-math.sin(p)) if walk else .12
+        upper_axis=Vector((sign*.085,math.sin(swing),-math.cos(swing))).normalized()
+        lower_axis=Vector((sign*.065,math.sin(swing-flex),-math.cos(swing-flex))).normalized()
+        elbow=shoulder+upper*upper_axis
+        wrist=elbow+lower*lower_axis
         targets[f'upper_arm.{side}']=(shoulder,elbow); targets[f'forearm.{side}']=(elbow,wrist)
-        targets[f'hand.{side}']=(wrist,wrist+Vector((-sign*.015,-.055,-.075)))
+        targets[f'hand.{side}']=(wrist,wrist+lower_axis*.09)
     for name,(head,tail) in targets.items():
         head=head+model_offset; tail=tail+model_offset
         bone=rig.pose.bones[name]
