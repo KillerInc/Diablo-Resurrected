@@ -11,6 +11,9 @@ assert rig and rig.type=='ARMATURE'
 assert len(rig.data.bones)==18
 meshes=[obj for obj in bpy.data.objects if obj.type=='MESH']
 assert len(meshes)>20
+assert bpy.data.objects.get('Steel shoulder L')
+assert not bpy.data.objects.get('Steel shoulder R')
+assert not bpy.data.objects.get('Pauldron lower plate R')
 assert all(any(mod.type=='ARMATURE' and mod.object==rig for mod in obj.modifiers) for obj in meshes)
 assert not any(image.packed_file or (image.filepath and image.source in {'FILE','SEQUENCE','MOVIE'}) for image in bpy.data.images)
 assert bpy.context.scene.camera.data.type=='ORTHO'

@@ -274,10 +274,12 @@ for sign in (-1,1):
         ellipsoid('Cuirass rivet',cloth_front(sign*.105,z),(.005,.003,.005),brass,'chest',segments=10,rings=8)
 for side,sign in [('L',1),('R',-1)]:
     shoulder,elbow,_=rest[f'upper_arm.{side}']; wrist=rest[f'forearm.{side}'][1]
-    pauldron=ellipsoid(f'Steel shoulder {side}',(sign*.278,.005,1.53),(.125,.117,.102),steel,f'upper_arm.{side}')
-    ellipsoid(f'Pauldron lower plate {side}',(sign*.302,.005,1.455),(.113,.111,.036),steel,f'upper_arm.{side}')
-    for y in (-.078,.078):
-        ellipsoid(f'Shoulder rivet {side}',(sign*.325,y,1.49),(.009,.007,.009),brass,f'upper_arm.{side}',segments=10,rings=8)
+    # Light Warrior wears one pauldron, on his left shoulder.
+    if side=='L':
+        pauldron=ellipsoid(f'Steel shoulder {side}',(sign*.278,.005,1.53),(.125,.117,.102),steel,f'upper_arm.{side}')
+        ellipsoid(f'Pauldron lower plate {side}',(sign*.302,.005,1.455),(.113,.111,.036),steel,f'upper_arm.{side}')
+        for y in (-.078,.078):
+            ellipsoid(f'Shoulder rivet {side}',(sign*.325,y,1.49),(.009,.007,.009),brass,f'upper_arm.{side}',segments=10,rings=8)
     start=Vector(elbow).lerp(Vector(wrist),.36)
     end=Vector(elbow).lerp(Vector(wrist),.94)
     segment(f'Forged bracer {side}',start,end,[(0,.073,.066),(.12,.075,.068),(.85,.047,.041),(1,.047,.041)],steel,f'forearm.{side}')
