@@ -90,7 +90,7 @@ steel=material('Worn forged steel',(0.24,0.27,0.29),0.57,0.72,90)
 steel_edge=material('Polished steel edges',(0.38,0.40,0.41),0.43,0.76)
 brass=material('Dull brass rivets',(0.27,0.17,0.065),0.44,0.72)
 hair=material('Short dark brown hair',(0.025,0.014,0.008),0.82,texture=110)
-eye_white=material('Muted eye white',(0.34,0.30,0.23),0.50)
+eye_white=material('Muted eye white',(0.11,0.075,0.047),0.75)
 eye_dark=material('Dark eyes',(0.012,0.009,0.006),0.35)
 parts=[]
 skin_parts=[]
@@ -289,17 +289,95 @@ for side,sign in [('L',1),('R',-1)]:
 ellipsoid('Nose bridge',(0,-.096,1.762),(.012,.017,.030),skin,'head')
 ellipsoid('Nose tip',(0,-.110,1.746),(.017,.017,.013),skin,'head')
 for sign in (-1,1):
-    ellipsoid('Cheek',(sign*.05,-.07,1.75),(.034,.022,.029),skin,'head')
-    ellipsoid('Eye socket',(sign*.033,-.084,1.785),(.018,.008,.010),skin_dark,'head')
-    ellipsoid('Eye',(sign*.033,-.091,1.785),(.010,.004,.0045),eye_white,'head')
-    ellipsoid('Iris',(sign*.033,-.095,1.785),(.0035,.002,.0035),eye_dark,'head',segments=12,rings=8)
+    ellipsoid('Cheek',(sign*.05,-.067,1.75),(.030,.017,.026),skin,'head')
+    # Deliberately indistinct face: recessed narrow eyes, no bright whites/irises.
+    ellipsoid('Eye socket',(sign*.033,-.084,1.783),(.014,.004,.004),skin_dark,'head')
     segment('Brow',(sign*.014,-.09,1.800),(sign*.052,-.079,1.802),[(0,.007,.005),(1,.006,.004)],hair,'head',sides=12)
     ellipsoid('Ear',(sign*.095,.005,1.764),(.018,.014,.029),skin,'head')
-strap('Mouth',[(-.026,-.09,1.705),(0,-.101,1.708),(.026,-.09,1.705)],.0022,skin_dark,'head')
+strap('Mouth',[(-.021,-.09,1.708),(0,-.097,1.708),(.021,-.09,1.708)],.0012,skin_dark,'head')
 loft('Short hair cap',[(0,.018,1.803,.095,.085),(0,.019,1.85,.095,.081),
                        (0,.019,1.88,.075,.066),(0,.019,1.9,.025,.025)],hair,'head')
 for sign in (-1,1):
     ellipsoid('Sideburn',(sign*.088,-.007,1.793),(.011,.025,.035),hair,'head')
+
+# Garment construction and equipment detail, independent of reference textures.
+# Keep the face broad and subdued; readable detail belongs to the equipment.
+thread=material('Dark flax stitching',(.16,.105,.053),.9)
+worn_metal=material('Dark recessed steel',(.075,.085,.091),.75,.65,45)
+for sign in (-1,1):
+    # Bound neck/arm openings and double rows of hand stitching on the cuirass.
+    strap('Cuirass bound top edge',[cloth_front(sign*x,z) for x,z in
+          ((.0,1.49),(.065,1.49),(.13,1.47),(.20,1.43))],.005,belt_mat,'chest')
+    for index in range(17):
+        z=1.145+index*.017
+        x=sign*(.036+(z-1.145)*.53)
+        strap('Cuirass hand stitch',[cloth_front(x-.002,z-.002),cloth_front(x+.002,z+.002)],
+              .0013,thread,'chest')
+    # Short creases around the waist; restrained so leather does not look striped.
+    for index in range(3):
+        z=1.115+index*.022
+        strap('Leather compression fold',[cloth_front(sign*x,z+dz) for x,dz in
+              ((.08,0),(.105,.004),(.13,0))],.0025,leather_edge,'spine')
+    # Belt keepers, studs and loose leather tabs.
+    ellipsoid('Belt keeper',(sign*.09,-.127,1.056),(.010,.008,.038),leather_edge,'hips')
+    for x in (.055,.125,.15):
+        y=-.003-.137*math.sqrt(max(.02,1-(x/.182)**2))-.004
+        ellipsoid('Belt stud',(sign*x,y,1.055),(.0035,.003,.0035),brass,'hips',segments=10,rings=8)
+strap('Buckle frame',[(-.028,-.155,1.033),(-.028,-.155,1.078),(.028,-.155,1.078),
+      (.028,-.155,1.033),(-.028,-.155,1.033)],.0035,brass,'hips')
+strap('Buckle tongue',[(0,-.16,1.055),(.026,-.16,1.055)],.002,steel_edge,'hips')
+
+# Hammered pauldron edging follows its ellipsoidal surface; one shoulder only.
+rim=[]
+for index in range(49):
+    angle=2*math.pi*index/48
+    rim.append((.278+.121*math.cos(angle),.005+.113*math.sin(angle),1.55))
+strap('Rolled pauldron rim L',rim,.006,steel_edge,'upper_arm.L')
+for offset in (-.047,0,.047):
+    points=[]
+    for index in range(13):
+        y=-.085+index*.014
+        x=.278+offset
+        z=1.53+.102*math.sqrt(max(.02,1-(offset/.125)**2-((y-.005)/.117)**2))+.001
+        points.append((x,y,z))
+    strap('Pauldron forged ridge L',points,.0025,worn_metal,'upper_arm.L')
+
+for side,sign in [('L',1),('R',-1)]:
+    elbow=Vector(rest[f'forearm.{side}'][0]); wrist=Vector(rest[f'forearm.{side}'][1])
+    start=elbow.lerp(wrist,.36); end=elbow.lerp(wrist,.94)
+    axis=end-start; orientation=Vector((0,1,0)).rotation_difference(axis)
+    # Fastening bands encircle each bracer, with small brass closures.
+    for t in (.18,.76):
+        center=start.lerp(end,t); radius=.075*(1-t)+.048*t
+        segment('Bracer leather fastening '+side,center-axis*.025,center+axis*.025,
+                [(0,radius+.003,radius*.9+.003),(1,radius+.003,radius*.9+.003)],
+                belt_mat,'forearm.'+side)
+        rivet=center+orientation@Vector((radius+.005,0,0))
+        ellipsoid('Bracer fastening rivet '+side,rivet,(.005,.005,.005),brass,'forearm.'+side,segments=10,rings=8)
+    # Boot closures, leather seams, welt stitching and subtle trouser folds.
+    for z in (.23,.43):
+        x=sign*.143
+        segment('Boot leather strap '+side,(x,-.015,z-.012),(x,-.015,z+.012),
+                [(0,.079,.088),(1,.080,.089)],belt_mat,'shin.'+side)
+        ellipsoid('Boot strap buckle '+side,(x+sign*.077,-.025,z),(.008,.022,.018),brass,'shin.'+side)
+    for index in range(8):
+        z=.27+index*.025
+        strap('Boot seam stitch '+side,[(sign*.145-.004,-.106,z),
+              (sign*.145+.004,-.106,z+.003)],.0015,thread,'shin.'+side)
+    for index in range(3):
+        z=.61+index*.028
+        strap('Trouser knee fold '+side,[(sign*.14-.048,-.078,z),
+              (sign*.14,-.09,z+.007),(sign*.14+.048,-.078,z+.002)],.0025,navy,'thigh.'+side)
+    strap('Boot toe cap seam '+side,[(sign*.15-.045,-.155,.085),
+          (sign*.15,-.17,.097),(sign*.15+.045,-.155,.085)],.0025,belt_mat,'foot.'+side)
+
+# Short sculpted hair grooves break up the smooth cap without facial detail.
+for index in range(13):
+    angle=2*math.pi*index/13
+    points=[]
+    for z,rx,ry in ((1.816,.095,.085),(1.85,.096,.082),(1.878,.076,.067)):
+        points.append((rx*math.cos(angle),.019+ry*math.sin(angle),z))
+    strap('Hair clump groove',points,.0018,belt_mat,'head')
 
 # Build the shared skeleton and deterministic skinning.
 armature=bpy.data.armatures.new('Warrior skeleton')
