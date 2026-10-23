@@ -4,6 +4,7 @@
  * Implementation of monster functionality, AI, actions, spawning, loading, etc.
  */
 #include "monster.h"
+#include "reincarnated/sheet_source.hpp"
 
 #include <algorithm>
 #include <array>
@@ -3246,6 +3247,31 @@ MonsterSpritesData LoadMonsterSpritesData(const MonsterData &monsterData)
 	}
 #endif
 
+#ifdef USE_SDL3
+    // The multi-file monster loader bypasses LoadCl2Sheet. Preserve each
+    // original animation path before joining its storage into the type buffer.
+    std::vector<OwnedClxSpriteListOrSheet> annotated;
+    size_t total = 0;
+    FileNameWithCharAffixGenerator names({ "monsters\\", monsterData.spritePath() }, DEVILUTIONX_CL2_EXT, Animletter);
+    for (size_t i = 0, j = 0; i < numAnims; ++i) {
+        if (!monsterData.hasAnim(i)) continue;
+        const size_t size = result.offsets[j + 1] - result.offsets[j];
+        auto copy = std::make_unique<uint8_t[]>(size);
+        std::memcpy(copy.get(), &result.data[result.offsets[j]], size);
+        annotated.push_back(reincarnated::AnnotateSheetSource(OwnedClxSpriteListOrSheet::FromBuffer(std::move(copy), size), names(i)));
+        total += annotated.back().dataSize();
+        ++j;
+    }
+    result.data = std::make_unique<std::byte[]>(total);
+    total = 0;
+    for (size_t j = 0; j < annotated.size(); ++j) {
+        result.offsets[j] = static_cast<uint32_t>(total);
+        const auto view = ClxSpriteListOrSheet(annotated[j]);
+        std::memcpy(&result.data[total], view.isSheet() ? view.sheet().data() : view.list().data(), view.dataSize());
+        total += view.dataSize();
+    }
+    result.offsets[annotated.size()] = static_cast<uint32_t>(total);
+#endif
 	return result;
 }
 

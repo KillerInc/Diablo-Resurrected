@@ -1,4 +1,4 @@
-name: Windows x64 v0.3
+name: Windows x64 v0.4
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 90
     env:
-      PACKAGE_NAME: Diablo Reincarnated v0.3
+      PACKAGE_NAME: Diablo Reincarnated v0.4
     steps:
       - name: Check out project
         uses: actions/checkout@v4
@@ -67,6 +67,14 @@ jobs:
           cmake --build build-win64 --config Release --target devilutionx --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'Windows x64 compilation failed' }
 
+      - name: Build and run original-named sheet rendering tests
+        shell: pwsh
+        run: |
+          cmake --build build-win64 --config Release --target reincarnated_sheet_test --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'Sheet rendering test build failed' }
+          & 'build-win64/Source/Release/reincarnated_sheet_test.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Sheet rendering regression tests failed' }
+
       - name: Build and run renderer tests
         shell: pwsh
         run: |
@@ -87,7 +95,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           # Keep every pre-release file under its own install folder.
-          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.3'
+          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.4'
           New-Item -ItemType Directory -Force -Path $folder | Out-Null
 
           $exe = Join-Path $PWD 'build-win64\Release\Diablo Reincarnated.exe'
@@ -109,16 +117,16 @@ jobs:
 
           Copy-Item -LiteralPath 'LICENSE.md' -Destination $folder
           @'
-          Diablo Reincarnated v0.3 - Windows 11 x64 PRE-RELEASE
+          Diablo Reincarnated v0.4 - Windows 11 x64 PRE-RELEASE
 
-          1. Extract the ZIP: it contains a "Diablo Reincarnated v0.3" folder.
+          1. Extract the ZIP: it contains a "Diablo Reincarnated v0.4" folder.
           2. Keep that folder separate from your existing DevilutionX installation.
           3. Copy DIABDAT.MPQ from a legally owned Diablo installation beside
              "Diablo Reincarnated.exe" in the new folder.
           4. Run "Diablo Reincarnated.exe" and start a Warrior.
           5. Press F10 to toggle Classic / experimental HD mode.
-          6. hd/players/0.png is a deliberately simple synthetic test sprite,
-             NOT detailed remastered art or Blizzard artwork.
+          6. Install your separately supplied sheets under hd/plrgfx, hd/monsters and hd/missiles.
+             The package contains no original game graphics or replacement sheets.
 
           This build uses separate Windows settings and save paths, so your
           existing DevilutionX settings and saves are not overwritten.
@@ -139,20 +147,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Building and verifying support MPQ failed' }
           if ((Get-Item $mpq).Length -lt 4096) { throw 'Support MPQ is too small' }
 
-      - name: Generate non-Blizzard HD test sprite
-        shell: pwsh
-        run: |
-          python tools/generate_hd_test_pack.py --out 'windows-package/Diablo Reincarnated v0.3'
-          if ($LASTEXITCODE -ne 0) { throw 'Synthetic Warrior generation failed' }
-          if (-not (Test-Path 'windows-package/Diablo Reincarnated v0.3/hd/players/0.png')) {
-            throw 'Warrior placeholder was not generated'
-          }
-
       - name: Verify packaged Windows entry point
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.3'
+          $folder = Join-Path $PWD 'windows-package/Diablo Reincarnated v0.4'
+          $expectedVersion = (Get-Content -LiteralPath 'REINCARNATED_VERSION' -Raw).Trim()
+          $versionInfo = (Get-Item -LiteralPath (Join-Path $folder 'Diablo Reincarnated.exe')).VersionInfo
+          if ($versionInfo.ProductVersion -ne $expectedVersion -or $versionInfo.FileVersion -ne $expectedVersion) {
+            throw 'Windows file/product version does not match REINCARNATED_VERSION'
+          }
           $process = Start-Process -FilePath (Join-Path $folder 'Diablo Reincarnated.exe') `
             -ArgumentList '--version' -WorkingDirectory $folder -WindowStyle Hidden -PassThru
           if (-not $process.WaitForExit(30000)) {
@@ -169,11 +173,11 @@ jobs:
           Copy-Item 'build-win64/_deps/sdl_mixer-src/LICENSE.txt' (Join-Path $licenses 'SDL3_mixer.txt')
 
       # GitHub automatically serves downloadable artifacts as .zip files.
-      # The downloaded filename is exactly "Diablo Reincarnated v0.3.zip".
-      - name: Upload Diablo Reincarnated v0.3.zip
+      # The downloaded filename is exactly "Diablo Reincarnated v0.4.zip".
+      - name: Upload Diablo Reincarnated v0.4.zip
         uses: actions/upload-artifact@v4
         with:
-          name: Diablo Reincarnated v0.3
+          name: Diablo Reincarnated v0.4
           path: windows-package/
           if-no-files-found: error
           retention-days: 30

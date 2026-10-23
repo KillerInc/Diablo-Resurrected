@@ -3,6 +3,7 @@
 #include "raster_bridge.hpp"
 #include <algorithm>
 #include <cmath>
+#include <charconv>
 #include <cstring>
 #include <sstream>
 #include <unordered_map>
@@ -12,6 +13,9 @@
 #include "engine/render/light_render.hpp"
 #include "game_mode.hpp"
 #include "dds_decode.hpp"
+#include "sheet_png.hpp"
+#include "engine/palette.h"
+#include "engine/surface.hpp"
 #include "utils/display.h"
 #include "utils/log.hpp"
 #include "utils/paths.h"
@@ -34,6 +38,72 @@ bool cursorSaved = false;
 bool inWorld, ready, suppressed;
 int scale = 1, offsetX;
 SDL_Rect clip;
+
+struct CachedSheet { SheetImage image; uint64_t used = 0; };
+std::unordered_map<std::string, CachedSheet> sheets;
+std::unordered_map<uint32_t, uint8_t> nearestColors;
+std::array<SDL_Color, 256> matchingPalette {};
+size_t sheetBytes = 0;
+uint64_t sheetClock = 0;
+size_t SheetBudget()
+{
+    static const size_t bytes = [] {
+        unsigned megabytes = 1024;
+        if (const char *value = SDL_getenv("D1R_SHEET_CACHE_MB")) {
+            unsigned requested = 0;
+            const auto end = value + std::strlen(value);
+            const auto parsed = std::from_chars(value, end, requested);
+            if (parsed.ec == std::errc() && parsed.ptr == end && requested >= 128 && requested <= 4096) megabytes = requested;
+        }
+        return size_t(megabytes) * 1024 * 1024;
+    }();
+    return bytes;
+}
+
+CachedSheet *LoadSheet(const SheetSource &source)
+{
+    const std::string key = source.path + ":" + std::to_string(source.columns) + ":" + std::to_string(source.rows) + ":" + std::to_string(source.width);
+    auto found = sheets.find(key);
+    if (found != sheets.end()) { found->second.used = ++sheetClock; return &found->second; }
+    CachedSheet entry;
+    AssetBytes bytes;
+    if (GetHdAssetStore().read(source.path, bytes)) {
+        if (DecodeSheetPng(bytes, source, entry.image)) {
+            while (sheetBytes + entry.image.rgba.size() > SheetBudget()) {
+                auto victim = sheets.end();
+                for (auto it = sheets.begin(); it != sheets.end(); ++it)
+                    if (!it->second.image.rgba.empty() && (victim == sheets.end() || it->second.used < victim->second.used)) victim = it;
+                if (victim == sheets.end()) break;
+                sheetBytes -= victim->second.image.rgba.size();
+                sheets.erase(victim);
+            }
+            sheetBytes += entry.image.rgba.size();
+            devilution::Log("Loaded HD sheet: {} ({}x{}, {} directions, {} frames, {}x retained density)", source.path,
+                entry.image.width, entry.image.height, source.columns, source.rows, entry.image.density);
+        } else devilution::Log("HD sheet layout/decode rejected; preserving Classic fallback: {}", source.path);
+    }
+    entry.used = ++sheetClock;
+    return &sheets.emplace(key, std::move(entry)).first->second;
+}
+
+uint8_t MatchColor(const uint8_t *rgba)
+{
+    const uint32_t rgb = (uint32_t(rgba[0]) << 16) | (uint32_t(rgba[1]) << 8) | rgba[2];
+    const auto found = nearestColors.find(rgb);
+    if (found != nearestColors.end()) return found->second;
+    unsigned distance = ~0U;
+    uint8_t match = 0;
+    for (unsigned i = 0; i < 256; ++i) {
+        const auto &c = matchingPalette[i];
+        const int r = int(rgba[0]) - c.r, g = int(rgba[1]) - c.g, b = int(rgba[2]) - c.b;
+        const unsigned d = r * r + g * g + b * b;
+        if (d < distance) { distance = d; match = static_cast<uint8_t>(i); }
+    }
+    // Bound the auxiliary truecolor matching table as well as the image cache.
+    if (nearestColors.size() >= 262144) nearestColors.clear();
+    nearestColors.emplace(rgb, match);
+    return match;
+}
 
 void EnsureSurface(devilution::SDLSurfaceUniquePtr &surface)
 {
@@ -192,6 +262,10 @@ void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clip
     HdCaptureActive = GetRendererSwitch().usesHdRenderer();
     ready = false; suppressed = false; cursorSaved = false;
     if (!HdCaptureActive) return;
+    if (std::memcmp(matchingPalette.data(), devilution::logical_palette.data(), sizeof(matchingPalette)) != 0) {
+        matchingPalette = devilution::logical_palette;
+        nearestColors.clear();
+    }
     EnsureSurface(world); EnsureSurface(ui); EnsureSurface(composed);
     scale = zoom; offsetX = xOffset;
     clip = { clipX, 0, clipWidth, clipHeight };
@@ -236,6 +310,71 @@ bool QueueHdPlayer(int type, int direction, int frame, int left, int bottom, int
 { return DrawVariants("hd/players/" + std::to_string(type), direction, frame, left, bottom, w, h); }
 bool QueueHdMonster(int type, int direction, int frame, int left, int bottom, int w, int h, int)
 { return DrawVariants("hd/monsters/" + std::to_string(type), direction, frame, left, bottom, w, h); }
+
+bool HasHdSheet(devilution::ClxSprite sprite)
+{
+    if (!HdCaptureActive || !inWorld) return false;
+    const auto *source = GetSheetSource(sprite);
+    return source && !LoadSheet(*source)->image.rgba.empty();
+}
+
+bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite,
+    const uint8_t *translation, const devilution::Lightmap *lightmap, bool blend)
+{
+    // Menu/cache renders can use the same sprite data; only replace writes to
+    // the active world surface. Keep classic indexed pixels for game logic.
+    if (!HdCaptureActive || !inWorld || suppressed || out.surface != devilution::PalSurface) return false;
+    const auto *source = GetSheetSource(sprite);
+    if (!source) return false;
+    auto &image = LoadSheet(*source)->image;
+    if (image.rgba.empty()) return false;
+    const auto *header = sprite.pixelData() - SheetHeaderSize;
+    const unsigned group = devilution::LoadLE16(header + 14), frame = devilution::LoadLE16(header + 16);
+    if (group >= source->columns || frame >= source->rows || image.cellHeight / image.density < sprite.height()) return false;
+    const int logicalHeight = image.cellHeight / image.density;
+    const int top = y + 1 - logicalHeight;
+    const int left = (x + out.region.x) * scale + offsetX;
+    const int upper = (top + out.region.y) * scale;
+    const int w = source->width * scale, h = logicalHeight * scale;
+    const auto *bakedTranslation = header + 18;
+    // Clip in the caller's local coordinates as well as to the world viewport.
+    const int xBegin = std::max({left, clip.x, out.region.x * scale + offsetX, 0});
+    const int xEnd = std::min({left + w, clip.x + clip.w, (out.region.x + out.w()) * scale + offsetX, world->w});
+    const int yBegin = std::max({upper, out.region.y * scale, 0});
+    const int yEnd = std::min({upper + h, clip.h, (out.region.y + out.h()) * scale, world->h});
+    for (int py = yBegin; py < yEnd; ++py) {
+        const unsigned sy = frame * image.cellHeight + (py - upper) * image.density / scale;
+        auto *dst = static_cast<uint8_t *>(world->pixels) + py * world->pitch;
+        for (int px = xBegin; px < xEnd; ++px) {
+            const unsigned sx = group * image.cellWidth + (px - left) * image.density / scale;
+            const auto *src = image.rgba.data() + (size_t(sy) * image.width + sx) * 4;
+            unsigned alpha = src[3];
+            if (!alpha) continue;
+            if (blend) alpha /= 2;
+            const uint8_t original = MatchColor(src);
+            uint8_t mapped = bakedTranslation[original];
+            if (translation) mapped = translation[mapped];
+            if (lightmap) {
+                const int localX = (px - offsetX) / scale - out.region.x;
+                const int localY = py / scale - out.region.y;
+                mapped = lightmap->adjustColor(mapped, *lightmap->getLightingAt(out.at(localX, localY)));
+            }
+            const auto &base = matchingPalette[original];
+            const auto &lit = devilution::Palette->colors[mapped];
+            const int originalChannels[3] { base.r, base.g, base.b };
+            const int litChannels[3] { lit.r, lit.g, lit.b };
+            // Preserve the sheet's truecolor smoothing residual around the
+            // nearest palette color while following vanilla TRN/light/fade.
+            const int intensity = std::min(256, (int(lit.r) + lit.g + lit.b) * 256 / std::max(1, int(base.r) + base.g + base.b));
+            for (int c = 0; c < 3; ++c) {
+                const int color = std::clamp(litChannels[c] + (int(src[c]) - originalChannels[c]) * intensity / 256, 0, 255);
+                dst[px * 4 + c] = (color * alpha + dst[px * 4 + c] * (255 - alpha) + 127) / 255;
+            }
+            dst[px * 4 + 3] = 255;
+        }
+    }
+    return true;
+}
 bool QueueHdTile(int type, unsigned piece, int left, int bottom, int w, int h, int)
 {
     const auto base = "hd/tiles/" + std::to_string(type) + "/" + std::to_string(piece);
@@ -269,6 +408,7 @@ void ResetHdAssets()
 {
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;
+    sheets.clear(); sheetBytes = 0; nearestColors.clear();
 }
 }
 #endif

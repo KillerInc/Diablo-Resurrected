@@ -391,7 +391,11 @@ void DrawMonster(const Surface &out, Point tilePosition, Point targetBufferPosit
 
 	const ClxSprite sprite = monster.animInfo.currentSprite();
 #ifndef USE_SDL1
-	const bool hdMonster = reincarnated::QueueHdMonster(static_cast<int>(monster.type().type),
+	const bool hdMonster =
+#ifdef USE_SDL3
+        !reincarnated::HasHdSheet(sprite) &&
+#endif
+        reincarnated::QueueHdMonster(static_cast<int>(monster.type().type),
 	        static_cast<int>(monster.direction),
 	        monster.animInfo.getFrameToUseForRendering(),
 	        targetBufferPosition.x, targetBufferPosition.y,
@@ -503,7 +507,11 @@ void DrawPlayer(const Surface &out, const Player &player, Point tilePosition, Po
 	const Point spriteBufferPosition = targetBufferPosition + player.getRenderingOffset(sprite);
 bool hdSprite = false;
 #ifndef USE_SDL1
-	hdSprite = reincarnated::QueueHdPlayer(static_cast<int>(player._pClass),
+	hdSprite =
+#ifdef USE_SDL3
+        !reincarnated::HasHdSheet(sprite) &&
+#endif
+        reincarnated::QueueHdPlayer(static_cast<int>(player._pClass),
 	    static_cast<int>(player._pdir),
 	    player.AnimInfo.getFrameToUseForRendering(),
 	    spriteBufferPosition.x, spriteBufferPosition.y,

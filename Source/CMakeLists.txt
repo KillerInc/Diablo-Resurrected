@@ -78,6 +78,8 @@ set(libdevilutionx_SRCS
   reincarnated/renderer_switch.cpp
   reincarnated/sprite_layout.cpp
   reincarnated/asset_provider.cpp
+  reincarnated/sheet_source.cpp
+  reincarnated/sheet_png.cpp
   reincarnated/hd_renderer.cpp
   reincarnated/hd_renderer_sdl3.cpp
   reincarnated/gpu_presenter.cpp
@@ -1143,7 +1145,7 @@ endif()
 if(WIN32 AND USE_SDL3)
   # Keep upstream protocol/save format versions, but identify our executable.
   set(PROJECT_NAME "Diablo Reincarnated")
-  set(PROJECT_VERSION_WITH_SUFFIX "0.2.0-pre")
+  set(PROJECT_VERSION_WITH_SUFFIX "${REINCARNATED_DISPLAY_VERSION}")
 endif()
 file(GENERATE OUTPUT ${CONFIG_PATH} CONTENT
 "#pragma once
@@ -1172,7 +1174,13 @@ endif()
 if(USE_SDL1)
   # No need for SDL_image
 elseif(USE_SDL3)
-  target_link_libraries(libdevilutionx PUBLIC SDL3_image::SDL3_image)
+  find_package(PNG REQUIRED)
+  target_link_libraries(libdevilutionx PUBLIC SDL3_image::SDL3_image PNG::PNG)
+  add_executable(reincarnated_sheet_test EXCLUDE_FROM_ALL ../test/hd_sheet_test.cpp)
+  target_link_dependencies(reincarnated_sheet_test PRIVATE libdevilutionx)
+  if(MSVC)
+    target_compile_options(reincarnated_sheet_test PRIVATE /EHsc)
+  endif()
 else()
   target_link_libraries(libdevilutionx PUBLIC SDL2::SDL2_image)
 endif()

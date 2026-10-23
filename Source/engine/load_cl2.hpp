@@ -18,6 +18,7 @@
 #include "utils/static_vector.hpp"
 #include "utils/status_macros.hpp"
 #include "utils/str_cat.hpp"
+#include "reincarnated/sheet_source.hpp"
 
 #ifdef UNPACKED_MPQS
 #define DEVILUTIONX_CL2_EXT ".clx"
@@ -70,9 +71,27 @@ std::expected<OwnedClxSpriteSheet, std::string> LoadMultipleCl2Sheet(tl::functio
 		accumulatedSize += size;
 	}
 #ifdef UNPACKED_MPQS
-	return OwnedClxSpriteSheet { std::move(data), static_cast<uint16_t>(count) };
+	auto result = OwnedClxSpriteSheet { std::move(data), static_cast<uint16_t>(count) };
 #else
-	return Cl2ToClx(std::move(data), accumulatedSize, frameWidth).sheet();
+	auto result = Cl2ToClx(std::move(data), accumulatedSize, frameWidth).sheet();
+#endif
+#ifdef USE_SDL3
+    std::vector<OwnedClxSpriteListOrSheet> lists;
+    size_t annotatedSize = sheetHeaderSize;
+    for (size_t i = 0; i < count; ++i) {
+        lists.push_back(reincarnated::AnnotateSheetSource(OwnedClxSpriteListOrSheet { result[i].clone() }, paths[i].data()));
+        annotatedSize += lists.back().dataSize();
+    }
+    auto annotated = std::make_unique<uint8_t[]>(annotatedSize);
+    size_t offset = sheetHeaderSize;
+    for (size_t i = 0; i < count; ++i) {
+        WriteLE32(annotated.get() + i * 4, static_cast<uint32_t>(offset));
+        std::memcpy(annotated.get() + offset, lists[i].list().data(), lists[i].dataSize());
+        offset += lists[i].dataSize();
+    }
+    return OwnedClxSpriteSheet { std::move(annotated), static_cast<uint16_t>(count) };
+#else
+    return result;
 #endif
 }
 
