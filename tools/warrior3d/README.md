@@ -4,7 +4,7 @@ Editable, procedurally built light-armor, unarmed Warrior. This is a rig/export 
 
 ## Contents and status
 
-- `models/warrior/Warrior-Light-Unarmed.blend`: editable source scene, 179 meshes, 18 bones, idle (10 frames) and walk (8 frames), plus loop endpoints.
+- `models/warrior/Warrior-Light-Unarmed.blend`: editable source scene, 181 meshes, 18 bones, idle (10 frames) and walk (8 frames), plus loop endpoints.
 - Eight orthographic directions, transparent 768-pixel cells; exporter produces `wlnas.png` (6144 x 7680) and `wlnaw.png` (6144 x 6144).
 - Both animation loops and all 144 exported cells passed structural validation. GLB is a portable rig/mesh derivative; Blender procedural material details are not baked into it.
 - Visual fidelity is **not accepted**: mean body-mask overlap is approximately 37% in the initial two-pauldron prototype for both actions. Anatomy, stance, clothing, materials and animation require substantial refinement against the NN8 references. This prototype does not cover town actions, attacks, spells, damage, death, other armor, weapons or shields.
@@ -37,3 +37,5 @@ The light-armor model uses one pauldron on the Warrior's left shoulder (viewer-r
 Animation refinement: idle hands now hang near the hips with slight breathing sway. Walk uses fixed-length arm segments, a shoulder pendulum opposite the same-side leg, and a gentle elbow bend. Validation checks idle hand height and fore/aft dominance of walking arm travel. Original sheet frame counts remain unchanged.
 
 Equipment detail pass: cuirass binding and hand stitching, waist creases, belt keepers and buckle hardware, rolled pauldron rim and forged ridges, bracer fastening bands, boot straps/buckles/stitches, toe-cap seams, subtle trouser folds, and short hair grooves. The face is intentionally indistinct: no bright eye whites or individual irises, with restrained mouth and broad facial forms. These are generated mesh and procedural material details; no artwork textures are embedded.
+
+Reference correction: removed separate rounded cheek meshes, keeping the face indistinct. Added a broad surface-following diagonal leather suspension belt from the opposite waist across the chest to the single left pauldron, with bound edges and a shoulder continuation. Original sheet artwork stays local.

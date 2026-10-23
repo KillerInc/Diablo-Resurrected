@@ -289,7 +289,6 @@ for side,sign in [('L',1),('R',-1)]:
 ellipsoid('Nose bridge',(0,-.096,1.762),(.012,.017,.030),skin,'head')
 ellipsoid('Nose tip',(0,-.110,1.746),(.017,.017,.013),skin,'head')
 for sign in (-1,1):
-    ellipsoid('Cheek',(sign*.05,-.067,1.75),(.030,.017,.026),skin,'head')
     # Deliberately indistinct face: recessed narrow eyes, no bright whites/irises.
     ellipsoid('Eye socket',(sign*.033,-.084,1.783),(.014,.004,.004),skin_dark,'head')
     segment('Brow',(sign*.014,-.09,1.800),(sign*.052,-.079,1.802),[(0,.007,.005),(1,.006,.004)],hair,'head',sides=12)
@@ -299,6 +298,35 @@ loft('Short hair cap',[(0,.018,1.803,.095,.085),(0,.019,1.85,.095,.081),
                        (0,.019,1.88,.075,.066),(0,.019,1.9,.025,.025)],hair,'head')
 for sign in (-1,1):
     ellipsoid('Sideburn',(sign*.088,-.007,1.793),(.011,.025,.035),hair,'head')
+
+# Broad diagonal suspension belt from opposite waist to the left pauldron.
+# A surface-following ribbon, rather than a thin decorative seam.
+strap_vertices=[]
+strap_centers=[]
+for index in range(25):
+    t=index/24
+    x=-.135+.355*t; z=1.115+.355*t
+    strap_centers.append((x,z))
+    for offset in (-.024,.024):
+        px,py,pz=cloth_front(x+offset,z-offset)
+        strap_vertices.append((px,py-.009,pz))
+strap_faces=[(i*2,i*2+1,i*2+3,i*2+2) for i in range(24)]
+mesh=bpy.data.meshes.new('Diagonal pauldron suspension belt')
+mesh.from_pydata(strap_vertices,[],strap_faces); mesh.update()
+obj=bpy.data.objects.new('Diagonal pauldron suspension belt',mesh)
+scene.collection.objects.link(obj)
+finish(obj,obj.name,belt_mat); obj['soft_torso']=True
+solid=obj.modifiers.new('Leather belt thickness','SOLIDIFY'); solid.thickness=.005
+bevel=obj.modifiers.new('Soft leather belt edges','BEVEL'); bevel.width=.002; bevel.segments=2
+for edge in (-.022,.022):
+    points=[]
+    for x,z in strap_centers:
+        px,py,pz=cloth_front(x+edge,z-edge)
+        points.append((px,py-.014,pz))
+    strap('Diagonal belt bound edge',points,.0017,leather_edge,'chest')
+# The shoulder continuation disappears underneath the pauldron.
+strap('Pauldron shoulder belt',[(.20,-.075,1.45),(.235,-.065,1.49),
+      (.26,-.035,1.51),(.26,.06,1.50)],.022,belt_mat,'chest')
 
 # Garment construction and equipment detail, independent of reference textures.
 # Keep the face broad and subdued; readable detail belongs to the equipment.
