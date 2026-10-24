@@ -681,3 +681,32 @@ The current local archive is `Native Paladin Death/Natural Legs`; the eight-view
 GIF holds its first/final frames for review. Original atlas dimensions, 20-frame
 game timing, scale, southeast light and executable remain unchanged. Live
 gameplay review is still required for the final appearance in motion.
+
+## North and northwest landing correction
+
+The pelvis-based steering left the N/NW endpoint too upright despite preserving
+native joint poses and fitting the cells. Those two views now use `body_axis`
+steering: rotate the current head-to-stance axis around its initial upright axis,
+then apply the minimum rigid turn carrying the current axis to that target.
+This preserves the starting pose, native joint articulation and stance midpoint
+while keeping the final body axis low. Other facings retain the previous method.
+
+`prepare_paladin_death_facings.py` accepts model/current-reference/output/scale
+calibration, refines only directions 3/4 and preserves all other facing metadata.
+Candidates must fit all twenty body/shadow poses, preserve the stance midpoint,
+and have final opaque height below 0.60 m. Selected body-axis adjustments are
+NW -90 and N -45 degrees. Body/shadow renderers honor optional `render_directions`
+to regenerate only these columns while reusing the other six raw renders.
+Local work is `paladin-native-death/north-refinement`. Sheet dimensions, scale,
+timing, native leg poses, southeast light and the executable are unchanged.
+
+All 160 final body/shadow cells pass rendered-alpha bounds checks; minimum
+body/shadow margins are 39/35 NN8 pixels. The six untouched atlas columns were
+compared by pixel hashes and are identical. Native local-joint matrix error
+remains below 4.77e-7 and stance midpoint XY error below 2.81e-7 m over all views.
+The N/NW before/after motion contact sheet was reviewed before installation.
+Current WLNDT SHA256 is
+`ED12575F0907C5C9A2B56BBBC0A499A463B4E192AD69D7C1F56D0FA9AFC6588E`.
+All seven installed action hashes were verified. Local archive:
+`Native Paladin Death/North Northwest Refined`. Live gameplay review remains
+outstanding; no executable was changed.

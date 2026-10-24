@@ -39,7 +39,7 @@ if ref.get('redirect_fall'):
  redirect=RedirectFall(rig,ref['redirect_fall']['first_frame'])
 def pose(direction,row):
  rig.location=(0,0,0);rig.rotation_euler.z=-direction*math.pi/4;scene.frame_set(times[row]);bpy.context.view_layer.update()
- if redirect:redirect.apply(times[row],ref['redirect_fall']['angles'][direction])
+ if redirect:redirect.apply(times[row],ref['redirect_fall']['angles'][direction],ref['redirect_fall'].get('modes',['pelvis']*8)[direction])
  p=rig.matrix_world@rig.pose.bones['pelvis'].head
  origin=rig.matrix_world.to_3x3()@initial
  if not ref.get('preserve_horizontal_root_motion',False):
@@ -52,7 +52,7 @@ def pose(direction,row):
 registrations=[[0.0,0.0] for _ in range(8)]
 # Final scale and fixed per-direction registration use rendered alpha bounds
 # in assemble_paladin_town_walk.py, excluding invisible material geometry.
-for d in range(8):
+for d in ref.get('render_directions',range(8)):
  camera.data.shift_x,camera.data.shift_y=registrations[d]
  for r in range(rows):
   pose(d,r)
@@ -65,4 +65,4 @@ if redirect:
  rig.animation_data.action=redirect.action;scene.frame_set(times[0]);bpy.context.view_layer.update()
 bpy.ops.wm.save_as_mainfile(filepath=str(out/'Paladin-town-walk-render.blend'))
 ground=world_to_camera_view(scene,camera,Vector((0,0,0)))
-(out/'render.json').write_text(json.dumps({'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_rows':rows,'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'ground_origin_pixel':[ground.x*cell,(1-ground.y)*cell],'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'pose_offsets':ref.get('pose_offsets',[]),'direction_pose_offsets':ref.get('direction_pose_offsets',[]),'redirect_fall':ref.get('redirect_fall'),'shadow_overscan':ref.get('shadow_overscan',0),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))
+(out/'render.json').write_text(json.dumps({'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_rows':rows,'render_directions':ref.get('render_directions',list(range(8))),'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'ground_origin_pixel':[ground.x*cell,(1-ground.y)*cell],'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'pose_offsets':ref.get('pose_offsets',[]),'direction_pose_offsets':ref.get('direction_pose_offsets',[]),'redirect_fall':ref.get('redirect_fall'),'shadow_overscan':ref.get('shadow_overscan',0),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))

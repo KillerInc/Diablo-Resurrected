@@ -31,11 +31,11 @@ sun=info.get('sun_position',[3,-4,6]);assert sun[2]>0
 rig.location=(0,0,0);rig.rotation_euler=(0,0,0);scene.frame_set(1);bpy.context.view_layer.update();initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy()
 material=bpy.data.materials.new('Ground shadow silhouette');material.use_nodes=True;nodes=material.node_tree.nodes;nodes.clear();output=nodes.new('ShaderNodeOutputMaterial');emit=nodes.new('ShaderNodeEmission');emit.inputs['Color'].default_value=(0,0,0,1);material.node_tree.links.new(emit.outputs[0],output.inputs['Surface'])
 mesh=bpy.data.meshes.new('Projected character');shadow=bpy.data.objects.new('Projected character',mesh);bpy.context.collection.objects.link(shadow);shadow.data.materials.append(material)
-for d in range(8):
+for d in info.get('render_directions',range(8)):
  for row,time in enumerate(times):
   rig.location=(0,0,0);rig.rotation_euler.z=-d*math.pi/4;scene.frame_set(int(time));bpy.context.view_layer.update();p=rig.matrix_world@rig.pose.bones['pelvis'].head;origin=rig.matrix_world.to_3x3()@initial
   if redirect:
-   redirect.apply(int(time),info['redirect_fall']['angles'][d]);p=rig.matrix_world@rig.pose.bones['pelvis'].head
+   redirect.apply(int(time),info['redirect_fall']['angles'][d],info['redirect_fall'].get('modes',['pelvis']*8)[d]);p=rig.matrix_world@rig.pose.bones['pelvis'].head
   if info.get('horizontal_root_motion_removed',True):
    rig.location.x=origin.x-p.x;rig.location.y=origin.y-p.y
   if info.get('pose_offsets'):
@@ -54,4 +54,4 @@ for d in range(8):
    faces.extend(tuple(offset+i for i in poly.vertices) for poly in me.polygons);ev.to_mesh_clear()
   mesh.clear_geometry();mesh.from_pydata(vertices,[],faces);mesh.update()
   scene.render.filepath=str(out/f'shadow-{d}-{row}.png');bpy.ops.render.render(write_still=True)
-(out/'shadow.json').write_text(json.dumps({'method':'opaque body projected onto z=0','sun_position':sun,'cast_direction':[-sun[0]/sun[2],-sun[1]/sun[2],-1],'distance_gain_about_support_foot':info.get('shadow_distance_gain',1),'frames':len(times),'directions':8,'same_camera_as_body':True},indent=2))
+(out/'shadow.json').write_text(json.dumps({'method':'opaque body projected onto z=0','sun_position':sun,'cast_direction':[-sun[0]/sun[2],-sun[1]/sun[2],-1],'distance_gain_about_support_foot':info.get('shadow_distance_gain',1),'frames':len(times),'directions':len(info.get('render_directions',range(8))),'render_directions':list(info.get('render_directions',range(8))),'same_camera_as_body':True},indent=2))

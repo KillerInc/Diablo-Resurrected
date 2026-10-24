@@ -36,7 +36,7 @@ class RedirectFall:
             self.rig.pose.bones[name].matrix_basis = matrix
         bpy.context.view_layer.update()
 
-    def apply(self, frame, angle):
+    def apply(self, frame, angle, mode='pelvis'):
         self.sample(frame)
         bones = self.rig.pose.bones
         native = {b.name: b.matrix.copy() for b in bones}
@@ -50,7 +50,19 @@ class RedirectFall:
         # Torso and pelvis are siblings under attach in this skeleton. Apply
         # the pelvis correction to their common parent, preserving their seam.
         corrected = Matrix.LocRotScale(position, rotation, scale)
-        bones['attach'].matrix = corrected @ native['pelvis'].inverted() @ native['attach']
+        if mode == 'body_axis':
+            first_mid = sum((self.initial['ankle.'+s].translation for s in ['L','R']), Vector())*.5
+            current_mid = sum((native['ankle.'+s].translation for s in ['L','R']), Vector())*.5
+            up = (self.initial['head'].translation-first_mid).normalized()
+            axis = (native['head'].translation-current_mid).normalized()
+            target = Quaternion(up, angle) @ axis
+            turn = axis.rotation_difference(target)
+            pivot = Vector((first_mid.x, first_mid.y, current_mid.z))
+            transform = Matrix.Translation(pivot) @ turn.to_matrix().to_4x4() @ Matrix.Translation(-current_mid)
+            bones['attach'].matrix = transform @ native['attach']
+        else:
+            assert mode == 'pelvis', mode
+            bones['attach'].matrix = corrected @ native['pelvis'].inverted() @ native['attach']
         bpy.context.view_layer.update()
         # Preserve every native joint angle. Pin only the horizontal midpoint
         # of the stance through the shared motion parent; solving each ankle
