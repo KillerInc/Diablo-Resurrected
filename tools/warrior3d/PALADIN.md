@@ -280,3 +280,29 @@ Reproduction order (all artwork inputs and outputs remain outside Git):
 
 The Paladin coverage is now AS/AW/ST/WL/AT. Hit, block, death and casting clips
 remain outstanding; their sheets still use the existing artwork.
+
+## Kick shadow correction and height audit
+
+The user rejected the compact kick shadow. The 0.20 projection-distance gain
+above made it too small; passing crop checks did not establish visual suitability.
+The installed replacement uses `reuse_paladin_idle_shadow.py` to hold the approved
+idle frame-zero ground shadow at its existing size/direction through all sixteen
+attack frames. This is deliberately a stable shadow approximation: it does not
+cast the raised kicking leg. It supersedes the compact projected attack shadow.
+All 128 body and shadow bounds pass; body bounds are identical to the previous
+kick sheet. Use the shadow reuse helper after rendering, in place of step 5's
+attack-shadow projection, then pass its output directory to the assembler.
+
+Height was audited against the edited static GLB and current idle. Mesh, skin,
+node and material records are identical, and both actions use pixel scale
+1.1334110707181562. After removing the attack cell's padding, the starting-pose
+body height matches idle within one 8x-sheet pixel in all eight directions.
+The grounding correction shifts that pose about 2–3 sheet pixels upward; it does
+not increase model height. Pose changes during the kick alter the silhouette.
+The correction changes only the shadow, retaining that body placement.
+
+Current WLNAT SHA256:
+`9106FFB8BF4BF9B7AE128C10A31C05572F3D7730C30942748D90B4A0F168EBB5`.
+Local `height-audit.json` records per-direction measurements. The uniquely named
+`attack-preview-shadow-fixed.gif` shows the replacement without preview-cache
+ambiguity. Gameplay verification of this shadow revision remains outstanding.

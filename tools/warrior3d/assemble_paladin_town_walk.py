@@ -29,6 +29,8 @@ if len(sys.argv)>4:
   registrations=[(dx+raw_pad-scale*raw_pad,dy+(cell-768)-scale*raw_pad) for dx,dy in registrations]
 shadow_root=Path(sys.argv[5]) if len(sys.argv)>5 else None
 sheet=Image.new('RGBA',(cell*8,rows*cell));cells=[];report={'global_pixel_scale':scale,'fixed_direction_offsets':registrations,'cells':[],'shadow_source':'animated model projection' if shadow_root else 'vanilla','body_rgb_gain':.62 if shadow_root else 1,'body_saturation':.86 if shadow_root else 1}
+if shadow_root and (shadow_root/'shadow.json').exists():
+ report['shadow_source']=json.loads((shadow_root/'shadow.json').read_text()).get('method',report['shadow_source'])
 for r in range(rows):
  row=[]
  for d in range(8):
