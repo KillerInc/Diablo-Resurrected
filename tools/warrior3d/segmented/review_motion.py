@@ -5,6 +5,7 @@ from mathutils import Vector,Matrix,Quaternion
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from pose_test import apply_test_pose
 from underarm_surface import endpoint_error
+from torso_attachment import pinned_skin_error
 out=Path(sys.argv[sys.argv.index('--')+1]).resolve();out.mkdir(parents=True,exist_ok=True)
 rig=next(o for o in bpy.data.objects if o.type=='ARMATURE');bridges=[o for o in bpy.data.objects if o.name.endswith('rounded underarm')]
 scene=bpy.context.scene;camera=scene.camera;scene.render.resolution_x=512;scene.render.resolution_y=512
@@ -18,7 +19,8 @@ for frame in range(17):
     checks=[];apply_test_pose(rig,amount,True,bridges,checks);error=endpoint_error(rig,bridges);assert error<1e-5
     for bone in rig.pose.bones:
         for path in ('location','rotation_quaternion','scale'):bone.keyframe_insert(data_path=path,frame=frame+1,group=bone.name)
-    results.append({'frame':frame+1,'endpoint_error':error,'pauldron':checks[0]})
+    skin_error=pinned_skin_error(rig);assert skin_error<1e-5,('Torso skin moved with arm',skin_error)
+    results.append({'frame':frame+1,'endpoint_error':error,'pinned_torso_skin_error':skin_error,'pauldron':checks[0]})
     if frame==16:continue
     for view,angle in [('front',0),('side',90),('back',180)]:
         direction=Quaternion(up,math.radians(angle))@front;camera.location=center+direction*3+up*.35

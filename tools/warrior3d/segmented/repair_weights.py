@@ -76,6 +76,8 @@ for o in meshes:
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from underarm_surface import connect_underarms,endpoint_error
 plate_weights(rig)
+from torso_attachment import anchor_torso_skin
+report['torso_skin_anchors']=anchor_torso_skin(rig)
 bridges,report['underarm_bridges']=connect_underarms(rig)
 from hidden_surfaces import fill_hidden_surfaces
 hidden_surfaces=fill_hidden_surfaces(rig)
@@ -96,7 +98,7 @@ render('unarmed-rest')
 rig['repair_status']='Weight-repair candidate; imported joint positions retained; not production approved'
 bpy.ops.wm.save_as_mainfile(filepath=str(a.out/'Warrior-weight-repair.blend'),compress=True)
 bpy.ops.object.select_all(action='DESELECT')
-for o in meshes+bridges+hidden_surfaces+[rig]:o.select_set(True)
+for o in meshes+bridges+hidden_surfaces+[o for o in bpy.data.objects if o.name.startswith(('Torso-attached skin ','Arm opening closure '))]+[rig]:o.select_set(True)
 bpy.context.view_layer.objects.active=rig
 bpy.ops.export_scene.gltf(filepath=str(a.out/'Warrior-weight-repair.glb'),export_format='GLB',use_selection=True,export_animations=False)
 for frame in range(16):
