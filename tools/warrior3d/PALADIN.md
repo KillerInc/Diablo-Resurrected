@@ -647,3 +647,37 @@ The local asset archive is `Native Paladin Death/Foot Anchored`; its eight-view
 GIF holds the first and final poses for review only. Live in-game death/corpse
 behavior remains unverified; this pass validates the animation and rendered
 atlas, not a new engine build.
+
+## Preserve native legs during redirected death
+
+The separate ankle IK from the preceding refinement caused unnatural inward
+knee bends and has been removed. The current method changes only the shared
+`attach` motion parent, including the translation needed to keep the stance
+midpoint at its original XY position. It preserves the native relative poses
+of both hips, knees, ankles and feet throughout the fall. The feet can pivot
+and release together; individual ankle trajectories are no longer forced.
+The fall axis is still redirected to fit each original cell, and grounding
+still uses vertical offsets. Neither sheet dimensions nor model scale changes.
+
+The renderer helper asserts that all eight thigh/shin/ankle/foot local matrices
+stay native. Independent validation of all 160 poses compared every local bone
+matrix except the intentionally changed `attach`: maximum difference 4.77e-7.
+Maximum starting-pose matrix error was 6.56e-7, and stance midpoint XY error was
+2.81e-7 m. The source animation's leg articulation is therefore preserved within
+numerical tolerance, rather than merely meeting a foot-position constraint.
+
+The updated smallest fitting fall-axis adjustments in S/SW/W/NW/N/NE/E/SE order
+are +45/+90/+90/-112.5/-67.5/0/0/0 degrees. These redirect the fall motion, not the
+initial facing. Bounds selection requires 18 NN8 pixels of clearance and less
+than 0.01 mm of stance-midpoint error. Local work is
+`paladin-native-death/natural-legs`. Previous IK atlases remain local history.
+
+All 160 final body and shadow cells pass rendered-alpha checks with minimum
+39/25 NN8-pixel margins respectively. The eight-view motion review was inspected.
+The installed WLNDT SHA256 is
+`CF531897CB98643D54A79D217D72003BA25A4658BA42AA6D44033EEBCEE611AB`.
+PNG/layout and all six other action hashes were verified after installation.
+The current local archive is `Native Paladin Death/Natural Legs`; the eight-view
+GIF holds its first/final frames for review. Original atlas dimensions, 20-frame
+game timing, scale, southeast light and executable remain unchanged. Live
+gameplay review is still required for the final appearance in motion.

@@ -1,8 +1,7 @@
 """Blender-only pose steering shared by body and projected-shadow rendering.
 
-Redirect pelvis motion relative to its first pose, rather than yawing the actor
-or translating the finished corpse. Preserve native child animation and solve
-both legs to redirected native ankle trajectories. No artwork is embedded.
+Redirect the fall axis while preserving native joint poses. Anchor the horizontal
+stance midpoint through the shared motion parent. No artwork is embedded.
 """
 import math
 import bpy
@@ -27,7 +26,7 @@ class RedirectFall:
             bpy.context.view_layer.update()
             self.native[frame] = {b.name: b.matrix_basis.copy() for b in rig.pose.bones}
         rig.animation_data.action = None
-        self.reach_errors = []
+        self.anchor_errors = []
         self.sample(first_frame)
 
     def sample(self, frame):
@@ -35,12 +34,6 @@ class RedirectFall:
         assert frame in self.native, ('Uncached native pose', frame)
         for name, matrix in self.native[frame].items():
             self.rig.pose.bones[name].matrix_basis = matrix
-        bpy.context.view_layer.update()
-
-    def rotation(self, name, quaternion):
-        bone = self.rig.pose.bones[name]
-        position, _, scale = bone.matrix.decompose()
-        bone.matrix = Matrix.LocRotScale(position, quaternion, scale)
         bpy.context.view_layer.update()
 
     def apply(self, frame, angle):
@@ -59,37 +52,29 @@ class RedirectFall:
         corrected = Matrix.LocRotScale(position, rotation, scale)
         bones['attach'].matrix = corrected @ native['pelvis'].inverted() @ native['attach']
         bpy.context.view_layer.update()
-        errors = []
-        # Remove the native pair's common foot drift, not the body's travel.
-        # The stance may fold/release, but its midpoint stays at the tile origin.
-        drift = sum((native['ankle.'+s].translation - self.initial['ankle.'+s].translation
-                     for s in ['L', 'R']), Vector()) * .5
-        drift.z = 0
+        # Preserve every native joint angle. Pin only the horizontal midpoint
+        # of the stance through the shared motion parent; solving each ankle
+        # separately can force inward knees as the pelvis turns during a fall.
+        first_midpoint = sum((self.initial['ankle.'+side].translation
+                              for side in ['L', 'R']), Vector()) * .5
+        midpoint = sum((bones['ankle.'+side].matrix.translation
+                        for side in ['L', 'R']), Vector()) * .5
+        shift = first_midpoint - midpoint
+        shift.z = 0
+        attach = bones['attach'].matrix.copy()
+        attach.translation += shift
+        bones['attach'].matrix = attach
+        bpy.context.view_layer.update()
+        # Root motion may change; anatomical joint poses must remain native.
         for side in ['L', 'R']:
-            thigh, shin, ankle = [n + '.' + side for n in ['thigh', 'shin', 'ankle']]
-            target = self.initial[ankle].translation + steer @ (
-                native[ankle].translation - self.initial[ankle].translation - drift)
-            hint = self.initial[shin].translation + steer @ (
-                native[shin].translation - self.initial[shin].translation)
-            hip, knee, foot = [bones[n].matrix.translation.copy() for n in [thigh, shin, ankle]]
-            a, b = (knee - hip).length, (foot - knee).length
-            line = target - hip
-            distance = max(abs(a-b)+1e-5, min(line.length, a+b-1e-5))
-            direction = line.normalized()
-            reachable = hip + direction * distance
-            pole = hint - hip
-            pole -= direction * pole.dot(direction)
-            if pole.length < 1e-6:
-                pole = Vector((0, -1, 0)).cross(direction)
-            pole.normalize()
-            along = (a*a-b*b+distance*distance)/(2*distance)
-            desired_knee = hip + direction*along + pole*math.sqrt(max(0, a*a-along*along))
-            self.rotation(thigh, (knee-hip).rotation_difference(desired_knee-hip) @ bones[thigh].matrix.to_quaternion())
-            knee, foot = [bones[n].matrix.translation.copy() for n in [shin, ankle]]
-            self.rotation(shin, (foot-knee).rotation_difference(reachable-knee) @ bones[shin].matrix.to_quaternion())
-            first_rotation = self.initial[ankle].to_quaternion()
-            delta = native[ankle].to_quaternion() @ first_rotation.inverted()
-            self.rotation(ankle, steer @ delta @ steer.inverted() @ first_rotation)
-            errors.append((bones[ankle].matrix.translation-target).length)
-        self.reach_errors.append(max(errors))
-        return max(errors)
+            for joint in ['thigh', 'shin', 'ankle', 'foot']:
+                name = joint + '.' + side
+                original = self.native[frame][name]
+                actual = bones[name].matrix_basis
+                assert max(abs(original[i][j]-actual[i][j])
+                           for i in range(4) for j in range(4)) < 1e-5, ('Changed native leg pose', frame, name)
+        midpoint = sum((bones['ankle.'+side].matrix.translation
+                        for side in ['L', 'R']), Vector()) * .5
+        error = math.hypot(midpoint.x-first_midpoint.x, midpoint.y-first_midpoint.y)
+        self.anchor_errors.append(error)
+        return error
