@@ -710,3 +710,56 @@ Current WLNDT SHA256 is
 All seven installed action hashes were verified. Local archive:
 `Native Paladin Death/North Northwest Refined`. Live gameplay review remains
 outstanding; no executable was changed.
+
+## Unarmed fire casting
+
+Warrior unarmed has no WLNBL sheet in the original assets. In `items.cpp`, only
+Monk equipment exceptions or a shield enable blocking; `player.cpp` skips BL
+loading without that flag. The next applicable unarmed action is fire casting,
+FM. `assets/txtdata/classes/warrior/animations.tsv` defines twenty casting frames
+and release on frame 14; `DoSpell` uses that action frame. No gameplay timing or
+blocking rules are changed.
+
+Four native gestures were visually compared: the two Harbinger unleash clips,
+use-scroll, and `palM_HTH_event_use_resurrect`. The resurrection gesture provides
+an empty open-hand extension, without the unleash roar or scroll-reading pose.
+The exact clip was extracted with the existing selector and merged onto the
+current edited model: 193 animated bones match, with maximum rest difference
+1.013e-5. The mesh, skin bindings, nodes and texture data remain unchanged.
+
+`create_paladin_cast.py` takes that merged native clip, current animated idle,
+output GLB and optional gesture strength. It samples the native gesture so frame
+26 falls on output frame 14, blends into/out of the exact first idle pose, and
+fixes horizontal stance midpoint through root translation. It does not solve
+individual legs. The selected strength is 0.43, with upper-arm weight multiplied
+by 0.65; anatomical elbow flex adds up to 55/20 degrees left/right and is capped
+at 125 degrees. A 25-degree casting-wrist extension presents the palm forward.
+The envelope removes all adjustments at both endpoints. These are pose edits,
+not changes to model size or shadow projection.
+
+The initial full gesture's west/northwest shadow overrun was shown before
+refinement. The casting arm is now kept closer to the body. Original NN8 FM is
+6144 x 15360, twenty 768-square cells per column; the sidecar remains
+`D1R_SHEET_V1 8 48 96`. The installed art scale and full southeast-to-northwest
+shadow projection remain unchanged. No fire particles are baked into the sprite;
+the existing game supplies spell effects. Local work is `paladin-casting`, with
+the selected output under `fire-palm`.
+
+All 160 final body/shadow cells pass rendered-alpha clipping checks, including
+blur; minimum body/shadow margins are 53/5 NN8 pixels. Starting/ending body alpha
+is identical in all eight views. RGB differences are limited to renderer rounding
+(at most 2/255 over at most fifteen pixels in each 768-square cell); authored idle
+endpoint transforms are exact. Release mapping and all source/buffer preservation
+assertions pass. The rendered motion contact sheet was reviewed.
+
+Installed WLNFM SHA256:
+`FD91AF0CBDE40DE5F614421CCEB78C986B632865132BA556DA53B9654A6FBE91`.
+The previous installed FM PNG (SHA256
+`40364A4AE2E9694DC31F2F9357A1344E049912087AA0B9DC849F1A5D2283D791`, no
+layout sidecar) is preserved under `Unarmed Fire Casting/Previous Installed`.
+The selected GLB, atlas, previews and private provenance remain in `Unarmed Fire
+Casting`. The current install manifest now has eight custom actions; all eight
+installed hashes were verified, with the other seven unchanged. The eight-view
+GIF adds review-only endpoint holds; gameplay still uses twenty 50 ms frames.
+No executable/build change. Live projectile/cast appearance remains to be checked
+in game. Lightning and other-magic sheets are still the previous installed art.
