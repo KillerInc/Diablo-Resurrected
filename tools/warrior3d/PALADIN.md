@@ -158,3 +158,29 @@ argument after the calibration JSON to `assemble_paladin_town_walk.py`:
 blender -b --python tools/warrior3d/render_paladin_shadows.py -- RENDER.blend render.json SHADOW_DIRECTORY
 python tools/warrior3d/assemble_paladin_town_walk.py FRAMES REFERENCE OUTPUT CALIBRATION.json SHADOW_DIRECTORY
 ```
+
+## Shorter stride
+
+The user requested shorter steps while retaining the grid-based tile duration.
+`shorten_paladin_stride.py` edits the source animation buffers directly:
+thigh/shin/foot rotations blend 60% toward each bone's cycle mean, while pelvis
+translation excursion is halved. Mesh buffers, joint hierarchy, inverse bind
+matrices, skin weights, texture data and sample times are preserved. A Blender
+re-export approach was rejected after its rendered legs distorted; only the
+direct-buffer result was installed.
+
+`measure_paladin_stride.py` evaluates every pose's boot geometry. Its measured
+ground offset is applied to the root translation so one boot maintains ground
+contact without changing the waist/chest joint relationship. Final minimum
+boot height across 40 poses is 0.00299988–0.00300016 metres (target 0.003).
+Forward foot excursion falls from approximately 1.117 / 1.084 metres to
+0.695 / 0.709 metres: about 36% shorter on average. All eight views were rendered
+and the 64 output cells validated without clipping. Shadows were regenerated
+from this motion, using the existing darker palette and fixed camera calibration.
+
+Installed WLNWL SHA256:
+`BBC37C30440EE22C5BE2977B39A4EA4191E1BECBAA9DA94ECE0B3C0BEFAFDC90`.
+Idle remains unchanged. The stride-comparison GIF plays both versions at
+50 ms per frame (the normal eight-frame cycle); earlier slow art previews are
+not playback-speed references. No engine timing or movement-speed changes were
+made. This pass is render/geometry validated; live gameplay feel remains to judge.
