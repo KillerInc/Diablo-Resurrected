@@ -62,3 +62,36 @@ or an in-game test. Game assets and preview renders remain local.
 python tools/warrior3d/merge_paladin_walk.py CHARACTER.glb WALK.glb OUTPUT.glb
 blender -b --python tools/warrior3d/preview_paladin_walk.py -- OUTPUT.glb PREVIEW_DIRECTORY
 ```
+
+## Installed unarmed town-walk sheet
+
+On 2026-10-24, generated and installed only
+`D:/Games/Diablo/HD/plrgfx/warrior/wln/wlnwl.png` (6144 x 6144 RGBA).
+The user authorized overwriting installed sheets and retains backups elsewhere.
+
+Pipeline:
+
+1. `prepare_town_walk.py` measures the original WLNWL CL2 body masks (excluding
+   palette-zero shadows), and extracts those shadows from the user's NN x8 PNG.
+2. `render_paladin_town_walk.py` renders the merged walk at source frames
+   1, 6, 11, 16, 21, 26, 31 and 36. Orthographic camera elevation is 30 degrees.
+   Rotations produce S, SW, W, NW, N, NE, E, SE. Horizontal root travel is removed.
+3. `assemble_paladin_town_walk.py` fits rendered alpha with one uniform scale
+   and one fixed registration per direction, averaged over the whole cycle.
+   Each body is composited over the corresponding unmodified vanilla shadow.
+   All 64 cells were checked for clipping and sheet dimensions were verified.
+
+Installed SHA256:
+`BBA568A9A324B7F154CF41F2D8236C40F3431C3717F1242A692C0EFED8C8EA15`.
+
+Live verification used the existing installed Diablo Reincarnated 0.4.0-pre
+executable, isolated test saves/configuration, a new Warrior with weapon and
+shield unequipped, and F10 HD mode. The log confirms `wlnwl.png` loaded as eight
+directions / eight frames with 2x retained density. Movement was observed in
+town, including scenery occlusion behind trees and the retained ground shadow.
+GPU captures 8850, 12250-12450 and 13450-13650 contain the new walking character.
+This is a limited directional walk test, not a full gameplay regression.
+
+Only town walking is replaced. Stopping still uses the original WLNST idle;
+other equipment, dungeon actions and all other sheets remain unchanged.
+There is no engine modification, executable replacement or build-version bump.
