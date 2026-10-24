@@ -184,3 +184,33 @@ Idle remains unchanged. The stride-comparison GIF plays both versions at
 50 ms per frame (the normal eight-frame cycle); earlier slow art previews are
 not playback-speed references. No engine timing or movement-speed changes were
 made. This pass is render/geometry validated; live gameplay feel remains to judge.
+
+## Approved walk and unarmed dungeon coverage
+
+The user subsequently tested the shorter town walk in game and approved its
+appearance. It is the baseline for further animation work.
+
+`prepare_paladin_dungeon.py` reuses that approved walk for `wlnaw.png` (eight
+frames) and every second rendered town-idle pose for `wlnas.png` (ten frames).
+Both layouts were checked against the original NN8 PNG and extracted CL2 frame
+counts. The existing scale, fixed directional registration, palette and matching
+projected shadows are retained. All 144 dungeon body cells passed crop checks;
+eight-direction contact sheets were visually reviewed. Installed hashes match:
+
+- WLNAW: `BBC37C30440EE22C5BE2977B39A4EA4191E1BECBAA9DA94ECE0B3C0BEFAFDC90`
+- WLNAS: `F381CFDA8A7326FF6650CCAB1A5E6EF8DC655F688782546D3D29A2AA350EDF5C`
+
+Dungeon standing currently uses the relaxed idle, pending a suitable combat-ready
+clip. Dungeon use has offline validation only. No engine or executable changes
+were needed. Preview timing now follows normal 20 Hz engine ticks: 50 ms for
+walking and 200 ms for standing (four ticks per frame).
+
+The user's unarmed suffix mapping is AS dungeon standing, AW dungeon walking,
+ST town standing, WL town walking, AT attack, HT hit reaction, BL blocking,
+DT death, FM fire casting, LM lightning casting and QM other magic casting.
+Only AS/AW/ST/WL have Paladin replacements. Other action sheets remain existing
+artwork. The inspected animation exports contain only `palM_HTH_nav_idle` and
+`palM_hth_nav_walk`; `palm_anims.glb` duplicates the idle clip. The next needed
+export is an unarmed attack on this same Paladin skeleton. Hit, block, death and
+casting clips are also needed for complete action coverage. No missing motion
+is represented as already available or complete.

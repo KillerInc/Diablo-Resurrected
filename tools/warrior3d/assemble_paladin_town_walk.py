@@ -52,8 +52,9 @@ for r in range(rows):
  for j,(d,label) in enumerate([(0,'South'),(2,'West'),(4,'North')]):
   canvas.alpha_composite(cells[r][d].crop((180,110,580,710)),(j*400,25));draw.text((j*400+10,7),label,fill='white')
  preview.append(canvas.convert('RGB'))
-preview_name='town-idle-preview.gif' if 'st' in filename else 'town-walk-preview.gif'
-preview[0].save(out/preview_name,save_all=True,append_images=preview[1:],duration=130 if rows==20 else 50,loop=0,optimize=False)
+is_idle=Path(filename).stem.endswith(('st','as'))
+preview_name='town-idle-preview.gif' if is_idle else 'town-walk-preview.gif'
+preview[0].save(out/preview_name,save_all=True,append_images=preview[1:],duration=200 if is_idle else 50,loop=0,optimize=False)
 contact=Image.new('RGBA',(768*4,768*2),(42,42,42,255))
 for d in range(8):contact.alpha_composite(cells[0][d],((d%4)*768,(d//4)*768))
 contact.resize((1536,768),Image.Resampling.LANCZOS).convert('RGB').save(out/'eight-directions.png')
