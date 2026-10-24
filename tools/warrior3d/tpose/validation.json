@@ -40,102 +40,102 @@
   "pauldron_clearance": [
     {
       "intersections": 0,
-      "hinge_drift": 1.201947465904182E-07,
+      "hinge_drift": 1.201947465904182e-07,
       "angle_degrees": -20
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -15
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -35
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.201947465904182E-07,
+      "hinge_drift": 1.201947465904182e-07,
       "angle_degrees": -20
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.201947465904182E-07,
+      "hinge_drift": 1.201947465904182e-07,
       "angle_degrees": -20.0
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -19.332108181052483
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20.57090350616535
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -21.125631329235418
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -22.196699141100893
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -15.803039933610929
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -24.629874257261825
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -12.5
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -27.5
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -13.196960066389067
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -30.37012574273817
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -12.874368670764582
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -32.80330085889911
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -13.667891818947519
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -34.42909649383465
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -15.0
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -35.0
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -13.667891818947522
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -34.42909649383465
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -12.874368670764586
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -32.80330085889911
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -13.19696006638908
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -30.370125742738175
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -12.500000000000004
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -27.5
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -15.803039933610926
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -24.629874257261825
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -21.125631329235418
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -22.196699141100893
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.194999734487045E-07,
-      "angle_degrees": -19.332108181052487
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20.57090350616535
     },
     {
       "intersections": 0,
-      "hinge_drift": 1.201947465904182E-07,
+      "hinge_drift": 1.201947465904182e-07,
       "angle_degrees": -20.0
     }
   ]

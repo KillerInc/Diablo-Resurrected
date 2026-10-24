@@ -11,7 +11,9 @@ def clear_hinge(rig,plate,coat,amount):
     # Check local shoulder/neck/chest geometry rather than distant hands/boots.
     names=('tripo_part_3','tripo_part_6','tripo_part_10','tripo_part_13','tripo_part_20','tripo_part_27','tripo_part_31','tripo_part_36','tripo_part_38','tripo_part_47')
     deps=bpy.context.evaluated_depsgraph_get();trees=[tree(bpy.data.objects[n],deps) for n in names]+[tree(coat,deps)]
-    base=20*(1-amount)-15*amount;best=None
+    # Negative Y rotation lifts the outer rim. Keep the lowered-arm pose at
+    # its clearance limit, then lift progressively as the arm rises.
+    base=-20-15*amount;best=None
     for step in range(71):
         angle=base-step;rotation=Quaternion((0,1,0),math.radians(angle)).to_matrix().to_4x4();bone.matrix=Matrix.Translation(pivot)@rotation@Matrix.Translation(-pivot)@rest;bpy.context.view_layer.update()
         current=tree(plate,bpy.context.evaluated_depsgraph_get());count=sum(len(current.overlap(other)) for other in trees)
