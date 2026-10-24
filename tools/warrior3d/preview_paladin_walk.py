@@ -4,6 +4,7 @@ from pathlib import Path
 from mathutils import Vector
 src=Path(sys.argv[sys.argv.index('--')+1]).resolve();out=Path(sys.argv[sys.argv.index('--')+2]).resolve();out.mkdir(parents=True,exist_ok=True)
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
+bpy.context.scene.render.fps=30
 bpy.ops.import_scene.gltf(filepath=str(src))
 rig=next(o for o in bpy.data.objects if o.type=='ARMATURE')
 assert rig.animation_data and rig.animation_data.action,'Imported walk action missing'

@@ -92,6 +92,34 @@ town, including scenery occlusion behind trees and the retained ground shadow.
 GPU captures 8850, 12250-12450 and 13450-13650 contain the new walking character.
 This is a limited directional walk test, not a full gameplay regression.
 
-Only town walking is replaced. Stopping still uses the original WLNST idle;
-other equipment, dungeon actions and all other sheets remain unchanged.
+The initial pass replaced only town walking; the idle addition is recorded below.
 There is no engine modification, executable replacement or build-version bump.
+
+## Town idle addition and consistent action sampling
+
+The user's `palm_Idle_anims.glb` contains `palM_HTH_nav_idle`: 80 samples over
+2.6333 seconds, with the same 193 matching animated bones. The idle is merged
+onto the edited model without modifying its meshes, skin or nodes.
+
+The sheet pipeline now handles both eight-frame walk and twenty-frame idle
+references. Blender's scene rate is set to 30 fps **before** glTF import so
+animation times map to their original sample numbers. Idle samples are
+0,4,...,76 and walk samples are 0,5,...,35 (zero-based Blender frame numbers).
+The walk was regenerated to correct the earlier default-import-rate sampling.
+Both actions use the original walk fit's identical pixel scale and eight
+direction registrations; idle is not independently resized. All 160 idle cells
+and all 64 corrected walk cells fit within their transparent canvases.
+
+Installed town sheets:
+
+| Sheet | Pixel dimensions | SHA256 |
+| --- | --- | --- |
+| `wlnst.png` | 6144 x 15360 | `E49DA41C00277DB56F2B98AAA4F16C9396776D15E87C0EC95F2CFA51F4B5D17D` |
+| `wlnwl.png` | 6144 x 6144 | `7A674371F18094EA45D348F324F52DC5575FEE0E3131B80508023946C7699F3E` |
+
+Live verification with the isolated unarmed Warrior confirmed both WLNST
+(20 frames) and WLNWL (8 frames) load in the existing executable's HD renderer.
+Standing, walking, and return to standing were observed. Stopping now retains
+the Paladin appearance. The isolated game was saved with both weapon and shield
+in inventory. Other equipment and dungeon animations remain vanilla/previous HD
+assets. This does not establish complete collision or gameplay coverage.
