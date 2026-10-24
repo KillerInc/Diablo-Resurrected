@@ -413,3 +413,15 @@ outcome. A separate full-game saved unarmed Warrior replay loaded the expanded
 idle sheet and passed HD/Classic switching, menus/panels and zoom; normal/zoomed
 GPU frames were reviewed. The knee sheet has render/geometry/compositor coverage;
 its actual attack feel/hit contact still needs live gameplay verification.
+
+`overlay_vanilla_paladin.py` produces local idle/walk/attack body-silhouette
+comparisons: cyan is the original decoded CL2 body (palette-zero shadows
+excluded), magenta is our current body, white is shared coverage, and green is
+the tile ground origin. Original cells are placed using their canvas center and
+bottom baseline; new art uses the actual camera-derived root registration and
+approved art scale. Neither is independently resized or body-bound centered.
+The animation comparisons use matching game row counts and timing. Vanilla AT is
+a punch whereas the replacement is a knee, so pose differences are intentional.
+Outputs are local under `paladin-knee/vanilla-overlay` and copied to the asset
+archive's `Expanded Canvas 0.4.1/Vanilla Overlay` directory. No installed files
+were changed for this comparison.
