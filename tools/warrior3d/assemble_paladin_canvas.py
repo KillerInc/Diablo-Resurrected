@@ -49,7 +49,7 @@ for row in range(rows):
             vd.line([(gx-24,gy),(gx+24,gy)],fill=(60,255,130,255),width=4);vd.line([(gx,gy-24),(gx,gy+24)],fill=(60,255,130,255),width=4)
         canvas.paste(view.resize((384,384),Image.Resampling.LANCZOS).convert('RGB'),(column*384,24));draw.text((column*384+10,7),['South','West','Northwest'][column],fill='white')
     draw.text((10,409),info.get('preview_caption','Green cross: fixed tile ground origin. Full moving shadow, sun southeast.'),fill='white');preview.append(canvas)
-    if row==8:canvas.save(out/(preview_prefix+'-contact.png'))
+    if row==info.get('preview_contact_row',8):canvas.save(out/(preview_prefix+'-contact.png'))
 dest=out/filename;sheet.save(dest,compress_level=6)
 (out/(filename+'.layout')).write_text(f'D1R_SHEET_V1 {density} {anchor[0]} {anchor[1]}\n',encoding='ascii')
 report['size']=[cell*8,cell*rows];report['sheet_sha256']=hashlib.sha256(dest.read_bytes()).hexdigest()

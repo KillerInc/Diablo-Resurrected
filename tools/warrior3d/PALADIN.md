@@ -508,3 +508,50 @@ The installed 0.4.1-pre executable completed the isolated 2,700-frame full-game
 HD/Classic/zoom/UI replay with exit 0. Its log confirms the restored WLNST loads
 at 1536 x 3840 retained pixels, twenty frames and 2x density. This replay has no
 final reference-save comparison and does not exercise the new punch in combat.
+
+## Native Paladin animation library and hit reaction
+
+The user supplied `palm_all_anims.glb` in the edited candidate folder. It contains
+330 clips, 816 source nodes and 193 animated bones; every animated bone matches
+our edited Paladin. Maximum rest-matrix difference is 1.01291e-5. The local
+catalog records each clip's maximum sample count/duration across all samplers,
+not just the root sampler. Model geometry and skin/node records are retained.
+
+`select_paladin_animation.py` extracts one exact named clip, packs only needed
+accessors (including inverse-bind matrices), and preserves the source node/skin
+hierarchy. The animation-only result is attached with `merge_paladin_walk.py`.
+The imported 190 MB library stays private; a single reaction's animation data
+compacts to about 249 KB without changing its samples. Local catalog and selected
+models are under `paladin-native-animations`.
+
+HT now uses native `palM_HTH_reac_flinch_B`, with original source samples
+0,5,10,15,20,25 from its 26-sample / 0.8333-second motion. This fills vanilla's
+six hit-recovery frames at its unchanged game timing (0.3 seconds normally).
+The generic get-hit and front-flinch candidates were rejected because their
+full projected shadows exceeded original cells. Back/left/right flinches passed
+a geometric shadow audit; backward recoil was chosen for the default reaction.
+All 48 rendered body and full moving shadow cells pass the final crop checks.
+Source feet remain stationary; minimum boot Z is -0.00679803 m across selected
+poses. No shadow shrinking, extra canvas or model scaling was used.
+
+Installed WLNHT is 6144 x 4608 RGBA, with `D1R_SHEET_V1 8 48 96` layout and SHA256
+`8FC222DC004105F9E70D68A0CE9601B3CC840EB5AA01689C7543CBE23BE1F36B`.
+Installed punch hash was rechecked and is unchanged. Preview/source copies are
+in `Native Paladin Hit Reaction`; the current NN8 install manifest includes HT.
+The raw GIF uses normal six-frame timing. The paused GIF adds idle holds only
+for review; installed gameplay timing is unchanged. This native HT has offline
+render/geometry validation; taking hits in live gameplay still needs verification.
+
+A procedural six-frame hit draft was prepared before this library arrived, but
+was not installed. Its optional `hit` authoring profile is retained as a draft;
+the default approved punch generator was checked to remain byte-identical after
+adding that profile. The native clip supersedes this draft for the installed HT.
+The generic canvas assembler accepts a preview contact-row override for short
+actions. No executable/build version changed for these asset updates.
+
+Inventory cautions for subsequent work: the library's `palM_hth_reac_death`
+contains only two samples (0.0333 seconds), so do not assume it is a complete
+fall/death motion. No explicitly HTH attack or block/parry-named clip was found
+in the catalog; keep the user-approved authored punch until another is reviewed.
+Prayer/scroll events and weapon-specific attacks are present and need individual
+inspection before mapping them to further D1 actions.
