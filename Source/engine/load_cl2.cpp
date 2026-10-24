@@ -8,6 +8,7 @@
 #include "mpq/mpq_common.hpp"
 #include "utils/status_macros.hpp"
 #include "utils/str_cat.hpp"
+#include "reincarnated/sheet_source.hpp"
 
 #ifdef UNPACKED_MPQS
 #include "engine/load_clx.hpp"
@@ -23,11 +24,12 @@ std::expected<OwnedClxSpriteListOrSheet, std::string> LoadCl2ListOrSheetWithStat
 	char path[MaxMpqPathSize];
 	*BufCopy(path, pszName, DEVILUTIONX_CL2_EXT) = '\0';
 #ifdef UNPACKED_MPQS
-	return LoadClxListOrSheetWithStatus(path);
+	ASSIGN_OR_RETURN(OwnedClxSpriteListOrSheet result, LoadClxListOrSheetWithStatus(path));
+	return reincarnated::AnnotateSheetSource(std::move(result), pszName);
 #else
 	size_t size;
 	ASSIGN_OR_RETURN(std::unique_ptr<uint8_t[]> data, LoadFileInMemWithStatus<uint8_t>(path, &size));
-	return Cl2ToClx(std::move(data), size, widthOrWidths);
+	return reincarnated::AnnotateSheetSource(Cl2ToClx(std::move(data), size, widthOrWidths), pszName);
 #endif
 }
 

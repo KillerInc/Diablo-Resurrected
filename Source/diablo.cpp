@@ -98,6 +98,7 @@
 #include "qol/xpbar.h"
 #include "quick_messages.hpp"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_presenter.hpp"
 #include "restrict.h"
 #include "stores.h"
 #include "storm/storm_net.hpp"
@@ -783,11 +784,23 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 		if (SDLC_EventKey(event) == SDLK_F10) {
 #ifndef USE_SDL1
 			if (!event.key.repeat) {
-				if (renderer == nullptr) {
+				if (
+#ifdef USE_SDL3
+                    !reincarnated::HasGpuPresenter()
+#else
+                    renderer == nullptr
+#endif
+                ) {
 					GetOptions().Graphics.upscale.SetValue(true);
 					ReinitializeRenderer();
 				}
-				if (renderer != nullptr) {
+				if (
+#ifdef USE_SDL3
+                    reincarnated::HasGpuPresenter()
+#else
+                    renderer != nullptr
+#endif
+                ) {
 					reincarnated::GetRendererSwitch().onF10KeyDown(false);
 					Log("Renderer mode: {}", reincarnated::GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic");
 					reincarnated::ResetHdAssets();

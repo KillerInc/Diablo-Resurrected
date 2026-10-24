@@ -54,6 +54,8 @@ public:
 		return LoadLE16(&data_[2]);
 	}
 
+	[[nodiscard]] constexpr uint16_t headerSize() const { return LoadLE16(data_); }
+
 	[[nodiscard]] constexpr uint16_t height() const
 	{
 		return LoadLE16(&data_[4]);

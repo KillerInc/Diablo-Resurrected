@@ -86,6 +86,15 @@ project(DevilutionX
   LANGUAGES C CXX)
 set(PROJECT_VERSION_WITH_SUFFIX "${VERSION_PREFIX}${VERSION_SUFFIX}")
 
+# Product identity is independent of upstream network/save-format versions.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/REINCARNATED_VERSION" REINCARNATED_DISPLAY_VERSION LIMIT_COUNT 1)
+if(NOT REINCARNATED_DISPLAY_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-[0-9A-Za-z.-]+)?$")
+  message(FATAL_ERROR "Invalid REINCARNATED_VERSION")
+endif()
+set(REINCARNATED_VERSION_MAJOR ${CMAKE_MATCH_1})
+set(REINCARNATED_VERSION_MINOR ${CMAKE_MATCH_2})
+set(REINCARNATED_VERSION_PATCH ${CMAKE_MATCH_3})
+
 # Platform definitions can override options and we want `cmake_dependent_option` to see the effects.
 # Note that a few options are still defined before this because they're needed by `VcPkgManifestFeatures.cmake`.
 include(Platforms)
@@ -411,6 +420,10 @@ endif()
 # Retain the upstream CMake target name for its build dependencies.
 if(WIN32 AND NOT UWP_LIB)
   set_target_properties(${BIN_TARGET} PROPERTIES OUTPUT_NAME "Diablo Reincarnated")
+  if(USE_SDL3)
+    configure_file(Packaging/windows/reincarnated_version.rc.in "${CMAKE_CURRENT_BINARY_DIR}/reincarnated_version.rc" @ONLY)
+    target_sources(${BIN_TARGET} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/reincarnated_version.rc")
+  endif()
 endif()
 
 if(NOT UWP_LIB)

@@ -19,6 +19,7 @@
 #endif
 
 #include "engine/point.hpp"
+#include "reincarnated/raster_bridge.hpp"
 #include "utils/sdl_geometry.h"
 #include "utils/sdl_wrap.h"
 
@@ -88,7 +89,10 @@ struct Surface {
 	void SetPixel(Point position, std::uint8_t col) const
 	{
 		if (InBounds(position))
+			{
 			(*this)[position] = col;
+			if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(at(position.x, position.y), 1);
+		}
 	}
 
 	/**

@@ -1,3 +1,4 @@
+#ifndef USE_SDL3
 #include "hd_renderer.hpp"
 #include <cmath>
 #include <limits>
@@ -122,7 +123,8 @@ bool Queue(const std::string &path, int left, int bottom, int nominalW, int nomi
     // before the GPU HD overlay. Since the menu has no separate GPU layer
     // yet, prefer the classic world sprites whenever the menu is open so
     // they cannot cover menu text or sliders.
-    if (!ShouldDrawHdWorld(GetRendererSwitch().usesHdRenderer(), devilution::gmenu_is_active())
+    if (devilution::gmenu_is_active()
+        || !ShouldDrawHdWorld(GetRendererSwitch().usesHdRenderer(), devilution::gmenu_is_active())
         || devilution::renderer == nullptr
         || nominalW <= 0 || nominalH <= 0 || zoom <= 0)
         return false;
@@ -258,3 +260,5 @@ bool QueueHdMonster(int, int, int, int, int, int, int, int) { return false; }
 bool QueueHdTile(int, unsigned, int, int, int, int, int) { return false; }
 #endif
 } // namespace reincarnated
+
+#endif
