@@ -1,8 +1,8 @@
 """Author a separate 16-pose straight punch from the current idle's skeleton.
 
 Blender --python SCRIPT -- IDLE.glb OUTPUT.glb
-Two-bone arm IK is solved in glTF world coordinates. Only local rotations change;
-all original geometry, skin bindings and node records are preserved. No glTF
+Arm and planted-leg IK are solved in glTF world coordinates. Rotations and a
+small root weight shift change; geometry, skin bindings and nodes are preserved. No glTF
 scene re-export is used. This is a preview candidate, not an installed action.
 """
 import copy,json,math,struct,sys
@@ -69,23 +69,59 @@ def arm(pose,side,target,guard):
     set_world_rotation(pose,e,rotation)
     return list(position(world_matrices(pose),h))
 
-guard=[0,.15,.4,.7,1,1,1,1,1,1,1,1,.85,.6,.3,0]
-strike=[0,0,0,0,.05,.15,.4,.75,1,.55,.2,0,0,0,0,0]
-yaw=[0,0,-.02,-.06,-.10,-.08,-.03,.04,.13,.07,.01,-.02,-.01,0,0,0]
-poses=[];measure=[];modified={'chest','upperArm.R','forearm.R','upperArm.L','forearm.L','hand.R','hand.L','head'}
+def planted_leg(pose,side,amount):
+    u,e,h=[n+'.'+side for n in ['thigh','shin','ankle']]
+    world=world_matrices(pose);hip=position(world,u);knee=position(world,e);ankle=position(world,h)
+    target=position(initial,h);l1=(knee-hip).length;l2=(ankle-knee).length
+    direction=target-hip;distance=direction.length
+    assert abs(l1-l2)<distance<l1+l2,('leg reach',side,distance,l1+l2)
+    direction.normalize();hint=position(initial,e)+Vector((0,-.02,.14*amount))
+    perpendicular=hint-hip;perpendicular-=direction*perpendicular.dot(direction);perpendicular.normalize()
+    along=(l1*l1-l2*l2+distance*distance)/(2*distance)
+    desired=hip+direction*along+perpendicular*math.sqrt(max(0,l1*l1-along*along))
+    set_world_rotation(pose,u,(knee-hip).rotation_difference(desired-hip)@world[names[u]].to_quaternion())
+    world=world_matrices(pose);knee=position(world,e);ankle=position(world,h)
+    set_world_rotation(pose,e,(ankle-knee).rotation_difference(target-knee)@world[names[e]].to_quaternion())
+    set_world_rotation(pose,h,initial[names[h]].to_quaternion())
+
+guard=[0,.12,.38,.72,.96,1,1,1,1,1,1,.97,.86,.65,.32,0]
+strike=[0,0,0,0,0,.04,.22,.72,1,.80,.38,.09,0,0,0,0]
+yaw=[0,0,-.025,-.07,-.12,-.15,-.12,.015,.20,.17,.09,.025,-.015,-.01,0,0]
+hip_yaw=[0,0,-.02,-.055,-.10,-.12,-.085,.02,.20,.23,.16,.10,.045,.01,-.008,0]
+weight_x=[0,-.005,-.012,-.025,-.03,-.02,0,.03,.055,.045,.03,.015,0,-.005,-.003,0]
+weight_y=[0,-.003,-.01,-.02,-.025,-.025,-.018,-.005,0,-.003,-.01,-.015,-.012,-.007,-.002,0]
+weight_z=[0,0,-.01,-.025,-.035,-.02,.01,.04,.07,.06,.04,.025,.01,0,0,0]
+poses=[];measure=[];modified={'root','chest','upperArm.R','forearm.R','upperArm.L','forearm.L','hand.R','hand.L','head'}
+modified|={n+'.'+s for n in ['thigh','shin','ankle'] for s in ['L','R']}
 modified|={f'm{number:03d}.{side}' for number in range(14,26) for side in ['R','L'] if f'm{number:03d}.{side}' in names}
 for row in range(16):
     pose=copy.deepcopy(base)
     if guard[row]:
-        chest=Quaternion((0,1,0),yaw[row])@Quaternion((1,0,0),.035*strike[row])@initial[names['chest']].to_quaternion()
+        shift=Vector((weight_x[row],weight_y[row],weight_z[row]));turn=Quaternion((0,1,0),hip_yaw[row])
+        pose[names['root']]['translation']=base[names['root']]['translation']+np.array(shift)
+        set_world_rotation(pose,'root',turn@initial[names['root']].to_quaternion())
+        # Lower the hips just enough to keep both planted legs within reach.
+        world=world_matrices(pose);lower=0
+        for side in ['R','L']:
+            hip=position(world,'thigh.'+side);knee=position(world,'shin.'+side);ankle=position(world,'ankle.'+side);target=position(initial,'ankle.'+side)
+            reach=((knee-hip).length+(ankle-knee).length)*.995
+            horizontal=(hip.x-target.x)**2+(hip.z-target.z)**2
+            assert horizontal<reach*reach
+            lower=max(lower,hip.y-target.y-math.sqrt(reach*reach-horizontal))
+        pose[names['root']]['translation'][1]-=max(0,lower)
+        for side in ['R','L']:planted_leg(pose,side,guard[row])
+        chest=Quaternion((0,1,0),hip_yaw[row]+yaw[row])@Quaternion((1,0,0),.085*strike[row])@initial[names['chest']].to_quaternion()
         set_world_rotation(pose,'chest',chest)
-        set_world_rotation(pose,'head',initial[names['head']].to_quaternion())
+        set_world_rotation(pose,'head',Quaternion((0,1,0),.25*hip_yaw[row])@Quaternion((1,0,0),.025*strike[row])@initial[names['head']].to_quaternion())
         world=world_matrices(pose)
         for side in ['R','L']:
             shoulder=position(world,'upperArm.'+side);sign=-1 if side=='R' else 1
-            ready=Vector((sign*.23,1.30,.24))
+            ready=turn@Vector((sign*.23,1.30,.24))+shift
             target=ready
-            if side=='R':target=ready.lerp(shoulder+Vector((.035,-.055,.52)),strike[row])
+            if side=='R':
+                target=ready.lerp(shoulder+Vector((.06,-.035,.52)),strike[row])
+                target.y+=.045*math.sin(math.pi*strike[row])
+            else:target+=Vector((.025*strike[row],.045*strike[row],-.045*strike[row]))
             target=position(initial,'hand.'+side).lerp(target,guard[row])
             arm(pose,side,target,guard[row])
             world=world_matrices(pose)
@@ -93,6 +129,7 @@ for row in range(16):
             forearm=wrist-position(world,'forearm.'+side)
             original_hand=world[names['hand.'+side]].to_quaternion()
             straight=(knuckles-wrist).rotation_difference(forearm)@original_hand
+            if side=='R':straight=Quaternion(forearm.normalized(),-.5*strike[row])@straight
             set_world_rotation(pose,'hand.'+side,original_hand.slerp(straight,guard[row]))
             world=world_matrices(pose)
             lateral=world[names['handEnd.'+side]].to_3x3().col[2].normalized()
@@ -105,7 +142,7 @@ for row in range(16):
                     bend=Quaternion(lateral,math.radians(degrees)*guard[row]*(-1 if side=='R' else 1))
                     set_world_rotation(pose,finger,bend@world[names[finger]].to_quaternion())
     world=world_matrices(pose)
-    measure.append({'row':row,'right_wrist':list(position(world,'hand.R')),'left_wrist':list(position(world,'hand.L')),'right_elbow':list(position(world,'forearm.R')),'right_shoulder':list(position(world,'upperArm.R'))})
+    measure.append({'row':row,'root_translation':pose[names['root']]['translation'].tolist(),'right_wrist':list(position(world,'hand.R')),'left_wrist':list(position(world,'hand.L')),'right_elbow':list(position(world,'forearm.R')),'right_shoulder':list(position(world,'upperArm.R'))})
     poses.append(pose)
 
 def add(data,kind):
@@ -116,7 +153,7 @@ def add(data,kind):
     ai=len(g['accessors']);g['accessors'].append(ac);return ai
 
 time=add(np.arange(16,dtype=float)[:,None]/30,'SCALAR');clip={'name':'Paladin-unarmed-straight-punch','channels':[],'samplers':[]}
-keys=set(tracks)|{(names[n],'rotation') for n in modified}
+keys=set(tracks)|{(names[n],'rotation') for n in modified}|{(names['root'],'translation')}
 for i,path in sorted(keys):
     values=np.array([p[i][path] for p in poses])
     clip['channels'].append({'sampler':len(clip['samplers']),'target':{'node':i,'path':path}})
@@ -129,5 +166,5 @@ for i in range(len(base)):
 text=json.dumps(g,separators=(',',':')).encode();text+=b' '*((-len(text))%4);blob.extend(b'\0'*((-len(blob))%4))
 destination.parent.mkdir(parents=True,exist_ok=True);assert destination.resolve()!=source.resolve()
 destination.write_bytes(struct.pack('<III',0x46546c67,2,28+len(text)+len(blob))+struct.pack('<II',len(text),0x4e4f534a)+text+struct.pack('<II',len(blob),0x004e4942)+blob)
-destination.with_suffix('.punch.json').write_text(json.dumps({'contact_frame_one_based':9,'frames':16,'guard':guard,'strike':strike,'torso_yaw_radians':yaw,'geometry_bind_and_nodes_preserved':True,'idle_endpoints_exact':True,'wrist_trajectories':measure},indent=2))
+destination.with_suffix('.punch.json').write_text(json.dumps({'contact_frame_one_based':9,'frames':16,'guard':guard,'strike':strike,'torso_yaw_radians':yaw,'hip_yaw_radians':hip_yaw,'weight_shift_metres':list(zip(weight_x,weight_y,weight_z)),'planted_ankle_targets':True,'geometry_bind_and_nodes_preserved':True,'idle_endpoints_exact':True,'wrist_trajectories':measure},indent=2))
 print('Created sixteen-pose straight punch; knee and idle input unchanged')

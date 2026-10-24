@@ -452,3 +452,26 @@ no executable, installed sheet or build version is changed by this preview.
 All 128 body and full moving shadow cells passed expanded-canvas checks. The
 preview GIF plays sixteen frames at 50 ms each. The compatible candidate atlas
 and its layout are saved locally for possible later testing, not installed.
+
+## Punch refinement after rigid-motion feedback
+
+The user rejected the first punch as too rigid. The revised authoring pass adds
+root/hip yaw, forward/lateral weight transfer, body dip, stronger delayed shoulder
+rotation, an arcing accelerating hand path, left-hand counter-motion, forearm
+pronation and a longer follow-through/recovery. This supersedes the earlier
+rotation-only prototype: root translation now changes as part of the animation,
+without scaling geometry or moving the game tile. Hip yaw ranges from -6.88 to
+13.18 degrees; the combined shoulder turn reaches about 23 degrees. Body dip is
+up to 3.78 cm. Both idle endpoints and ninth-frame contact remain fixed.
+
+Both legs are solved against the original ankle positions, with their original
+foot orientations. Reach is checked before solving; hips lower enough to avoid
+overextending either planted leg. Imported-result measurements show foot drift
+below 3e-7 m and boot minimum Z from -0.006820925 to -0.006820654 m. There is no
+sliding, model-height scaling or altered attack/gameplay timing. All 128 body and
+moving-shadow cells fit the expanded canvas and use the southeast sun rule.
+
+Local work is `paladin-punch-fluid`; copies are in `Unarmed Punch Preview/Fluid
+Pass`. `punch-before-after.gif` compares the old and revised west views at the
+same display scale, anchor and normal playback speed. This remains an offline
+preview candidate, with the knee still installed and no executable/version change.
