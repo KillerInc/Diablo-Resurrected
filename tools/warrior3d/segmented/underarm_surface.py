@@ -7,20 +7,21 @@ def connect_underarms(rig):
     for side,sign in [('R',-1),('L',1)]:
         shoulder=rig.data.bones[side+'_Upperarm'].head_local.copy()
         elbow=rig.data.bones[side+'_Forearm'].head_local.copy()
-        start=shoulder+Vector((-sign*.047,0,-.018))
-        end=shoulder+(elbow-shoulder).normalized()*.10
-        control=shoulder+Vector((0,0,-.012))
+        start=shoulder+Vector((-sign*.035,0,-.012))
+        end=shoulder+(elbow-shoulder).normalized()*.052
+        control=shoulder+Vector((0,0,-.006))
         vertices=[];faces=[];weights=[];rows=9;cols=24
         for row in range(rows):
             t=row/(rows-1)
             center=(1-t)**2*start+2*(1-t)*t*control+t*t*end
+            center.y-=.018
             tangent=(2*(1-t)*(control-start)+2*t*(end-control)).normalized()
             axis_y=Vector((0,1,0));axis_v=tangent.cross(axis_y).normalized()
             # Concealed ends and broad rounded deltoid preserve a real volume.
-            radius=(.023+.005*math.sin(math.pi*t)) if side=='R' else (.020+.004*math.sin(math.pi*t))
+            radius=(.019+.003*math.sin(math.pi*t)) if side=='R' else (.017+.002*math.sin(math.pi*t))
             for col in range(cols):
                 angle=2*math.pi*col/cols
-                point=center+axis_y*(radius*math.cos(angle))+axis_v*(radius*math.sin(angle))
+                point=center+axis_y*(radius*1.45*math.cos(angle))+axis_v*(radius*math.sin(angle))
                 vertices.append(tuple(point));u=t*t*(3-2*t);weights.append(u)
         for row in range(rows-1):
             for col in range(cols):

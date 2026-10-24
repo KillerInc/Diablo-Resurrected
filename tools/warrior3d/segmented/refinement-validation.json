@@ -1,24 +1,29 @@
 {
   "pose_samples": 17,
-  "loop_matrix_error": 0.0,
-  "joint_test_degrees": {
-    "knee": 60,
-    "shoulder": 65,
-    "elbow": 25
-  },
-  "maximum_pauldron_intersections": 0.0,
-  "status": "joint-range review candidate; not locomotion",
-  "views": [
-    "front",
-    "side",
-    "back"
-  ],
-  "maximum_hinge_drift": 0.0,
   "existing_mesh_stretch": {
     "p99_edge_stretch": 1.1118876554529686,
     "maximum_edge_stretch": 1.878249911329042,
     "edges_stretched_over_3x": 0,
     "maximum_by_part": {}
   },
-  "maximum_endpoint_error": 2.656156841358476E-07
+  "maximum_pauldron_intersections": 0.0,
+  "maximum_hinge_drift": 0.0,
+  "maximum_endpoint_error": 2.7837666410609194E-07,
+  "views": [
+    "front",
+    "side",
+    "back"
+  ],
+  "status": "joint-range review candidate; not locomotion",
+  "joint_test_degrees": {
+    "elbow": 25,
+    "knee": 60,
+    "shoulder": 65
+  },
+  "reconstructed_hidden_surfaces": [
+    "Reconstructed closed torso back",
+    "Reconstructed neck",
+    "Reconstructed skull beneath hair"
+  ],
+  "loop_matrix_error": 0.0
 }

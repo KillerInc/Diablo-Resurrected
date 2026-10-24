@@ -17,6 +17,7 @@ def apply_test_pose(rig,amount,repair_active=False,bridges=(),collision_results=
     set_control(rig,amount)
     if repair_active:
         colliders=[bpy.data.objects[f'tripo_part_{i}'] for i in (2,6,8,15,17,18,21,26,35,37,38)]+list(bridges)
+        colliders += [o for o in bpy.data.objects if o.type=='MESH' and o.name.startswith('Reconstructed ')]
         clearance=clear_body(rig,colliders)
         assert clearance['intersections']==0,('Pauldron collision',clearance)
         if collision_results is not None:collision_results.append(clearance)

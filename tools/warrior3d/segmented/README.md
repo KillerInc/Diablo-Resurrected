@@ -32,3 +32,5 @@ The hand retains its original gripping shape. Socket surface texture blending, e
 - [SideFX Houdini 21 rigging](https://www.sidefx.com/products/whats-new-in-h21/rigging/): reusable controls, anatomical components and corrective deformation. Here the refinements are implemented in the existing Blender workflow; Houdini/APEX is not required or claimed to be implemented.
 
 These are principles and quality references, not proof that this asset matches their demonstrated production quality.
+
+Shield-removal correction: reconstruct closed torso-back, neck and skull surfaces tucked underneath the original geometry. The back uses procedural worn leather; the concealed skull uses dark hair shading to prevent a bald patch behind the original hair. Structural validation confirms manifold edge counts and hits along five sampled rear sightlines. This fills missing geometry; blending the new panel materials into the original coat remains an art refinement. Shoulder sockets are shortened and brought toward the visible arm surfaces to reduce the misplaced muscle appearance. Current pauldron clearance includes the new reconstructed surfaces.
