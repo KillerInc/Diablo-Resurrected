@@ -324,3 +324,44 @@ is still installed, and idle/walk still have the earlier projection. Those need
 consistent relighting in the next implementation pass. Do not treat the old
 negative-X/negative-Y projection, compressed kick shadow or held idle shadow as
 the final lighting standard.
+
+## Knee attack review replacing the kick
+
+The user requested a knee strike. `sample_paladin_knee.py` uses only the kick's
+early chamber samples (0–3), adds a weighted 50-degree right-shin fold, and blends
+from/to the current idle over sixteen frames. The knee leads the tucked boot at
+contact: world forward is negative Y, knee Y is -0.46937 m and foot Y is
+-0.39118 m. Contact remains on row 8 / action frame 9. Meshes, bindings, model
+height and calibrated pixels per metre are unchanged. Ground correction targets
+the idle's original boot height instead of lifting its endpoints to a new plane.
+Final boot minimum Z is -0.006821007 to -0.006820712 m; planted-foot XY drift is
+below 6e-8 m. Both endpoint poses return to the original idle placement.
+
+The common renderer now defaults to southeast main light (3,-4,6), with northwest
+sun-shadow rays derived from that light. Character rotation leaves the world
+light fixed. This knee preview uses a full moving shadow, with distance gain 1:
+no shrinking or held-idle substitution. Existing installed idle/walk assets have
+not been relit by this code change.
+
+`preview_paladin_attack.py` composes an uncropped review using a 256-pixel
+overscan shadow render. The red rectangle marks the actual 1024-pixel cell.
+All 128 body poses fit. Six northwest-facing shadow poses (one-based frames
+6–11) cross the left boundary, by up to 56 NN8 pixels / 7 logical pixels.
+The user explicitly asked to see clipping issues before they are fixed, so this
+is a review candidate and has **not** replaced the installed WLNAT sheet.
+Do not hide the overflow by shortening the shadow or rescaling the character.
+
+Local work: `warrior-3d/paladin-knee/Paladin-knee-final-v2.glb`, `frames-final`,
+`shadows-overscan`, `final-v2-measure.json` and `review/bounds.json`.
+`review/knee-preview.gif` plays at the normal 50 ms per frame and shows S/W/NW;
+`knee-contact-eight-directions.png` shows every facing at contact. Copies are
+saved beside the edited model under `Unarmed Knee Review`. The previous kick
+and installed game sheets remain intact. No engine or build-version change.
+
+Reproduce by sampling the retargeted kick and idle without measurement, evaluating
+that result with `measure_paladin_attack.py`, then resampling with the measured
+ground/support input. Render with the existing attack reference (frames 0–15,
+horizontal root motion preserved, sun (3,-4,6), shadow distance gain 1). For the
+review, expand only the shadow render canvas from 1024 to 1536 and multiply the
+camera's orthographic scale by 1.5, preserving pixels per metre; pass those
+overscan shadows and normal body frames to `preview_paladin_attack.py`.

@@ -19,6 +19,7 @@ for o in list(bpy.data.objects):
  o.hide_render=True
 assert len(parts)==6,len(parts)
 info=json.loads(metadata.read_text());times=info['source_frames']
+sun=info.get('sun_position',[3,-4,6]);assert sun[2]>0
 rig.location=(0,0,0);rig.rotation_euler=(0,0,0);scene.frame_set(1);bpy.context.view_layer.update();initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy()
 material=bpy.data.materials.new('Ground shadow silhouette');material.use_nodes=True;nodes=material.node_tree.nodes;nodes.clear();output=nodes.new('ShaderNodeOutputMaterial');emit=nodes.new('ShaderNodeEmission');emit.inputs['Color'].default_value=(0,0,0,1);material.node_tree.links.new(emit.outputs[0],output.inputs['Surface'])
 mesh=bpy.data.meshes.new('Projected character');shadow=bpy.data.objects.new('Projected character',mesh);bpy.context.collection.objects.link(shadow);shadow.data.materials.append(material)
@@ -34,9 +35,9 @@ for d in range(8):
   for o in parts:
    ev=o.evaluated_get(deps);me=ev.to_mesh();offset=len(vertices);transform=ev.matrix_world
    for v in me.vertices:
-    p=transform@v.co;h=max(0,p.z);x=p.x-.23*h;y=p.y-.32*h
+    p=transform@v.co;h=max(0,p.z);x=p.x-sun[0]/sun[2]*h;y=p.y-sun[1]/sun[2]*h
     vertices.append((anchor.x+(x-anchor.x)*gain,anchor.y+(y-anchor.y)*gain,.002))
    faces.extend(tuple(offset+i for i in poly.vertices) for poly in me.polygons);ev.to_mesh_clear()
   mesh.clear_geometry();mesh.from_pydata(vertices,[],faces);mesh.update()
   scene.render.filepath=str(out/f'shadow-{d}-{row}.png');bpy.ops.render.render(write_still=True)
-(out/'shadow.json').write_text(json.dumps({'method':'opaque body projected onto z=0','light_direction':[.23,.32,1],'distance_gain_about_support_foot':info.get('shadow_distance_gain',1),'frames':len(times),'directions':8,'same_camera_as_body':True},indent=2))
+(out/'shadow.json').write_text(json.dumps({'method':'opaque body projected onto z=0','sun_position':sun,'cast_direction':[-sun[0]/sun[2],-sun[1]/sun[2],-1],'distance_gain_about_support_foot':info.get('shadow_distance_gain',1),'frames':len(times),'directions':8,'same_camera_as_body':True},indent=2))

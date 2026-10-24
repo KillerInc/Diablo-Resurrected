@@ -18,6 +18,6 @@ for frame in range(round(first),round(last)+1):
     z=min((ev.matrix_world@v.co).z for v in mesh.vertices);ev.to_mesh_clear()
     report.append({'frame':frame,'boot_min_z':z,'bones':{
         n:list(rig.matrix_world@rig.pose.bones[n].head)
-        for n in ['root','pelvis','foot.L','foot.R']}})
+        for n in ['root','pelvis','shin.R','ankle.R','foot.L','foot.R']}})
 Path(out).write_text(json.dumps(report,indent=2))
 print('Measured',len(report),'poses; boot Z range:',min(r['boot_min_z'] for r in report),max(r['boot_min_z'] for r in report))

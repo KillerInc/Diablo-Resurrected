@@ -19,7 +19,8 @@ ref=json.loads(reference.read_text());cell=ref.get('cell',768)
 scene.render.resolution_x=cell;scene.render.resolution_y=cell
 target=Vector((0,0,.9));bpy.ops.object.camera_add(location=(0,-6,.9+6*math.tan(math.radians(30))));camera=bpy.context.object;camera.rotation_euler=(target-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.type='ORTHO';camera.data.ortho_scale=2.75;scene.camera=camera
 camera.data.ortho_scale=2.75*cell/768
-for pos,power,size in [((-3,-4,6),400,4),((3,-1,3),140,3),((0,3,4),110,3)]:
+sun_position=ref.get('sun_position',[3,-4,6])
+for pos,power,size in [(sun_position,400,4),((-3,-1,3),140,3),((0,3,4),110,3)]:
  bpy.ops.object.light_add(type='AREA',location=pos);l=bpy.context.object;l.data.energy=power;l.data.size=size;l.rotation_euler=(target-l.location).to_track_quat('-Z','Y').to_euler()
 # Direction order is controlled by rotating the character under a fixed camera.
 # Remove horizontal root travel only; retain vertical bob and all limb motion.
@@ -46,4 +47,4 @@ for d in range(8):
   pose(d,r);scene.render.filepath=str(out/f'body-{d}-{r}.png');bpy.ops.render.render(write_still=True)
 pose(0,0);camera.data.shift_x,camera.data.shift_y=registrations[0]
 bpy.ops.wm.save_as_mainfile(filepath=str(out/'Paladin-town-walk-render.blend'))
-(out/'render.json').write_text(json.dumps({'source_frames':times,'output_rows':rows,'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))
+(out/'render.json').write_text(json.dumps({'source_frames':times,'output_rows':rows,'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))
