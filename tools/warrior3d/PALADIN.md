@@ -475,3 +475,36 @@ Local work is `paladin-punch-fluid`; copies are in `Unarmed Punch Preview/Fluid
 Pass`. `punch-before-after.gif` compares the old and revised west views at the
 same display scale, anchor and normal playback speed. This remains an offline
 preview candidate, with the knee still installed and no executable/version change.
+
+## Selected punch and restored original NN8 dimensions
+
+The user selected the revised full-body punch, and clarified that the desired
+size was the original NN8 size before adding shadow canvas. The assembler now
+accepts explicit `canvas_logical` and `canvas_anchor` metadata. All five custom
+unarmed sheets were rebuilt at their original dimensions and installed, with the
+revised punch replacing the knee. The 0.4.1-pre executable is unchanged; optional
+expanded-canvas support remains available for future assets.
+
+Attack cells are 128 logical / 1024 source pixels, anchor (64,128). Idle/walk
+cells are 96 logical / 768 source pixels, anchor (48,96). These agree with the
+original Classic canvas-center and baseline placement. Model scale, shortened
+walk, ninth-frame punch contact, corrected root alignment and southeast sunlight
+are retained. Every body and full moving shadow fits without trimming or extra
+shadow compression. PNG dimensions were compared directly with the user's
+original NN8 files before installation, and installed hashes were verified.
+
+| Sheet | Original/restored PNG size | SHA256 |
+| --- | --- | --- |
+| WLNAT | 8192 x 16384 | `30479C2A4480C55F8FC788F7E555B69A816FB5D88F0660B8D0C8C22DF4463B1A` |
+| WLNWL / WLNAW | 6144 x 6144 | `84EC2D63A2FC5220850EF222BEBE6B2C6B9025732AB841A4DBFA4DF00E840438` |
+| WLNST | 6144 x 15360 | `396DBCDBE0C01BDF43EE084A2DAC5B49B58E3FBD84412DADD0B1F34D4774F087` |
+| WLNAS | 6144 x 7680 | `E3E924620B19BDC1B0578B0817D591D38DF09281974B9F1DBE3B95591C3286EF` |
+
+Local work and the install manifest are under `paladin-vanilla-dimensions`;
+asset copies and the punch preview are under `Vanilla NN8 Dimensions`. Prior
+expanded sheets, knee and punch prototypes remain in their separate asset
+directories. No proprietary art is included in Git.
+The installed 0.4.1-pre executable completed the isolated 2,700-frame full-game
+HD/Classic/zoom/UI replay with exit 0. Its log confirms the restored WLNST loads
+at 1536 x 3840 retained pixels, twenty frames and 2x density. This replay has no
+final reference-save comparison and does not exercise the new punch in combat.

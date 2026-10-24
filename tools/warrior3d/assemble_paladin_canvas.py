@@ -1,9 +1,10 @@
-"""Build an expanded, root-anchored HD-only attack canvas, without installing it.
+"""Build a root-anchored HD canvas, without installing it.
 
 python SCRIPT BODY_FRAMES OVERSCAN_SHADOWS RENDER.json CALIBRATION.json OUTPUT
-The raw body is 1024 square; shadows have 256 extra pixels on every side.
+Raw bodies are 768/1024 square; shadows have 256 extra pixels on every side.
 Uniform art scale is retained; the projected world ground origin anchors to the
-center of a 64x32 logical tile. Requires the 0.4.1 named-sheet layout extension.
+center of a 64x32 logical tile. Optional canvas_logical/canvas_anchor metadata
+selects original cell sizes; the default is the 0.4.1 expanded 192-pixel canvas.
 """
 import hashlib,json,sys
 from pathlib import Path
@@ -14,11 +15,12 @@ body_root,shadow_root,render_file,calibration,out=map(Path,sys.argv[1:6]);out.mk
 info=json.loads(render_file.read_text());cal=json.loads(calibration.read_text())
 scale=cal['global_pixel_scale'];origin=info['ground_origin_pixel']
 preview_prefix=info.get('preview_prefix','knee-centered')
-density=8;cell=1536;rows=info['output_rows'];filename=info.get('sheet','wlnat.png');anchor=(96,160);ground=(anchor[0]*density,(anchor[1]-16)*density)
+density=8;canvas_logical=info.get('canvas_logical',192);cell=canvas_logical*density;rows=info['output_rows'];filename=info.get('sheet','wlnat.png');anchor=tuple(info.get('canvas_anchor',[96,160]));ground=(anchor[0]*density,(anchor[1]-16)*density)
+assert all(0<=value<=canvas_logical for value in anchor)
 raw_cell=Image.open(body_root/'body-0-0.png').width
 dx=ground[0]-scale*origin[0];dy=ground[1]-scale*origin[1]
 sheet=Image.new('RGBA',(cell*8,cell*rows));preview=[];report={
-    'global_pixel_scale':scale,'canvas_logical':[192,192],'density':density,
+    'global_pixel_scale':scale,'canvas_logical':[canvas_logical,canvas_logical],'density':density,
     'anchor':list(anchor),'ground_origin_pixel':list(ground),
     'fixed_registration_all_directions':[dx,dy],'body_cells':[],'shadow_cells':[],
     'sun_position':info['sun_position'],'model_geometry_rescaled':False,
@@ -49,7 +51,7 @@ for row in range(rows):
     draw.text((10,409),info.get('preview_caption','Green cross: fixed tile ground origin. Full moving shadow, sun southeast.'),fill='white');preview.append(canvas)
     if row==8:canvas.save(out/(preview_prefix+'-contact.png'))
 dest=out/filename;sheet.save(dest,compress_level=6)
-(out/(filename+'.layout')).write_text('D1R_SHEET_V1 8 96 160\n',encoding='ascii')
+(out/(filename+'.layout')).write_text(f'D1R_SHEET_V1 {density} {anchor[0]} {anchor[1]}\n',encoding='ascii')
 report['size']=[cell*8,cell*rows];report['sheet_sha256']=hashlib.sha256(dest.read_bytes()).hexdigest()
 (out/'validation.json').write_text(json.dumps(report,indent=2))
 preview[0].save(out/(preview_prefix+'-preview.gif'),save_all=True,append_images=preview[1:],duration=200 if Path(filename).stem.endswith(('as','st')) else 50,loop=0,optimize=False)

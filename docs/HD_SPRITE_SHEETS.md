@@ -44,6 +44,13 @@ The Paladin test art uses one fixed camera-projected ground origin for every
 direction and action, with the previously approved uniform art scale preserved.
 Southeast sunlight casts full moving shadows northwest.
 
+The user's current local Paladin selection restores the original NN8 canvas
+sizes: idle/walk use 96-pixel logical cells with anchors (48,96); the selected
+refined punch uses 128-pixel cells with anchors (64,128). All full moving shadows
+fit those cells. Larger canvases remain an optional renderer capability, not a
+requirement to use the current art. Model scale and fixed ground registration
+are independent of transparent canvas padding.
+
 ## Color and memory
 
 Sheet colors pass through the sprite's accumulated palette translation, the draw's TRN or per-pixel lightmap, and the current display palette. Truecolor smoothing residuals around the nearest palette color are retained. This follows the vanilla color-control path; it is not an assertion of exact color equality for every interpolated pixel or every artist-authored palette. Alpha and the existing 50% sprite blend are composited in traversal order.
