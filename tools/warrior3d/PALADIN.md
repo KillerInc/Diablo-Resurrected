@@ -599,3 +599,51 @@ during rendering, not baked into that GLB. The current NN8 install manifest now
 includes DT. No executable/version change. Live death/corpse behavior still needs
 gameplay verification; validation here covers source poses, render placement,
 frame/dimension compatibility, shadow bounds and visual review.
+
+## Foot-anchored directional death refinement
+
+This supersedes the corpse-centering and two-pixel upward settling described
+above. The same native faint clip now falls into the space available in each
+original death cell, with no horizontal actor translation or image shift.
+Twenty frames, 128 x 96 logical cells, original anchor, art scale and southeast
+sun remain unchanged. Other installed actions and the executable are unchanged.
+
+`prepare_redirected_paladin_fall.py` accepts the merged native model, original
+death reference, output reference and existing scale calibration. It checks
+sixteen possible fall-axis adjustments against all twenty poses and eight
+views, then selects the smallest adjustment with over 18 NN8 pixels of geometric
+body/shadow clearance and less than 5 mm of leg-target error. Selected angles
+for S/SW/W/NW/N/NE/E/SE are 0/+22.5/+67.5/-22.5/0/0/0/0 degrees.
+
+`redirect_paladin_fall.py` redirects pelvis travel and the axis of its rotation
+relative to the starting pose. The correction acts through `attach`, the shared
+parent of torso and pelvis, so the torso seam stays intact. Both legs use
+two-bone IK, retaining native individual ankle motion while removing the pair's
+common horizontal drift. Their midpoint stays at the initial stance location;
+feet can fold and release during the fall. Native relative upper-body animation
+is retained. Grounding adds vertical offsets only, independently per pose/view.
+
+Body and shadow renderers share this pose correction. Native samples are cached
+before temporarily disabling action evaluation: otherwise Blender's render
+update overwrites manually corrected bones. Every body render checks that its
+pelvis, head and ankle matrices survive rendering unchanged. The saved scene
+restores the original action so the shadow pass can reproduce native samples.
+Optional 512-pixel raw shadow overscan is now supported directly by the shadow
+renderer; the output sheet itself is never enlarged.
+
+Actual-rig validation over 160 poses found maximum initial matrix error
+2.58e-6, ankle-midpoint XY error 5.25e-7 m, and ankle-target error 1.50e-6 m.
+These are numerical tolerances; the initial pose/facing and stance midpoint are
+preserved. Local work and provenance are under `paladin-native-death/redirected`.
+No proprietary input, pose data, preview or atlas is committed to GitHub.
+
+Final rendered-alpha validation passes all 160 body and 160 shadow cells, with
+minimum margins of 27 and 16 NN8 pixels respectively, including shadow blur.
+The eight-facing motion contact sheet was reviewed before installation. Revised
+WLNDT SHA256 is
+`AEAA9352157B5917828E769EEBE5A38B0E5E46F5F4A3B78D00B9D0250F56784D`.
+Installed PNG/layout and all six other installed action hashes were verified.
+The local asset archive is `Native Paladin Death/Foot Anchored`; its eight-view
+GIF holds the first and final poses for review only. Live in-game death/corpse
+behavior remains unverified; this pass validates the animation and rendered
+atlas, not a new engine build.

@@ -19,6 +19,14 @@ for o in list(bpy.data.objects):
  o.hide_render=True
 assert len(parts)==6,len(parts)
 info=json.loads(metadata.read_text());times=info['source_frames']
+overscan=info.get('shadow_overscan',0)
+if overscan:
+ old_size=scene.render.resolution_x;scene.render.resolution_x+=overscan;scene.render.resolution_y+=overscan;scene.camera.data.ortho_scale*=scene.render.resolution_x/old_size
+redirect=None
+if info.get('redirect_fall'):
+ sys.path.insert(0,str(Path(__file__).resolve().parent))
+ from redirect_paladin_fall import RedirectFall
+ redirect=RedirectFall(rig,info['redirect_fall']['first_frame'])
 sun=info.get('sun_position',[3,-4,6]);assert sun[2]>0
 rig.location=(0,0,0);rig.rotation_euler=(0,0,0);scene.frame_set(1);bpy.context.view_layer.update();initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy()
 material=bpy.data.materials.new('Ground shadow silhouette');material.use_nodes=True;nodes=material.node_tree.nodes;nodes.clear();output=nodes.new('ShaderNodeOutputMaterial');emit=nodes.new('ShaderNodeEmission');emit.inputs['Color'].default_value=(0,0,0,1);material.node_tree.links.new(emit.outputs[0],output.inputs['Surface'])
@@ -26,10 +34,14 @@ mesh=bpy.data.meshes.new('Projected character');shadow=bpy.data.objects.new('Pro
 for d in range(8):
  for row,time in enumerate(times):
   rig.location=(0,0,0);rig.rotation_euler.z=-d*math.pi/4;scene.frame_set(int(time));bpy.context.view_layer.update();p=rig.matrix_world@rig.pose.bones['pelvis'].head;origin=rig.matrix_world.to_3x3()@initial
+  if redirect:
+   redirect.apply(int(time),info['redirect_fall']['angles'][d]);p=rig.matrix_world@rig.pose.bones['pelvis'].head
   if info.get('horizontal_root_motion_removed',True):
    rig.location.x=origin.x-p.x;rig.location.y=origin.y-p.y
   if info.get('pose_offsets'):
    rig.location+=rig.matrix_world.to_3x3()@Vector(info['pose_offsets'][row])
+  if info.get('direction_pose_offsets'):
+   rig.location+=rig.matrix_world.to_3x3()@Vector(info['direction_pose_offsets'][d][row])
   bpy.context.view_layer.update()
   anchor=rig.matrix_world@rig.pose.bones['foot.L'].head
   gain=info.get('shadow_distance_gain',1)
