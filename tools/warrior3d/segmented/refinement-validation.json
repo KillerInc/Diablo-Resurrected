@@ -1,0 +1,24 @@
+{
+  "pose_samples": 17,
+  "loop_matrix_error": 0.0,
+  "joint_test_degrees": {
+    "knee": 60,
+    "shoulder": 65,
+    "elbow": 25
+  },
+  "maximum_pauldron_intersections": 0.0,
+  "status": "joint-range review candidate; not locomotion",
+  "views": [
+    "front",
+    "side",
+    "back"
+  ],
+  "maximum_hinge_drift": 0.0,
+  "existing_mesh_stretch": {
+    "p99_edge_stretch": 1.1118876554529686,
+    "maximum_edge_stretch": 1.878249911329042,
+    "edges_stretched_over_3x": 0,
+    "maximum_by_part": {}
+  },
+  "maximum_endpoint_error": 2.656156841358476E-07
+}

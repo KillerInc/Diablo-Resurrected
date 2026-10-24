@@ -1,24 +1,34 @@
-# Segmented Warrior repair
+# Segmented Warrior refinement
 
-Run Blender 5.1 against the local 39-part segmented Warrior GLB:
+Run Blender 5.1 against the local inspected 39-part segmented Warrior GLB:
 
 ```powershell
 & $blender --background --factory-startup --python-exit-code 1 --python tools/warrior3d/segmented/repair_weights.py -- --input '<local-model.glb>' --out '<private-output-directory>'
+& $blender --background '<private-output-directory>/Warrior-weight-repair.blend' --python-exit-code 1 --python tools/warrior3d/segmented/review_motion.py -- '<private-review-directory>'
 ```
 
-The workflow preserves imported body joint locations and original rest geometry, repairs unrelated bone influences, binds rigid equipment, and adds two reconstructed underarm surfaces. Their endpoints copy exact positions and skin weights from the arm rim and torso. UV-split duplicate vertices are collapsed only for detecting true boundary edges. New underarm materials are subdued placeholders because the original images contain no texture coverage for the missing surfaces.
+The output is a separate editable candidate; original exports and the installed game are untouched. Third-party models, textures, Blender scenes and rendered diagnostics remain local. Only source tools, documentation and numeric validation belong in Git.
 
-The pauldron uses its own `Pauldron_L_Control` bone, independent of the upper arm, with its pivot fixed at the inner edge beside the neck. Test poses rotate it around that hinge without any outward translation. Triangle-intersection checks against torso, arms, hands, neck/head pieces and the reconstructed joins increase hinge rotation until no intersections remain. This is a pose evaluation helper, not a live Blender constraint: new animations must call it or have the resulting control poses baked. It does not guarantee clearance for arbitrary future poses or surface containment without triangle intersections.
+## Current refinement
 
-Validated on the supplied export:
+- Remove unrelated bone influences and bind rigid equipment to inspected attachments.
+- Replace flat underarm strips with closed rounded sockets. Concealed end rings follow chest and upper-arm bones exactly; dual-quaternion skinning preserves the rounded cross-section. The reconstructed surfaces use subdued materials, since there is no original texture coverage for their missing geometry. They overlap adjoining surfaces rather than welding the source topology.
+- Bend knees around an armature-space mediolateral axis, independent of imported bone roll. Rebuild trouser knee weights as smooth monotonic thigh/calf transitions. Add patella controls with half-angle follow, and make the large left knee plate follow thigh, kneecap and calf regions.
+- Preserve the approved inner-edge pauldron hinge. Its control rotates around a fixed point beside the neck with no translational push. Triangle-intersection checks add hinge rotation for clearance against nearby body surfaces.
+- Render front, side and rear views across 16 samples, then bake a 17-frame review action with a duplicate loop endpoint into `Warrior-refinement-review.blend`.
 
-- Controlled 65-degree shoulder, 25-degree elbow, 20-degree knee test: edges stretched over 3x reduced from 183 to 0; maximum existing-mesh stretch reduced from 12.08x to 2.005x. This metric excludes new underarm surfaces.
-- Both underarm surface endpoint errors are below 0.00001 across all 16 sampled motion poses (observed maximum 0).
-- All 19 pauldron clearance evaluations report zero intersections against the checked body surfaces.
-- The editable Blender candidate retains optional sword/back shield objects hidden in their own collection. The GLB copy retains that equipment; Blender is authoritative for its visibility state.
+## Validation and limits
 
-Outputs include `Warrior-weight-repair.blend`, a GLB copy, renders and a numeric validation report. Source exports and installed game files are untouched. Models, textures and reference-derived renders remain local and are never committed. Only these source tools and documentation belong in Git.
+The current exercise combines 65-degree shoulder abduction, 25-degree elbow motion and 60-degree knee flexion. Existing-mesh maximum edge stretch is approximately 1.88x, with zero edges over 3x; the 99th percentile is approximately 1.11x. This metric excludes the newly constructed shoulder sockets. Socket endpoint error is below 0.00001 across all sampled frames. The baked review loop's first/last bone matrix error is below 0.00001. All sampled pauldron checks have zero detected intersections and negligible fixed-hinge drift.
 
-Still a candidate: underarm surface shape/materials need visual refinement; the hands retain their original gripping pose, knee/boot joins require further review, the segmented textures are lower-resolution than the original 4K input, and no gameplay animation or sprite replacement has been accepted. The map is specific to this inspected 39-part export.
+The clearance helper evaluates poses; it is not a live Blender collision constraint. Future animations must call it or bake its resulting control poses. Intersection tests do not establish absence of complete mesh containment, nor clearance in arbitrary untested poses. The numeric checks alone do not establish art quality.
 
-Hinge refinement: all 19 tested poses have zero measured hinge translation and zero detected body intersections. Clearance uses only 0-3 additional degrees of hinge rotation; there is no translational push away from the torso.
+The hand retains its original gripping shape. Socket surface texture blending, equipment seams and low-resolution segmented textures still need art review. This is a joint-range exercise, **not a walking animation**: the feet intentionally leave the ground. Locomotion requires separate foot planting, IK/balance and timing validation. No game sheets are accepted or installed.
+
+## References supplied by the user
+
+- [80.lv: human character movement simulation](https://80.lv/articles/next-gen-simulation-of-biped-character-movement-002sgr) and its [primary research project](https://mrl.snu.ac.kr/research/ProjectScalable/Page.htm): anatomical motion, joint limits and balanced locomotion. This workflow does not implement the paper's muscle-actuated reinforcement-learning simulation.
+- [Academy of Animated Art: rigging terms](https://academyofanimatedart.com/master-these-important-3d-rigging-terms/): hierarchy, skin weights, FK/IK and deformation constraints.
+- [SideFX Houdini 21 rigging](https://www.sidefx.com/products/whats-new-in-h21/rigging/): reusable controls, anatomical components and corrective deformation. Here the refinements are implemented in the existing Blender workflow; Houdini/APEX is not required or claimed to be implemented.
+
+These are principles and quality references, not proof that this asset matches their demonstrated production quality.

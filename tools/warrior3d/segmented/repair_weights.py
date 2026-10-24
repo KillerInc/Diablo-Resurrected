@@ -20,6 +20,8 @@ rig.data.pose_position='POSE';bpy.context.view_layer.update()
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from pauldron_control import add_control,set_control,clear_body,NAME
 add_control(rig)
+from knee_control import add_knees,bend,plate_weights
+add_knees(rig)
 collision_results=[];repair_active=False
 # Rigid equipment must not interpolate between unrelated bones.
 rigid={0:'Spine02',3:'Waist',4:'Pelvis',5:'Head',7:'R_Calf',8:'L_Upperarm',9:'L_Foot',
@@ -34,20 +36,10 @@ assert set(rigid)|set(soft)==set(range(39))
 report={'status':'candidate; visual review required','rig_strategy':'retain imported joint locations; restrict skin weights by inspected part; rigid equipment binding','parts':[], 'original_assets_in_git':False}
 original={o.name:[[(o.vertex_groups[g.group].name,g.weight) for g in v.groups] for v in o.data.vertices] for o in meshes}
 # Build controlled shoulder test using armature-space pivots; preserve imported rest geometry.
+from pose_test import apply_test_pose
 def pose(amount):
- for b in rig.pose.bones:b.matrix_basis.identity()
- bpy.context.view_layer.update()
- for side,sign in [('L',-1),('R',1)]:
-  b=rig.pose.bones[side+'_Upperarm'];pivot=b.head.copy()
-  transform=Matrix.Translation(pivot)@Quaternion((0,1,0),sign*math.radians(65)*amount).to_matrix().to_4x4()@Matrix.Translation(-pivot)
-  b.matrix=transform@b.matrix;bpy.context.view_layer.update()
-  elbow=rig.pose.bones[side+'_Forearm']; elbow.rotation_mode='QUATERNION'; elbow.rotation_quaternion=Quaternion((1,0,0),math.radians(25)*amount);bpy.context.view_layer.update()
-  knee=rig.pose.bones[side+'_Calf']; knee.rotation_mode='QUATERNION'; knee.rotation_quaternion=Quaternion((1,0,0),math.radians(20)*amount);bpy.context.view_layer.update()
- set_control(rig,amount)
- if repair_active:
-  colliders=[bpy.data.objects[f'tripo_part_{i}'] for i in (2,6,8,15,17,18,21,26,35,37,38)]+bridges
-  clearance=clear_body(rig,colliders);assert clearance['intersections']==0,('Pauldron collision',clearance)
-  collision_results.append(clearance)
+ apply_test_pose(rig,amount,repair_active,globals().get('bridges',()),collision_results)
+
 def edge_positions():
  deps=bpy.context.evaluated_depsgraph_get();result={}
  for o in meshes:
@@ -55,7 +47,7 @@ def edge_positions():
  return result
 pose(0);baseline=edge_positions()
 def distortion():
- now=edge_positions();ratios=np.concatenate([now[n]/np.maximum(baseline[n],1e-8) for n in now]);return {'p99_edge_stretch':float(np.percentile(ratios,99)),'maximum_edge_stretch':float(ratios.max()),'edges_stretched_over_3x':int((ratios>3).sum())}
+ now=edge_positions();ratios=np.concatenate([now[n]/np.maximum(baseline[n],1e-8) for n in now]);return {'p99_edge_stretch':float(np.percentile(ratios,99)),'maximum_edge_stretch':float(ratios.max()),'edges_stretched_over_3x':int((ratios>3).sum()),'maximum_by_part':{n:float((now[n]/np.maximum(baseline[n],1e-8)).max()) for n in now if (now[n]/np.maximum(baseline[n],1e-8)).max()>2}}
 scene=bpy.context.scene;scene.render.engine='BLENDER_EEVEE';scene.render.resolution_x=768;scene.render.resolution_y=768;scene.render.resolution_percentage=100;scene.render.image_settings.file_format='PNG';scene.render.image_settings.color_mode='RGBA';scene.render.film_transparent=True;scene.world.color=(.12,.12,.12)
 up=(rig.matrix_world.to_3x3()@Vector((0,0,1))).normalized();front=(rig.matrix_world.to_3x3()@Vector((0,-1,0))).normalized();center=rig.matrix_world@Vector((.015,-.02,.51))
 bpy.ops.object.camera_add();cam=bpy.context.object;cam.data.type='ORTHO';cam.data.ortho_scale=1.28;scene.camera=cam;cam.location=center+front*3+up*.35
@@ -83,6 +75,7 @@ for o in meshes:
  report['parts'].append({'part':index,'bones':allowed,'vertices_with_removed_influences':removed})
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from underarm_surface import connect_underarms,endpoint_error
+plate_weights(rig)
 bridges,report['underarm_bridges']=connect_underarms(rig)
 repair_active=True
 pose(1);report['repaired_shoulder_test']=distortion();render('after-arm-test')
