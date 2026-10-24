@@ -306,3 +306,21 @@ Current WLNAT SHA256:
 Local `height-audit.json` records per-direction measurements. The uniquely named
 `attack-preview-shadow-fixed.gif` shows the replacement without preview-cache
 ambiguity. Gameplay verification of this shadow revision remains outstanding.
+
+## Project-wide lighting direction — user requirement
+
+The user approved the southeast-sun preview and explicitly requires **all shadows
+to follow that direction**: sun southeast, cast shadows northwest, consistently
+across every character, facing direction and animation. Body lighting must agree
+with the shadow. Using the established sprite direction convention, the preview
+places the main light at Blender (3, -4, 6) and projects away from it toward
+negative X / positive Y. Character rotation must not rotate the world light.
+
+The review is local at `paladin-kick/sun-se-preview/sun-se-moving-shadow.gif`.
+It shows the full moving shadow and original kick extension with cell boundaries.
+It is approved for light direction, not a completed clipping solution. Installed
+sheets have not yet been updated to this lighting: the prior held-idle kick shadow
+is still installed, and idle/walk still have the earlier projection. Those need
+consistent relighting in the next implementation pass. Do not treat the old
+negative-X/negative-Y projection, compressed kick shadow or held idle shadow as
+the final lighting standard.
