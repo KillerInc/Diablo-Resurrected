@@ -21,16 +21,16 @@ def body_mask(data,base,frame,width=96):
         else:
             length=256-control
             pixels.extend(payload[position:position+length]); position+=length
-    if len(pixels)%width or len(pixels)//width>96:
+    if len(pixels)%width or len(pixels)//width>width:
         raise ValueError('Original CL2 frame does not fit the logical cell')
     height=len(pixels)//width
-    result=Image.new('L',(96,96),0)
+    result=Image.new('L',(width,width),0)
     rows=[pixels[i*width:(i+1)*width] for i in range(height)][::-1]
     # Palette index 0 is the original baked ground shadow. Excluding it from
     # anatomy/camera fitting prevents treating the shadow as a foot or limb.
     values=[255 if value>0 else 0 for row in rows for value in row]
     frame_image=Image.new('L',(width,height)); frame_image.putdata(values)
-    result.paste(frame_image,(0,96-height))
+    result.paste(frame_image,(0,width-height))
     return result
 
 

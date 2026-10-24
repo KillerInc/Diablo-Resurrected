@@ -172,7 +172,7 @@ direct-buffer result was installed.
 `measure_paladin_stride.py` evaluates every pose's boot geometry. Its measured
 ground offset is applied to the root translation so one boot maintains ground
 contact without changing the waist/chest joint relationship. Final minimum
-boot height across 40 poses is 0.00299988–0.00300016 metres (target 0.003).
+boot height across 40 poses is 0.00299988â€“0.00300016 metres (target 0.003).
 Forward foot excursion falls from approximately 1.117 / 1.084 metres to
 0.695 / 0.709 metres: about 36% shorter on average. All eight views were rendered
 and the 64 output cells validated without clipping. Shadows were regenerated
@@ -214,3 +214,69 @@ artwork. The inspected animation exports contain only `palM_HTH_nav_idle` and
 export is an unarmed attack on this same Paladin skeleton. Hit, block, death and
 casting clips are also needed for complete action coverage. No missing motion
 is represented as already available or complete.
+
+## Barbarian kick transferred to Paladin unarmed attack
+
+The user supplied `palm_kick_anims.glb`, containing `barM_DW_attk_kick`
+(42 samples, 1.3667 seconds). Direct merging correctly rejected its different
+rest transforms. `retarget_paladin_kick.py` instead transfers local animation
+deltas to the Paladin's rest pose, retaining target bone lengths, mesh buffers,
+nodes, skin bindings, materials and textures. It transfers 49 bone tracks and
+skips 139 class-specific tracks. Numbered clavicle ancestors are matched through
+known upper-arm parent chains, not by coincidental numeric names. This is an
+art-tested transfer, not a general-purpose retargeter for all D4 classes.
+
+`sample_paladin_kick.py` samples sixteen poses, with source sample 8 on sheet
+row 8 (zero based). Warrior data specifies unarmed action frame 9; `DoAttack`
+checks `currentFrame == _pAFNum - 1`, so the visible contact pose aligns with
+damage processing. At normal speed the sixteen-frame attack lasts 0.8 seconds.
+First and last poses blend to the current idle. Full Barbarian extension exceeded
+the original cell width in east/west views; a 0.70 motion blend produces a more
+compact kick without rescaling the character. This gain is an animation blend,
+not a literal 30% reduction in measured foot travel.
+
+`measure_paladin_attack.py` evaluates boot geometry and supporting-foot position.
+The sampler's optional measurement input corrects root translation, locking the
+left foot horizontally and grounding the boots. Final sixteen-pose boot minimum
+Z is 0.002999946â€“0.003000137 metres; supporting-foot XY drift is below 1.2e-7 m.
+Horizontal pelvis tracking is disabled for this action so the supporting foot
+stays planted while the body leans. Shadows follow exactly the same poses.
+The full projected attack shadow exceeded the cell's bottom edge. This action
+uses a deliberately compact contact shadow: projected ground coordinates retain
+20% of their distance from the planted left foot before rendering. This is an art
+adjustment, not a physically exact directional shadow. Walking and idle retain
+their existing shadow projection. The assembler checks attack shadow bounds as
+well as body bounds to reject hard sheet-edge cutoffs.
+
+AT has 128-pixel logical cells, unlike the 96-pixel standing/walking cells.
+The reference decoder, renderer and assembler now accept this larger layout.
+Rendering preserves pixels per metre; composition preserves horizontal center
+and bottom registration relative to the approved walk calibration. No character
+rescaling or engine changes are involved. Reassembling the existing AW sheet
+through the generalized pipeline reproduced its SHA256 exactly.
+
+All 128 attack cells passed raw and assembled crop checks. Contact poses in all
+eight directions were visually reviewed. The installed sheet is 8192 x 16384
+RGBA, SHA256 `BE19170424D81188E1D895C794FE3628F0C2E87EB4C8D1B6B30E34B3595A6868`.
+Local assets and the full-cell, three-view `attack-preview.gif` are under the
+edited candidate's `Unarmed Kick` directory. Only WLNAT was installed in this
+pass; the approved walk/idle sheets remain intact. In-game kick feel and actual
+hit contact still need gameplay verification. Restart to reload cached sheets.
+
+Reproduction order (all artwork inputs and outputs remain outside Git):
+
+1. Retarget the edited static character and supplied kick with
+   `retarget_paladin_kick.py`.
+2. Run `sample_paladin_kick.py RETARGET IDLE SAMPLED` and evaluate SAMPLED with
+   Blender's `measure_paladin_attack.py`.
+3. Run `sample_paladin_kick.py RETARGET IDLE FINAL MEASUREMENT.json`, then measure
+   FINAL to verify ground contact.
+4. Prepare the original WLNAT PNG/CL2 using `prepare_town_walk.py`. In its local
+   reference JSON set `source_frames` to 0 through 15 and
+   `preserve_horizontal_root_motion` to true and `shadow_distance_gain` to 0.20.
+5. Render FINAL with `render_paladin_town_walk.py`, project matching shadows with
+   `render_paladin_shadows.py`, and assemble with the original walk calibration
+   using `assemble_paladin_town_walk.py`.
+
+The Paladin coverage is now AS/AW/ST/WL/AT. Hit, block, death and casting clips
+remain outstanding; their sheets still use the existing artwork.

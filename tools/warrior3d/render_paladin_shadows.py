@@ -24,13 +24,19 @@ material=bpy.data.materials.new('Ground shadow silhouette');material.use_nodes=T
 mesh=bpy.data.meshes.new('Projected character');shadow=bpy.data.objects.new('Projected character',mesh);bpy.context.collection.objects.link(shadow);shadow.data.materials.append(material)
 for d in range(8):
  for row,time in enumerate(times):
-  rig.location=(0,0,0);rig.rotation_euler.z=-d*math.pi/4;scene.frame_set(int(time));bpy.context.view_layer.update();p=rig.matrix_world@rig.pose.bones['pelvis'].head;origin=rig.matrix_world.to_3x3()@initial;rig.location.x=origin.x-p.x;rig.location.y=origin.y-p.y;bpy.context.view_layer.update()
+  rig.location=(0,0,0);rig.rotation_euler.z=-d*math.pi/4;scene.frame_set(int(time));bpy.context.view_layer.update();p=rig.matrix_world@rig.pose.bones['pelvis'].head;origin=rig.matrix_world.to_3x3()@initial
+  if info.get('horizontal_root_motion_removed',True):
+   rig.location.x=origin.x-p.x;rig.location.y=origin.y-p.y
+  bpy.context.view_layer.update()
+  anchor=rig.matrix_world@rig.pose.bones['foot.L'].head
+  gain=info.get('shadow_distance_gain',1)
   deps=bpy.context.evaluated_depsgraph_get();vertices=[];faces=[]
   for o in parts:
    ev=o.evaluated_get(deps);me=ev.to_mesh();offset=len(vertices);transform=ev.matrix_world
    for v in me.vertices:
-    p=transform@v.co;h=max(0,p.z);vertices.append((p.x-.23*h,p.y-.32*h,.002))
+    p=transform@v.co;h=max(0,p.z);x=p.x-.23*h;y=p.y-.32*h
+    vertices.append((anchor.x+(x-anchor.x)*gain,anchor.y+(y-anchor.y)*gain,.002))
    faces.extend(tuple(offset+i for i in poly.vertices) for poly in me.polygons);ev.to_mesh_clear()
   mesh.clear_geometry();mesh.from_pydata(vertices,[],faces);mesh.update()
   scene.render.filepath=str(out/f'shadow-{d}-{row}.png');bpy.ops.render.render(write_still=True)
-(out/'shadow.json').write_text(json.dumps({'method':'opaque body projected onto z=0','light_direction':[.23,.32,1],'frames':len(times),'directions':8,'same_camera_as_body':True},indent=2))
+(out/'shadow.json').write_text(json.dumps({'method':'opaque body projected onto z=0','light_direction':[.23,.32,1],'distance_gain_about_support_foot':info.get('shadow_distance_gain',1),'frames':len(times),'directions':8,'same_camera_as_body':True},indent=2))
