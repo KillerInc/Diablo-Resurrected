@@ -7,6 +7,7 @@ Private artwork is not embedded.
 import bpy,sys,json,math
 from pathlib import Path
 from mathutils import Vector
+from bpy_extras.object_utils import world_to_camera_view
 src,reference,out=map(Path,sys.argv[sys.argv.index('--')+1:]);out=out.resolve();out.mkdir(parents=True,exist_ok=True)
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 bpy.context.scene.render.fps=30
@@ -47,4 +48,5 @@ for d in range(8):
   pose(d,r);scene.render.filepath=str(out/f'body-{d}-{r}.png');bpy.ops.render.render(write_still=True)
 pose(0,0);camera.data.shift_x,camera.data.shift_y=registrations[0]
 bpy.ops.wm.save_as_mainfile(filepath=str(out/'Paladin-town-walk-render.blend'))
-(out/'render.json').write_text(json.dumps({'source_frames':times,'output_rows':rows,'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))
+ground=world_to_camera_view(scene,camera,Vector((0,0,0)))
+(out/'render.json').write_text(json.dumps({'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_rows':rows,'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'ground_origin_pixel':[ground.x*cell,(1-ground.y)*cell],'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))

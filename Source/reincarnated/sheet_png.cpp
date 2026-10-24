@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 
 namespace reincarnated {
 namespace {
@@ -18,7 +19,23 @@ void Read(png_structp png, png_bytep target, png_size_t count)
 void Error(png_structp png, png_const_charp) { png_longjmp(png, 1); }
 void Warning(png_structp, png_const_charp) {}
 }
-bool DecodeSheetPng(const std::vector<uint8_t> &bytes, const SheetSource &source, SheetImage &image)
+bool ParseSheetLayout(const std::vector<uint8_t> &bytes, SheetLayout &layout)
+{
+    layout = {};
+    if (bytes.size() > 256) return false;
+    std::istringstream input(std::string(bytes.begin(), bytes.end()));
+    std::string version;
+    SheetLayout parsed;
+    if (!(input >> version >> parsed.density >> parsed.anchorX >> parsed.anchorY)
+        || version != "D1R_SHEET_V1") return false;
+    input >> std::ws;
+    if (!input.eof() || !(parsed.density == 1 || parsed.density == 2 || parsed.density == 4
+        || parsed.density == 8 || parsed.density == 16)
+        || parsed.anchorX < 0 || parsed.anchorY < 0 || parsed.anchorX > 65536 || parsed.anchorY > 65536) return false;
+    layout = parsed;
+    return true;
+}
+bool DecodeSheetPng(const std::vector<uint8_t> &bytes, const SheetSource &source, SheetImage &image, const SheetLayout *layout)
 {
     image = {};
     if (!source.columns || !source.rows || !source.width || bytes.empty()) return false;
@@ -40,10 +57,13 @@ bool DecodeSheetPng(const std::vector<uint8_t> &bytes, const SheetSource &source
     const unsigned width = png_get_image_width(png, info), height = png_get_image_height(png, info);
     if (width % source.columns || height % source.rows) png_error(png, "Invalid sheet grid");
     const unsigned cellWidth = width / source.columns, cellHeight = height / source.rows;
-    if (!cellWidth || cellWidth % source.width) png_error(png, "Invalid sheet scale");
-    const unsigned density = cellWidth / source.width;
+    if (!cellWidth || (!layout && cellWidth % source.width)) png_error(png, "Invalid sheet scale");
+    const unsigned density = layout ? layout->density : cellWidth / source.width;
     if (!(density == 1 || density == 2 || density == 4 || density == 8 || density == 16)
-        || cellHeight % density || !cellHeight) png_error(png, "Unsupported sheet scale");
+        || cellWidth % density || cellHeight % density || !cellHeight) png_error(png, "Unsupported sheet scale");
+    if (layout && (cellWidth / density < source.width || layout->anchorX < 0 || layout->anchorY < 0
+        || unsigned(layout->anchorX) > cellWidth / density || unsigned(layout->anchorY) > cellHeight / density))
+        png_error(png, "Invalid sheet canvas anchor");
     if (png_get_interlace_type(png, info) != PNG_INTERLACE_NONE) png_error(png, "Interlaced sheets need offline conversion");
     const unsigned step = std::max(1U, density / 2);
     if (width % step || height % step) png_error(png, "Invalid sample grid");
@@ -73,6 +93,9 @@ bool DecodeSheetPng(const std::vector<uint8_t> &bytes, const SheetSource &source
     image.width = width / step; image.height = height / step;
     image.cellWidth = cellWidth / step; image.cellHeight = cellHeight / step;
     image.density = density / step;
+    image.logicalWidth = cellWidth / density;
+    image.anchorX = layout ? layout->anchorX : int(source.width / 2);
+    image.anchorY = layout ? layout->anchorY : int(cellHeight / density);
     image.rgba.assign(pixels, pixels + size);
     std::free(row); std::free(pixels);
     png_destroy_read_struct(&png, &info, nullptr);

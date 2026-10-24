@@ -2,6 +2,8 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <source_location>
 #include <SDL3/SDL.h>
@@ -58,13 +60,37 @@ public:
         out = bytes; return true;
     }
 };
+class CanvasProvider final : public reincarnated::AssetProvider {
+    std::string layout;
+public:
+    explicit CanvasProvider(std::string text) : layout(std::move(text)) {}
+    bool read(const std::string &id, reincarnated::AssetBytes &out) const override {
+        if (id == "hd/plrgfx/warrior/wln/wlnst.png") { out = Png(); return true; }
+        if (id == "hd/plrgfx/warrior/wln/wlnst.png.layout") { out.assign(layout.begin(),layout.end()); return true; }
+        return false;
+    }
+};
 }
 
-int main()
+int main(int argc, char **argv)
 {
     using namespace devilution;
     using namespace reincarnated;
     try {
+        if (argc == 3) {
+            const auto read = [](const char *path) {
+                std::ifstream file(path,std::ios::binary);
+                Check(bool(file));
+                return std::vector<uint8_t>(std::istreambuf_iterator<char>(file),{});
+            };
+            SheetLayout privateLayout;
+            SheetImage privateImage;
+            Check(ParseSheetLayout(read(argv[2]),privateLayout));
+            Check(DecodeSheetPng(read(argv[1]),SheetSource{"local attack test",8,16,128},privateImage,&privateLayout));
+            Check(privateImage.logicalWidth==192 && privateImage.cellHeight/privateImage.density==192);
+            Check(privateImage.anchorX==96 && privateImage.anchorY==160 && privateImage.density==2);
+            std::puts("PASS: local expanded attack atlas streams at unchanged 2x retained density and explicit anchor");
+        }
         auto sprites = Sprites();
         const auto sprite = sprites.list()[0];
         const auto *source = GetSheetSource(sprite);
@@ -90,6 +116,17 @@ int main()
         Check(!DecodeSheetPng({png.begin(),png.begin()+png.size()/2},*source,image));
         auto wrong = *source; wrong.columns=3;
         Check(!DecodeSheetPng(png,wrong,image));
+        SheetLayout canvas;
+        const auto parse = [&](const std::string &text) { return ParseSheetLayout({text.begin(),text.end()},canvas); };
+        Check(parse("D1R_SHEET_V1 2 2 3\n"));
+        Check(DecodeSheetPng(png,*source,image,&canvas));
+        Check(image.logicalWidth==4 && image.cellHeight/image.density==4 && image.anchorX==2 && image.anchorY==3);
+        Check(!parse("D1R_SHEET_V1 3 2 3"));
+        Check(!parse("D1R_SHEET_V1 2 -1 3"));
+        Check(!parse("D1R_SHEET_V2 2 2 3"));
+        Check(!parse("D1R_SHEET_V1 2 2 3 garbage"));
+        Check(parse("D1R_SHEET_V1 2 5 3"));
+        Check(!DecodeSheetPng(png,*source,image,&canvas)); // anchor outside the real canvas
 
         Check(SDL_Init(0));
         gnScreenWidth=8; gnScreenHeight=8;
@@ -147,8 +184,42 @@ int main()
         EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
         bottom=static_cast<uint8_t*>(composed->pixels)+7*composed->pitch;
         Check(bottom[0]==255 && bottom[1]==255 && bottom[2]==255);
+        ResetHdAssets();
+        GetHdAssetStore().mount(std::make_unique<CanvasProvider>("D1R_SHEET_V1 2 2 3\n"));
+        SDL_FillSurfaceRect(PalSurface,nullptr,0);
+        BeginHdWorldFrame(1,0,0,8,8);
+        ClxDraw(out,{2,4},sprite);
+        Check(out[{1,2}]==0 && out[{2,4}]==128); // expanded HD pixels never enter the Classic buffer
+        EndHdWorldFrame(); classic.reset(SDL_ConvertSurface(PalSurface,SDL_PIXELFORMAT_RGBA32));
+        composed=ComposeHdFrame(classic.get());
+        auto pixel = [&](int x,int y) { return static_cast<uint8_t*>(composed->pixels)+y*composed->pitch+x*4; };
+        Check(pixel(1,2)[2]==255 && pixel(4,2)[0]==255); // larger than the original 2-pixel width
+        Check(pixel(1,5)[0]==255 && pixel(4,5)[1]==255); // extra bottom canvas and anchor
+        ResetHdAssets();
+        SDL_FillSurfaceRect(PalSurface,nullptr,0);
+        BeginHdWorldFrame(2,0,0,8,8);
+        ClxDraw(out,{1,2},sprite);
+        EndHdWorldFrame(); classic.reset(SDL_ConvertSurface(PalSurface,SDL_PIXELFORMAT_RGBA32));
+        composed=ComposeHdFrame(classic.get());
+        Check(pixel(0,0)[2]==255 && pixel(7,7)[1]==255); // same pivot at 2x
+        ResetHdAssets();
+        BeginHdWorldFrame(2,0,0,8,8);
+        ClxDraw(out,{1,2},sprite);
+        out.SetPixel({0,0},131); // later foreground covers extended pixels too
+        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
+        Check(pixel(0,0)[0]==255 && pixel(0,0)[1]==255 && pixel(0,0)[2]==255);
+        ResetHdAssets();
+        BeginHdWorldFrame(2,0,0,8,8);
+        ClxDraw(out,{0,0},sprite); // viewport clipping must retain the correct texture origin
+        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
+        Check(pixel(0,0)[0]==255 && pixel(0,0)[2]==0);
+        ResetHdAssets();
+        GetHdAssetStore().mount(std::make_unique<CanvasProvider>("D1R_SHEET_V1 3 2 3"));
+        BeginHdWorldFrame(1,0,0,8,8);
+        Check(!HasHdSheet(sprite)); // malformed metadata takes the existing Classic fallback
+        EndHdWorldFrame();
         ResetHdAssets(); PalSurface=nullptr; Palette.reset(); SDL_Quit();
-        std::puts("PASS: provenance, cloning, translations, streamed decode/rejection, 2x anchoring, Classic buffer, lighting, blending and foreground occlusion");
+        std::puts("PASS: provenance, translations, legacy/expanded decode, 1x/2x anchors, viewport clipping, invalid metadata fallback, Classic buffer, lighting, blending and foreground occlusion");
         return 0;
     } catch (const std::exception &e) { std::fprintf(stderr,"%s\n",e.what()); return 1; }
 }

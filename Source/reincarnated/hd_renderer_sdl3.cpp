@@ -66,9 +66,11 @@ CachedSheet *LoadSheet(const SheetSource &source)
     auto found = sheets.find(key);
     if (found != sheets.end()) { found->second.used = ++sheetClock; return &found->second; }
     CachedSheet entry;
-    AssetBytes bytes;
-    if (GetHdAssetStore().read(source.path, bytes)) {
-        if (DecodeSheetPng(bytes, source, entry.image)) {
+    AssetBytes bytes, sidecar;
+    if (GetHdAssetStore().readWithSidecar(source.path, bytes, sidecar)) {
+        SheetLayout layout;
+        const bool validLayout = sidecar.empty() || ParseSheetLayout(sidecar, layout);
+        if (validLayout && DecodeSheetPng(bytes, source, entry.image, sidecar.empty() ? nullptr : &layout)) {
             while (sheetBytes + entry.image.rgba.size() > SheetBudget()) {
                 auto victim = sheets.end();
                 for (auto it = sheets.begin(); it != sheets.end(); ++it)
@@ -332,10 +334,10 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
     const unsigned group = devilution::LoadLE16(header + 14), frame = devilution::LoadLE16(header + 16);
     if (group >= source->columns || frame >= source->rows || image.cellHeight / image.density < sprite.height()) return false;
     const int logicalHeight = image.cellHeight / image.density;
-    const int top = y + 1 - logicalHeight;
-    const int left = (x + out.region.x) * scale + offsetX;
+    const int top = y + 1 - image.anchorY;
+    const int left = (x + int(source->width / 2) - image.anchorX + out.region.x) * scale + offsetX;
     const int upper = (top + out.region.y) * scale;
-    const int w = source->width * scale, h = logicalHeight * scale;
+    const int w = image.logicalWidth * scale, h = logicalHeight * scale;
     const auto *bakedTranslation = header + 18;
     // Clip in the caller's local coordinates as well as to the world viewport.
     const int xBegin = std::max({left, clip.x, out.region.x * scale + offsetX, 0});

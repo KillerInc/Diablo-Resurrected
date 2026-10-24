@@ -10,7 +10,39 @@ Player town/dungeon animations, equipment, armor and class graphics therefore fo
 
 The sheet grid comes from the original file's direction lists and maximum frame count. Column = original direction list, row = original frame. Integer PNG scale is measured against the original sprite width. Cells may be rectangular. Frames draw at their original width with the cell bottom aligned to the classic baseline. Transparent top padding is retained instead of stretching the image to a variable-height frame.
 
-Loose numeric PNG/DDS overrides remain available as the existing fallback when there is no usable named sheet. If no replacement can draw, Classic rasterization still supplies that sprite. Named sheets use their original grid rather than optional numeric-override layout sidecars.
+Loose numeric PNG/DDS overrides remain available as the existing fallback when there is no usable named sheet. If no replacement can draw, Classic rasterization still supplies that sprite. Named sheets retain the original direction/frame grid; version 0.4.1 adds an optional named-sheet canvas sidecar described below.
+
+## Expanded HD canvases and fixed anchors (0.4.1-pre)
+
+An original-named PNG may have a UTF-8/ASCII sidecar at `NAME.png.layout`:
+
+```text
+D1R_SHEET_V1 8 96 160
+```
+
+Fields are source pixel density, horizontal center anchor and vertical baseline
+anchor, all anchors in original logical pixels. PNG dimensions still divide by
+the original direction/frame grid, but the cell width is independent of the
+Classic sprite width. The example uses 192 x 192 logical cells at 8x density.
+Its cell center anchor is x=96; the Classic bottom baseline is y=160, leaving
+32 extra logical pixels below the baseline. The tile's ground center is 16
+pixels above that baseline. The sample's world ground origin is therefore
+authored at (96,144), not at its changing visible-body bounding-box center.
+
+At draw time, the expanded cell's anchor aligns to the Classic canvas center
+and bottom baseline. Original movement offsets, animation frames, damage/range,
+world traversal, palette/light handling and the indexed buffer are unchanged.
+The full larger rectangle participates in world rendering and the existing
+foreground/UI/viewport clipping. Sheets without metadata keep their prior width
+and bottom alignment. PNG and sidecar resolve from the same asset provider;
+malformed metadata or out-of-range anchors preserve the Classic fallback.
+
+Density is explicitly 1, 2, 4, 8 or 16, independent of canvas dimensions. Source
+dimensions, streaming decode, retained 2x density and cache limits still apply.
+Only the drawing canvas grows; neither the sprite nor game tiles are enlarged.
+The Paladin test art uses one fixed camera-projected ground origin for every
+direction and action, with the previously approved uniform art scale preserved.
+Southeast sunlight casts full moving shadows northwest.
 
 ## Color and memory
 

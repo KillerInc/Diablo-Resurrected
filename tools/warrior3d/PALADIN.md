@@ -365,3 +365,51 @@ horizontal root motion preserved, sun (3,-4,6), shadow distance gain 1). For the
 review, expand only the shadow render canvas from 1024 to 1536 and multiply the
 camera's orthographic scale by 1.5, preserving pixels per metre; pass those
 overscan shadows and normal body frames to `preview_paladin_attack.py`.
+
+## Expanded renderer canvas and corrected tile anchor
+
+The user requested a larger drawing area in our existing renderer and questioned
+centering. Version 0.4.1-pre adds optional named-sheet canvas metadata, retaining
+Classic simulation and original action selection. It does not replace the engine.
+`assemble_paladin_canvas.py` authors 192 x 192 logical canvases at the existing
+8x source density and calibrated scale 1.1334110707181562. The sidecar is
+`D1R_SHEET_V1 8 96 160`; its fixed ground origin is (96,144), at the center of a
+64 x 32 tile. The renderer aligns this anchor to the original Classic placement.
+
+The previous per-direction body-bound fitting displaced the model's ground
+origin by up to 3.22 logical pixels horizontally and 4.02 vertically. The new
+assembler uses the camera-projected world origin (0,0,0), with a single transform
+for every direction and frame. Extra canvas no longer changes apparent size or
+position. The knee's full moving shadow fits without compression or clipping.
+
+The same root anchor and southeast sunlight were applied to the existing short
+walk and idle renders. The approved shortened motion, original row counts,
+character geometry, darker palette, normal timing and source pixels per metre
+are retained. AS still uses every second town-idle sample; AW and WL share the
+approved eight-frame walk. All body and shadow cells fit in the expanded canvas.
+Only light direction and registration changed in the idle/walk art pass.
+
+Local outputs are `paladin-knee/output-expanded`,
+`paladin-root-aligned/walk/output`, `paladin-root-aligned/idle/output` and
+`paladin-root-aligned/idle/dungeon-output`. A local `anchor-audit.json` records
+the old directional offsets. Preview crosses/diamonds show the fixed ground
+origin and tile outline; those markers are never included in the game sheets.
+See `docs/HD_SPRITE_SHEETS.md` for metadata and draw-position semantics.
+
+The tested 0.4.1-pre executable and paired PNG/layout files are now installed.
+The previous executable was backed up. Installation hashes were verified:
+
+| Sheet | SHA256 |
+| --- | --- |
+| WLNAT | `8621F389C9A53377B1B9B4F6A5FA98F784FCDF7C39B0F8C56BAF94AF3649B6E9` |
+| WLNWL / WLNAW | `F6F22D1DBC07864AD7811228A724589764387F8142B9B8868AEA0B3E81DBEEA7` |
+| WLNST | `B725C299A7DF064B6A281D6257832550EC86B8982AADE0678E782E6C186C2607` |
+| WLNAS | `9CB2ACB8FAECDCED614B69090197E4E0D6506F2D1496137EE61E21931595482F` |
+
+Copies and correctly named previews are local under `Expanded Canvas 0.4.1`.
+The decoder/compositor regression tests passed, including streaming the actual
+expanded knee sheet. The 4,853-frame gameplay replay retained its reference-save
+outcome. A separate full-game saved unarmed Warrior replay loaded the expanded
+idle sheet and passed HD/Classic switching, menus/panels and zoom; normal/zoomed
+GPU frames were reviewed. The knee sheet has render/geometry/compositor coverage;
+its actual attack feel/hit contact still needs live gameplay verification.
