@@ -6,14 +6,15 @@ NAME='Pauldron_L_Control'
 def add_control(rig):
     bpy.context.view_layer.objects.active=rig;bpy.ops.object.select_all(action='DESELECT');rig.select_set(True)
     bpy.ops.object.mode_set(mode='EDIT')
-    b=rig.data.edit_bones.new(NAME);b.head=(.15,-.02,.81);b.tail=(.15,-.02,.87);b.parent=rig.data.edit_bones['Spine02'];b.use_deform=True
+    b=rig.data.edit_bones.new(NAME);b.head=(.058,-.025,.845);b.tail=(.058,.035,.845);b.parent=rig.data.edit_bones['Spine02'];b.use_deform=True
     bpy.ops.object.mode_set(mode='OBJECT')
-    rig.pose.bones[NAME]['purpose']='Independent rigid pauldron; lifted outward for body clearance'
+    rig.pose.bones[NAME]['purpose']='Inner-edge hinge; rotation only, no outward translation'
 
 def set_control(rig,amount):
     bone=rig.pose.bones[NAME];rest=rig.data.bones[NAME].matrix_local.copy();pivot=rest.translation.copy()
     rotation=Quaternion((0,1,0),-math.radians(20)*amount).to_matrix().to_4x4()
-    bone.matrix=Matrix.Translation(Vector((.012*amount,0,.018*amount)))@Matrix.Translation(pivot)@rotation@Matrix.Translation(-pivot)@rest
+    bone.matrix=Matrix.Translation(pivot)@rotation@Matrix.Translation(-pivot)@rest
+    bone['test_hinge_angle_degrees']=20*amount
     bpy.context.view_layer.update()
 
 def mesh_tree(obj,deps):
@@ -24,9 +25,14 @@ def mesh_tree(obj,deps):
 def clear_body(rig,colliders):
     plate=bpy.data.objects['tripo_part_12'];bone=rig.pose.bones[NAME]
     deps=bpy.context.evaluated_depsgraph_get();trees=[mesh_tree(o,deps) for o in colliders]
-    count=0
+    count=0;start=bone.matrix.copy();pivot=start.translation.copy()
     for step in range(61):
         tree=mesh_tree(plate,bpy.context.evaluated_depsgraph_get());count=sum(len(tree.overlap(other)) for other in trees)
-        if count==0:return {'intersections':0,'clearance_steps':step}
-        matrix=bone.matrix.copy();matrix.translation+=Vector((.0015,0,.002));bone.matrix=matrix;bpy.context.view_layer.update()
+        if count==0:
+            error=(bone.matrix.translation-pivot).length
+            assert error<1e-6,('Hinge drift',error)
+            return {'intersections':0,'clearance_steps':step,'hinge_drift':error,'additional_rotation_degrees':step}
+        rotation=Quaternion((0,1,0),-math.radians(step+1)).to_matrix().to_4x4()
+        bone.matrix=Matrix.Translation(pivot)@rotation@Matrix.Translation(-pivot)@start
+        bpy.context.view_layer.update()
     return {'intersections':count,'clearance_steps':61}
