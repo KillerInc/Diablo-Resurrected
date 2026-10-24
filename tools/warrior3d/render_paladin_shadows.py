@@ -28,6 +28,8 @@ for d in range(8):
   rig.location=(0,0,0);rig.rotation_euler.z=-d*math.pi/4;scene.frame_set(int(time));bpy.context.view_layer.update();p=rig.matrix_world@rig.pose.bones['pelvis'].head;origin=rig.matrix_world.to_3x3()@initial
   if info.get('horizontal_root_motion_removed',True):
    rig.location.x=origin.x-p.x;rig.location.y=origin.y-p.y
+  if info.get('pose_offsets'):
+   rig.location+=rig.matrix_world.to_3x3()@Vector(info['pose_offsets'][row])
   bpy.context.view_layer.update()
   anchor=rig.matrix_world@rig.pose.bones['foot.L'].head
   gain=info.get('shadow_distance_gain',1)

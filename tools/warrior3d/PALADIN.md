@@ -555,3 +555,47 @@ fall/death motion. No explicitly HTH attack or block/parry-named clip was found
 in the catalog; keep the user-approved authored punch until another is reviewed.
 Prayer/scroll events and weapon-specific attacks are present and need individual
 inspection before mapping them to further D1 actions.
+
+## Native death collapse and original rectangular death cells
+
+DT now uses `palM_HTH_event_faint` from the user's native library: a complete
+46-sample / 1.5-second collapse ending on the ground. The named
+`palM_hth_reac_death` was inspected and proved to be two identical standing
+poses. Knockdown was also inspected; its end remains propped up rather than
+fully resting. No missing fall was assumed or invented.
+
+The raw faint ends off-center, with opaque armor as low as -0.1312 m. An uncropped
+three-view preview showed the original-cell overflow before corrections.
+`prepare_paladin_fall.py` evaluates the existing model and prepares render-only
+offsets: floor contact matches the idle's -0.00682082 m minimum, and a smooth
+fall-height-driven translation settles toward one fixed final footprint center.
+The final center is computed once, not refitted separately per facing/frame.
+A smooth two-logical-pixel upward image placement during settling leaves space
+for the full soft shadow in the original rectangle. These identical placements
+apply to body and shadow in all directions. Geometry, joint animation, pixels
+per metre, light direction and shadow length remain unchanged.
+
+Vanilla DT cells are rectangular: 128 x 96 logical / 1024 x 768 NN8 pixels.
+`prepare_town_walk.py` now obtains row count from CL2 and keeps separate cell
+width/height; `assemble_paladin_canvas.py` accepts rectangular canvas metadata
+and letterboxes its previews without stretching. Default square output was
+regression-checked: the installed HT atlas rebuilds byte-identically. Rendering
+and shadow projection share per-pose placement metadata; it defaults to zero
+for previous actions.
+
+Source samples are `round(i*45/19)` for twenty rows, including the final pose.
+The game retains vanilla's two ticks per death frame (normally 100 ms), so the
+twenty-row action lasts two seconds and the existing game holds the last corpse
+pose. Preview holds before/after the fall are review-only. All 160 body and full
+moving northwest shadow cells fit, with a minimum 10 NN8-pixel shadow margin.
+Model scale remains 1.1334110707181562; no canvas enlargement or shadow shrinking.
+
+Installed WLNDT is 8192 x 15360 RGBA, with `D1R_SHEET_V1 8 64 96` layout and SHA256
+`3B3DFB6AE33A617B0547D47CDFAB3A7904254C843464B551A87C60EAE988DCA9`.
+AT and HT hashes were rechecked unchanged. Local work is `paladin-native-death`;
+copies are in `Native Paladin Death`. `Native-Source-Faint.glb` is explicitly the
+unaltered native source; grounding/settling is applied by the accompanying JSON
+during rendering, not baked into that GLB. The current NN8 install manifest now
+includes DT. No executable/version change. Live death/corpse behavior still needs
+gameplay verification; validation here covers source poses, render placement,
+frame/dimension compatibility, shadow bounds and visual review.

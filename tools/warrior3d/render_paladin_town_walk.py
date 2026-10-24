@@ -38,6 +38,8 @@ def pose(direction,row):
  origin=rig.matrix_world.to_3x3()@initial
  if not ref.get('preserve_horizontal_root_motion',False):
   rig.location.x=origin.x-p.x;rig.location.y=origin.y-p.y
+ if 'pose_offsets' in ref:
+  rig.location+=rig.matrix_world.to_3x3()@Vector(ref['pose_offsets'][row])
  bpy.context.view_layer.update()
 registrations=[[0.0,0.0] for _ in range(8)]
 # Final scale and fixed per-direction registration use rendered alpha bounds
@@ -49,4 +51,4 @@ for d in range(8):
 pose(0,0);camera.data.shift_x,camera.data.shift_y=registrations[0]
 bpy.ops.wm.save_as_mainfile(filepath=str(out/'Paladin-town-walk-render.blend'))
 ground=world_to_camera_view(scene,camera,Vector((0,0,0)))
-(out/'render.json').write_text(json.dumps({'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_rows':rows,'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'ground_origin_pixel':[ground.x*cell,(1-ground.y)*cell],'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))
+(out/'render.json').write_text(json.dumps({'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_rows':rows,'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'ground_origin_pixel':[ground.x*cell,(1-ground.y)*cell],'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'pose_offsets':ref.get('pose_offsets',[]),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'},indent=2))
