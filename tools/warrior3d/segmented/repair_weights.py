@@ -17,9 +17,13 @@ for o in list(bpy.data.objects):
 rig.animation_data_clear()
 for b in rig.pose.bones:b.matrix_basis.identity()
 rig.data.pose_position='POSE';bpy.context.view_layer.update()
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from pauldron_control import add_control,set_control,clear_body,NAME
+add_control(rig)
+collision_results=[];repair_active=False
 # Rigid equipment must not interpolate between unrelated bones.
 rigid={0:'Spine02',3:'Waist',4:'Pelvis',5:'Head',7:'R_Calf',8:'L_Upperarm',9:'L_Foot',
-10:'L_Calf',11:'R_Foot',12:'L_Upperarm',13:'L_Calf',14:'R_Thigh',15:'R_Hand',16:'Spine02',
+10:'L_Calf',11:'R_Foot',12:NAME,13:'L_Calf',14:'R_Thigh',15:'R_Hand',16:'Spine02',
 17:'L_Hand',19:'R_Thigh',20:'Pelvis',21:'Head',23:'Pelvis',27:'L_Foot',28:'R_Foot',
 30:'R_Hand',31:'L_Thigh',32:'L_Hand',33:'R_Calf',34:'R_Hand',35:'Head',36:'L_Hand',37:'R_Upperarm',38:'Head'}
 soft={1:['Pelvis','L_Thigh','R_Thigh'],2:['Waist','Spine01','Spine02'],
@@ -39,6 +43,11 @@ def pose(amount):
   b.matrix=transform@b.matrix;bpy.context.view_layer.update()
   elbow=rig.pose.bones[side+'_Forearm']; elbow.rotation_mode='QUATERNION'; elbow.rotation_quaternion=Quaternion((1,0,0),math.radians(25)*amount);bpy.context.view_layer.update()
   knee=rig.pose.bones[side+'_Calf']; knee.rotation_mode='QUATERNION'; knee.rotation_quaternion=Quaternion((1,0,0),math.radians(20)*amount);bpy.context.view_layer.update()
+ set_control(rig,amount)
+ if repair_active:
+  colliders=[bpy.data.objects[f'tripo_part_{i}'] for i in (2,6,8,15,17,18,21,26,35,37,38)]+bridges
+  clearance=clear_body(rig,colliders);assert clearance['intersections']==0,('Pauldron collision',clearance)
+  collision_results.append(clearance)
 def edge_positions():
  deps=bpy.context.evaluated_depsgraph_get();result={}
  for o in meshes:
@@ -72,6 +81,10 @@ for o in meshes:
    if w>0:groups[n].add([v.index],w/total,'REPLACE')
  o['repair_binding']='rigid' if index in rigid else 'restricted skin';o['repair_allowed_bones']=','.join(allowed)
  report['parts'].append({'part':index,'bones':allowed,'vertices_with_removed_influences':removed})
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from underarm_surface import connect_underarms,endpoint_error
+bridges,report['underarm_bridges']=connect_underarms(rig)
+repair_active=True
 pose(1);report['repaired_shoulder_test']=distortion();render('after-arm-test')
 pose(0);render('repaired-rest')
 # Keep equipment in the file, with an explicit reversible unarmed collection.
@@ -87,10 +100,14 @@ render('unarmed-rest')
 rig['repair_status']='Weight-repair candidate; imported joint positions retained; not production approved'
 bpy.ops.wm.save_as_mainfile(filepath=str(a.out/'Warrior-weight-repair.blend'),compress=True)
 bpy.ops.object.select_all(action='DESELECT')
-for o in meshes+[rig]:o.select_set(True)
+for o in meshes+bridges+[rig]:o.select_set(True)
 bpy.context.view_layer.objects.active=rig
 bpy.ops.export_scene.gltf(filepath=str(a.out/'Warrior-weight-repair.glb'),export_format='GLB',use_selection=True,export_animations=False)
 for frame in range(16):
- pose(.5-.5*math.cos(2*math.pi*frame/16));render(f'arm-check-{frame:02}')
+ pose(.5-.5*math.cos(2*math.pi*frame/16))
+ error=endpoint_error(rig,bridges);assert error<1e-5,('Detached underarm',error)
+ report['maximum_underarm_endpoint_error']=max(error,report.get('maximum_underarm_endpoint_error',0))
+ render(f'arm-check-{frame:02}')
 pose(0)
+report['pauldron_clearance']=collision_results
 (a.out/'repair-report.json').write_text(json.dumps(report,indent=2));print('REPAIR_REPORT',json.dumps({k:v for k,v in report.items() if k!='parts'}),flush=True)

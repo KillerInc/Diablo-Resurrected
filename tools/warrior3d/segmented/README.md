@@ -1,15 +1,22 @@
-# Segmented Warrior weight repair
+# Segmented Warrior repair
 
-Run Blender 5.1 against the user's local 39-part `D1+Warror+GLB+Segmented.glb`:
+Run Blender 5.1 against the local 39-part segmented Warrior GLB:
 
 ```powershell
 & $blender --background --factory-startup --python-exit-code 1 --python tools/warrior3d/segmented/repair_weights.py -- --input '<local-model.glb>' --out '<private-output-directory>'
 ```
 
-The script preserves imported joint locations and rest geometry. It binds inspected rigid gear to individual bones and removes unrelated influences from body/clothing pieces, renormalizing remaining weights. It saves an editable Blender candidate, GLB copy, before/after renders and a numeric report. Sword and back shield pieces are retained in a reversible optional collection, hidden for the Blender unarmed preview. The GLB copy retains equipment for compatibility; use the Blender scene for the explicit hidden-equipment state.
+The workflow preserves imported body joint locations and original rest geometry, repairs unrelated bone influences, binds rigid equipment, and adds two reconstructed underarm surfaces. Their endpoints copy exact positions and skin weights from the arm rim and torso. UV-split duplicate vertices are collapsed only for detecting true boundary edges. New underarm materials are subdued placeholders because the original images contain no texture coverage for the missing surfaces.
 
-Validated on the supplied export: 39 character meshes, no source animations. A repeatable 65-degree shoulder, 25-degree elbow and 20-degree knee test reduced mesh edges stretched more than 3x from 183 to 0. Maximum edge stretch fell from 12.08x to 2.005x. This measures stretching only: it does not establish joint closure, collision freedom, anatomical correctness, or animation readiness.
+The pauldron uses its own `Pauldron_L_Control` bone, independent of the upper arm. Test poses rotate and lift it outward. Triangle-intersection checks against torso, arms, hands, neck/head pieces and the reconstructed joins increase clearance until no intersections remain. This is a pose evaluation helper, not a live Blender constraint: new animations must call it or have the resulting control poses baked. It does not guarantee clearance for arbitrary future poses or surface containment without triangle intersections.
 
-**Remaining work:** open shoulder boundaries are exposed in raised-arm poses; hands retain the original weapon-gripping pose; equipment remains in its original rest locations; knee/boot joins need additional inspection; the segmented textures are lower resolution than the original 4K source. No new idle/walk animation or game-sheet replacement is approved. A simple shoulder seam weight blend was rejected because it introduced worse stretching; shoulder surface reconstruction or deliberate topology/weight repair is still needed.
+Validated on the supplied export:
 
-All third-party geometry, textures, Blender outputs and rendered diagnostics stay local outside the repository. Only this repair script and documentation are tracked. Nothing modifies the original exports or installed game files. The part map is specific to this inspected export, not a general Tripo model repair tool.
+- Controlled 65-degree shoulder, 25-degree elbow, 20-degree knee test: edges stretched over 3x reduced from 183 to 0; maximum existing-mesh stretch reduced from 12.08x to 2.005x. This metric excludes new underarm surfaces.
+- Both underarm surface endpoint errors are below 0.00001 across all 16 sampled motion poses (observed maximum 0).
+- All 19 pauldron clearance evaluations report zero intersections against the checked body surfaces.
+- The editable Blender candidate retains optional sword/back shield objects hidden in their own collection. The GLB copy retains that equipment; Blender is authoritative for its visibility state.
+
+Outputs include `Warrior-weight-repair.blend`, a GLB copy, renders and a numeric validation report. Source exports and installed game files are untouched. Models, textures and reference-derived renders remain local and are never committed. Only these source tools and documentation belong in Git.
+
+Still a candidate: underarm surface shape/materials need visual refinement; the hands retain their original gripping pose, knee/boot joins require further review, the segmented textures are lower-resolution than the original 4K input, and no gameplay animation or sprite replacement has been accepted. The map is specific to this inspected 39-part export.
