@@ -425,3 +425,30 @@ a punch whereas the replacement is a knee, so pose differences are intentional.
 Outputs are local under `paladin-knee/vanilla-overlay` and copied to the asset
 archive's `Expanded Canvas 0.4.1/Vanilla Overlay` directory. No installed files
 were changed for this comparison.
+
+## Separate authored punch preview
+
+The user asked whether we could make a punch. `create_paladin_punch.py` authors a
+new straight right punch from the current idle, without replacing the installed
+knee. It solves the upper-arm/forearm chains in glTF world coordinates, keeps a
+left-hand guard, adds a small torso wind-up/follow-through, straightens the wrists
+and curls the four finger chains into fists while preserving source thumb poses.
+The finger mapping is specific to this Paladin rig, not a general humanoid rig.
+
+The sixteen poses have exact idle endpoints and contact on the ninth game frame.
+Only bone rotations change. Meshes, materials, skin bindings and node records
+are retained; no Blender scene re-export is involved. The actual imported result
+was measured: both feet remain stationary and minimum boot height stays exactly
+-0.006820822 m across all sixteen poses. Model height, source density and the
+fixed tile-ground anchor are unchanged. Full moving shadows use southeast sun.
+
+Initial previews exposed a bent wrist and open-hand appearance; the reviewed
+version (`Paladin-punch-v3.glb`) aligns the knuckle axis with the forearm and uses
+the correct mirrored finger-curl direction. Body, guard, fists and contact pose
+were visually inspected. The expanded-canvas assembler supports a clean preview
+without the optional anchor guide. Local work is `paladin-punch`, and the local
+asset copy is `Unarmed Punch Preview`. This is an offline animation candidate;
+no executable, installed sheet or build version is changed by this preview.
+All 128 body and full moving shadow cells passed expanded-canvas checks. The
+preview GIF plays sixteen frames at 50 ms each. The compatible candidate atlas
+and its layout are saved locally for possible later testing, not installed.

@@ -13,6 +13,7 @@ from PIL import Image,ImageDraw,ImageFilter
 body_root,shadow_root,render_file,calibration,out=map(Path,sys.argv[1:6]);out.mkdir(parents=True,exist_ok=True)
 info=json.loads(render_file.read_text());cal=json.loads(calibration.read_text())
 scale=cal['global_pixel_scale'];origin=info['ground_origin_pixel']
+preview_prefix=info.get('preview_prefix','knee-centered')
 density=8;cell=1536;rows=info['output_rows'];filename=info.get('sheet','wlnat.png');anchor=(96,160);ground=(anchor[0]*density,(anchor[1]-16)*density)
 raw_cell=Image.open(body_root/'body-0-0.png').width
 dx=ground[0]-scale*origin[0];dy=ground[1]-scale*origin[1]
@@ -41,14 +42,15 @@ for row in range(rows):
     canvas=Image.new('RGB',(1152,420),(38,38,38));draw=ImageDraw.Draw(canvas)
     for column,direction in enumerate([0,2,3]):
         view=Image.new('RGBA',(cell,cell),(46,46,46,255));view=Image.alpha_composite(view,cells[direction]);vd=ImageDraw.Draw(view)
-        gx,gy=ground;vd.line([(gx-256,gy),(gx,gy-128),(gx+256,gy),(gx,gy+128),(gx-256,gy)],fill=(80,125,100,255),width=3)
-        vd.line([(gx-24,gy),(gx+24,gy)],fill=(60,255,130,255),width=4);vd.line([(gx,gy-24),(gx,gy+24)],fill=(60,255,130,255),width=4)
+        if info.get('preview_anchor',True):
+            gx,gy=ground;vd.line([(gx-256,gy),(gx,gy-128),(gx+256,gy),(gx,gy+128),(gx-256,gy)],fill=(80,125,100,255),width=3)
+            vd.line([(gx-24,gy),(gx+24,gy)],fill=(60,255,130,255),width=4);vd.line([(gx,gy-24),(gx,gy+24)],fill=(60,255,130,255),width=4)
         canvas.paste(view.resize((384,384),Image.Resampling.LANCZOS).convert('RGB'),(column*384,24));draw.text((column*384+10,7),['South','West','Northwest'][column],fill='white')
-    draw.text((10,409),'Green cross: fixed tile ground origin. Full moving shadow, sun southeast.',fill='white');preview.append(canvas)
-    if row==8:canvas.save(out/'knee-centered-contact.png')
+    draw.text((10,409),info.get('preview_caption','Green cross: fixed tile ground origin. Full moving shadow, sun southeast.'),fill='white');preview.append(canvas)
+    if row==8:canvas.save(out/(preview_prefix+'-contact.png'))
 dest=out/filename;sheet.save(dest,compress_level=6)
 (out/(filename+'.layout')).write_text('D1R_SHEET_V1 8 96 160\n',encoding='ascii')
 report['size']=[cell*8,cell*rows];report['sheet_sha256']=hashlib.sha256(dest.read_bytes()).hexdigest()
 (out/'validation.json').write_text(json.dumps(report,indent=2))
-preview[0].save(out/'knee-centered-preview.gif',save_all=True,append_images=preview[1:],duration=200 if Path(filename).stem.endswith(('as','st')) else 50,loop=0,optimize=False)
+preview[0].save(out/(preview_prefix+'-preview.gif'),save_all=True,append_images=preview[1:],duration=200 if Path(filename).stem.endswith(('as','st')) else 50,loop=0,optimize=False)
 print('Validated',rows*8,'body and shadow cells; fixed root anchor, unchanged art scale:',dest)
