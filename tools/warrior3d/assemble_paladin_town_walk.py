@@ -5,7 +5,7 @@ to keep the same character size and anchor across idle and walk.
 """
 import sys,json,hashlib
 from pathlib import Path
-from PIL import Image,ImageDraw
+from PIL import Image,ImageDraw,ImageFilter
 import numpy as np
 
 frames,reference,out=map(Path,sys.argv[1:4]);out.mkdir(parents=True,exist_ok=True)
@@ -22,15 +22,24 @@ for d in range(8):
  registrations.append((float(target_center-scale*center),float(target_bottom-scale*bottom)))
 if len(sys.argv)>4:
  calibration=json.loads(Path(sys.argv[4]).read_text());scale=calibration['global_pixel_scale'];registrations=calibration['fixed_direction_offsets']
-sheet=Image.new('RGBA',(6144,rows*768));cells=[];report={'global_pixel_scale':scale,'fixed_direction_offsets':registrations,'cells':[]}
+shadow_root=Path(sys.argv[5]) if len(sys.argv)>5 else None
+sheet=Image.new('RGBA',(6144,rows*768));cells=[];report={'global_pixel_scale':scale,'fixed_direction_offsets':registrations,'cells':[],'shadow_source':'animated model projection' if shadow_root else 'vanilla','body_rgb_gain':.62 if shadow_root else 1,'body_saturation':.86 if shadow_root else 1}
 for r in range(rows):
  row=[]
  for d in range(8):
   dx,dy=registrations[d]
   # One uniform scale for all 64 cells; one constant anchor per direction.
   body=images[r][d].transform((768,768),Image.Transform.AFFINE,(1/scale,0,-dx/scale,0,1/scale,-dy/scale),resample=Image.Resampling.BICUBIC)
+  if shadow_root:
+   rgba=np.array(body);rgb=rgba[:,:,:3].astype(np.float32);luminance=rgb@np.array([.2126,.7152,.0722],dtype=np.float32)
+   rgb=(luminance[:,:,None]+.86*(rgb-luminance[:,:,None]))*.62;rgba[:,:,:3]=np.clip(rgb,0,255).astype(np.uint8);body=Image.fromarray(rgba)
   box=body.getbbox();assert box and min(box[:2])>0 and max(box[2:])<768,('cropped sprite',d,r,box)
-  shadow=Image.open(reference/f'shadow-{d}-{r}.png').convert('RGBA');cell=Image.alpha_composite(shadow,body);sheet.paste(cell,(d*768,r*768));row.append(cell)
+  if shadow_root:
+   raw_shadow=Image.open(shadow_root/f'shadow-{d}-{r}.png').convert('RGBA')
+   alpha=raw_shadow.getchannel('A').transform((768,768),Image.Transform.AFFINE,(1/scale,0,-dx/scale,0,1/scale,-dy/scale),resample=Image.Resampling.BICUBIC).filter(ImageFilter.GaussianBlur(2.0)).point(lambda v:round(v*.70))
+   shadow=Image.new('RGBA',(768,768));shadow.putalpha(alpha)
+  else:shadow=Image.open(reference/f'shadow-{d}-{r}.png').convert('RGBA')
+  cell=Image.alpha_composite(shadow,body);sheet.paste(cell,(d*768,r*768));row.append(cell)
   report['cells'].append({'direction':d,'row':r,'body_bounds':bounds(body),'shadow_alpha_pixels':sum(x>0 for x in shadow.getchannel('A').getdata())})
  cells.append(row)
 dest=out/filename;sheet.save(dest,compress_level=6)

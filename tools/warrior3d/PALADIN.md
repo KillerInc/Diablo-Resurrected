@@ -123,3 +123,38 @@ Standing, walking, and return to standing were observed. Stopping now retains
 the Paladin appearance. The isolated game was saved with both weapon and shield
 in inventory. Other equipment and dungeon animations remain vanilla/previous HD
 assets. This does not establish complete collision or gameplay coverage.
+
+## Shadow alignment and darker palette pass
+
+The user reported that the reused vanilla idle shadow did not fit the new
+stance, and the sprite was too bright for Diablo. The current sheets supersede
+the prior shadow/color output above:
+
+- `render_paladin_shadows.py` projects each animated pose onto the z=0 ground
+  plane, with the same camera, pose and root-motion correction as its body.
+  It uses opaque head, torso, limb and armor geometry; transparent hair cards,
+  facial overlays and eye planes do not cast silhouette artifacts.
+- The assembler transforms each projected shadow with the body's identical
+  scale and registration. A two-pixel edge blur and 70% opacity replace the
+  copied original shadow. Both idle and walk now use model-matched shadows.
+- Body RGB is multiplied by 0.62 and saturation is reduced to 0.86, preserving
+  alpha and the existing geometric alignment. This is a deliberate darker art
+  pass; source textures and raw body renders are unchanged.
+
+The eight-direction contact sheets were visually reviewed and all 224 body
+cells remain uncropped. The updated PNGs were installed and hashes verified.
+This latest art pass has offline visual validation; the live checks above
+refer to the earlier palette/shadows. Restart the game to clear its sheet cache.
+
+Current installed hashes:
+
+- WLNST: `A5BE20632726DEEE258ECE4800C8CA94BCBD6FFCE07C44083B146A41A21A21C4`
+- WLNWL: `87725C4BD0E885F361FEB001D970EB3DF4B4611005319C51571649E1765BCF39`
+
+To use projected shadows, pass their output directory as a fifth positional
+argument after the calibration JSON to `assemble_paladin_town_walk.py`:
+
+```text
+blender -b --python tools/warrior3d/render_paladin_shadows.py -- RENDER.blend render.json SHADOW_DIRECTORY
+python tools/warrior3d/assemble_paladin_town_walk.py FRAMES REFERENCE OUTPUT CALIBRATION.json SHADOW_DIRECTORY
+```
