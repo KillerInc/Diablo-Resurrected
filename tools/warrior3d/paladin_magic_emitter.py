@@ -6,22 +6,29 @@ rather than filling a pre-existing spiral or wrapping particles to the floor.
 import math
 
 
-def emitted_particles(phase,seeds,scale):
+def emitted_particles(phase,seeds,scale,spin_speed=1,density=1,disperse=False):
+    assert spin_speed>0 and density in (1,2)
     radius=.53
-    for seed in seeds[::2]:
+    for seed in seeds[::(2 if density==1 else 1)]:
         birth=.035+seed[0]*.72
         age=(phase-birth)/.48
         if not 0<=age<=1:continue
-        birth_angle=math.tau*1.25*birth
-        angle=birth_angle+math.tau*1.45*age+(seed[1]-.5)*(.10+.22*age)
+        birth_angle=math.tau*1.25*birth*spin_speed
+        angle=birth_angle+math.tau*1.45*age*spin_speed+(seed[1]-.5)*(.10+.22*age)
         r=radius+.025*math.sin(age*10)+(seed[2]-.5)*(.07+.09*age)
         z=.035+1.73*age+(seed[3]-.5)*.06*age
         fade=min(1,age/.035)*min(1,(1-age)/.20)
+        if disperse:
+            spread=age*age
+            r+=.11*spread+(seed[2]-.5)*.14*spread
+            angle+=(seed[1]-.5)*1.0*spread
+            z+=(seed[4]-.5)*.18*spread
+            fade=min(1,age/.035)
         yield ((r*math.cos(angle),r*math.sin(angle),z),
                (.010+.014*seed[3])*scale,(.4+.6*seed[4])*fade)
     # A concentrated glow and a short ground trail identify the moving source.
     if .035<=phase<=.80:
         for i in range(10):
-            angle=math.tau*1.25*phase-i*.045
+            angle=math.tau*1.25*phase*spin_speed-i*.045
             yield ((radius*math.cos(angle),radius*math.sin(angle),.035),
                    .09 if i==0 else .035*scale,(1-i/10)*.9)

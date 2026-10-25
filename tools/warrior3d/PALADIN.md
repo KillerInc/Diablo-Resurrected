@@ -1049,3 +1049,33 @@ The current mirror and install manifest record both options and select Option 2.
 All nine other custom sheet hashes remain unchanged. Private production files
 are under `paladin-magic/option2`; no artwork or extracted data enters Git.
 No executable/version change. In-game visual transitions still need review.
+
+#### Option 2 refinement: faster, denser and dispersing
+
+The user requested faster spin, more particles and increasing space between
+particles as they rise, explicitly rejecting age-based fading. The selected
+reference now sets `spin_speed = 1.5`, `emission_density = 2` and
+`disperse = true`. Both source orbit and particle angular travel are 50% faster.
+Emission uses all 640 seeded birth events instead of 320. Particle size,
+material, body animation and lighting are unchanged. Quadratic age-driven radial
+and angular spread, plus modest vertical variation, separate older motes.
+There is no age-based dimming in this profile: emitted motes retain their
+brightness until their lifetime ends. The existing whole-cast idle transition
+still turns the effect off at the end of the action. Default settings reproduce
+the previous Option 2; Option 1 remains independent.
+
+Checks confirm doubled event count, increasing radial spread and equal particle
+brightness at early/late ages. All 160 body/effect and 160 shadow bounds checks
+pass, with minimum margins 17 and 5 NN8 pixels. All emission masks exist and idle
+masks/silhouettes pass. The unchanged anatomical shadows were reused after
+matching pose, camera and registration metadata. The reviewed previews include
+previous/new Option 2 and vanilla/Option 1/new Option 2, plus all eight facings.
+
+Current QM SHA256:
+`1C8687D47F76F23FCD3E151528DC9DC77F045219C92F92FEEDB05EC193E4435F`.
+Private data is under `paladin-magic/option2-fast`, and the archive is
+`Unarmed Magic Casting/Option 2 Faster Denser`, including `Previous Option 2`.
+The Option 1 archive hash and all nine other installed custom action hashes
+remain unchanged. The current mirror and manifest select the refined Option 2
+and retain both older options. No executable/version change. Live gameplay
+still needs visual review. All art and extracted data stay local.
