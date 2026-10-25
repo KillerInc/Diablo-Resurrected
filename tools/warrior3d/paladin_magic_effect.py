@@ -12,7 +12,8 @@ from paladin_fire_effect import FireEffect,smooth
 class MagicEffect(FireEffect):
     def __init__(self,scene,rig,output,settings):
         super().__init__(scene,rig,output,{**settings,'style':'magic'})
-        self.particles=np.random.default_rng(settings.get('seed',1447)).random((640,5))
+        particle_count=int(settings.get('particle_count',640));assert 1<=particle_count<=4096
+        self.particles=np.random.default_rng(settings.get('seed',1447)).random((particle_count,5))
         self.particle_scale=float(settings.get('particle_scale',1));assert 0<self.particle_scale<=4
         self.motion=settings.get('motion','spiral');assert self.motion in ('spiral','ground_emitter')
         self.emitter_speed=float(settings.get('spin_speed',1));self.emission_density=int(settings.get('emission_density',1));self.disperse=bool(settings.get('disperse',False))

@@ -1079,3 +1079,30 @@ The Option 1 archive hash and all nine other installed custom action hashes
 remain unchanged. The current mirror and manifest select the refined Option 2
 and retain both older options. No executable/version change. Live gameplay
 still needs visual review. All art and extracted data stay local.
+
+#### Option 2 second speed/density increase
+
+At the user's request, emission is doubled again to 1,280 birth events and
+`spin_speed` increases from 1.5 to 2.25 (another 50%). `particle_count` is now a
+bounded optional setting, defaulting to 640 for reproducibility. The existing
+640 seeded events remain the exact prefix of the larger seed pool. A midcast
+sample increases from 416 to 831 live particles, excluding the ground source
+trail. Particle size, outward age-driven dispersion and brightness are
+unchanged; no age fading was added. Source orbit and particle travel both use
+the new speed. Body poses and twenty-frame gameplay casting timing remain fixed.
+
+Private production files are under `paladin-magic/option2-faster`. The comparison
+includes vanilla, preserved Option 1 and the latest Option 2, as well as a
+previous/new Option 2 preview. Existing anatomical shadows are reused only after
+matching camera, poses, offsets, scale, ground origin and shadow metadata.
+
+The new output passes all 160 body/effect and 160 shadow cell bounds checks,
+with minimum margins 14 and 5 NN8 pixels. All 160 emission masks exist and idle
+endpoint masks/silhouettes pass. Reviewed the eight-facing contact and the
+previous/new and vanilla/Option 1/Option 2 comparisons before installation.
+Current QM SHA256:
+`B2FE99153435F8B3B7B933B4ECC1405A62536740833BB6D9155F59144FCFD62D`.
+The local archive is `Unarmed Magic Casting/Option 2 Faster Denser v2`, with the
+previous sheet/layout under `Previous Option 2`. The mirror and manifest select
+this revision; Option 1 and all nine other custom sheets retain their hashes.
+No executable/version change. Live gameplay still needs visual review.
