@@ -1213,3 +1213,43 @@ The archive is `Unarmed Magic Casting/Option 2 Wider Ground Orbit`, including
 the previous sheet/layout under `Previous Option 2`. The mirror and manifest
 select the wider orbit. Option 1 and all nine other custom action hashes remain
 unchanged. No executable/version change; live gameplay still needs review.
+
+### QM final approval and next equipment set
+
+The user selected the latest Option 2 wider-ground-orbit QM as final. Its
+approved SHA256 remains
+`6EF285E90AA21292CCBEAE1D53AF94A5A0D20CCF2273F58FE795E5FA008CB97B`.
+The exact installed PNG/layout and reference are archived under
+`Unarmed Magic Casting/Final QM`; the private install manifest now marks QM
+final and retains the alternative options. All ten installed custom action
+hashes were checked and remain unchanged. Do not replace this approved QM
+while developing the next equipment set.
+
+All applicable light-unarmed actions are covered. There is no vanilla WLNBL
+sheet; blocking requires a shield. The next development set is light armor
+with sword and shield, code **WLD** (`WepChar` maps sword+shield to `d`).
+The available `palM_1hsShd_nav_idle` clip has been extracted and directly merged
+onto the existing edited Paladin: 193 animated bones match, maximum rest-matrix
+difference 1.0129064321517944e-05, with original meshes/skins/nodes preserved.
+This is a private body candidate, not an installed armed animation. Grip and
+shield attachments still need fitting after equipment selection.
+
+The user requested equipment options before fitting. Local options are:
+
+| Label | File | Appearance |
+|---|---|---|
+| S1 | `sword_base00.glb` | Plain straight crossguard, silver blade |
+| S2 | `sword_base01.glb` | Broad curved crossguard, lighter blade |
+| S3 | `sword_base03.glb` | Darker worn blade, narrower guard |
+| H1 | `shield_base02.glb` | Round wood/metal shield, gold detailing |
+| H2 | `shield_base04.glb` | Red round shield with decorated metal boss |
+| H3 | `Shield_S15_Warrior.glb` | Plain wood shield with metal rim and crossbar |
+
+`preview_warrior_equipment.py` renders two sides of all six local GLBs, retaining
+original dimensions with one fixed camera scale per category. It changes no
+source models. Labelled sword/shield contact sheets and source-hash metadata
+are saved locally under `Equipment Options`, also in the private
+`paladin-sword-shield/equipment-options` work folder. S1/H2 is the proposed
+closest visual match to vanilla; the user's selection remains pending. No
+armed sheet has been installed. Equipment models, textures and previews remain
+outside Git; only this renderer and notes are committed.
