@@ -898,3 +898,48 @@ were checked before and after: only FM changed. No game executable or version
 change. In-game spell/projectile appearance still needs a gameplay review.
 Only scripts and these notes are committed; no models, animation tracks,
 textures, sheets, masks, extracted metadata or preview artwork enter Git.
+
+### Lightning casting (LM)
+
+LM continues the approved native Paladin Gizmo Operate motion without changing
+the body animation, armor, geometry, scale or anchor. The original NN8 LM PNG is
+6144×16128, and all eight original CL2 direction headers contain 21 frames.
+Warrior `animations.tsv` still specifies twenty gameplay casting frames and
+release at frame 14. The original-size output therefore retains 21 stored rows:
+rows 0–19 use the approved twenty poses and the spare row 20 repeats final idle.
+The hand motion is not stretched across an extra gameplay frame.
+
+`prepare_paladin_lightning_reference.py` verifies the original LM direction
+counts and derives the LM reference from the approved grounded FM reference.
+`paladin_lightning_effect.py` creates deterministic blue-white, forked 3D arcs
+from the hands around the lower body, reflecting the original LM's baked
+electrical casting effect. It uses separate emission masks, a small shadowless
+blue light and the existing renderer. Electrical grading preserves cool colors;
+the fire grading path remains unchanged. The arcs fade completely at idle and
+do not cast shadows. This is caster artwork only: engine spell/projectile
+selection and timing remain unchanged.
+
+Private production data is under `paladin-lightning`: `reference.json`, `frames`,
+`shadows` and `output`. Fresh anatomical shadow renders use the southeast sun,
+full original shadow length and the same fixed registration. The sheet sidecar
+is `D1R_SHEET_V1 8 48 96`, with 768×768 cells and fixed foot origin (384,640).
+Review GIFs compare vanilla NN8 and the new caster at the same cell size in
+south/west views, and show all eight new facings. The GIF plays the twenty
+gameplay frames at 50 ms each; the PNG retains all 21 original stored rows.
+
+All 168 combined body/effect cells and 168 blurred-shadow cells pass strict
+bounds checks. Minimum margins are 58 and 5 NN8 pixels respectively. All 168
+emission masks exist; masks are empty in rows 0, 19 and 20 for every facing, and
+those idle silhouettes match. The approved FM body GLB was reused without edits.
+The original FM effect remains installed and its hash is unchanged.
+
+Installed LM SHA256:
+`60A27507B3149C6774665381CF0C459D5DDC02D95E8F15C033D410EB64A5BDFE`.
+The asset archive is `Paladin Candidate 1 Edited/Unarmed Lightning Casting`,
+with the previous installed vanilla sheet in `Previous Vanilla Sheet`. The
+current NN8 mirror and install manifest now contain nine custom actions. All
+eight previously approved sheet hashes were verified before and after LM
+installation. Only LM changed. Scripts and documentation are committed; all
+proprietary source data, models, sheets, masks and comparisons stay local.
+The executable remains 0.4.1-pre; this asset-only change requires no rebuild.
+Live lightning spell/projectile appearance remains to be checked in game.

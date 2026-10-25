@@ -41,7 +41,10 @@ fire=None
 if ref.get('fire_effect'):
  sys.path.insert(0,str(Path(__file__).resolve().parent))
  from paladin_fire_effect import FireEffect
- fire=FireEffect(scene,rig,out,ref['fire_effect'])
+ if ref['fire_effect'].get('style')=='lightning':
+  from paladin_lightning_effect import LightningEffect
+  fire=LightningEffect(scene,rig,out,ref['fire_effect'])
+ else:fire=FireEffect(scene,rig,out,ref['fire_effect'])
 def pose(direction,row):
  rig.location=(0,0,0);rig.rotation_euler.z=-direction*math.pi/4;scene.frame_set(times[row]);bpy.context.view_layer.update()
  if redirect:redirect.apply(times[row],ref['redirect_fall']['angles'][direction],ref['redirect_fall'].get('modes',['pelvis']*8)[direction])
