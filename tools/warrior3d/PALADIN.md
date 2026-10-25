@@ -1253,3 +1253,27 @@ are saved locally under `Equipment Options`, also in the private
 closest visual match to vanilla; the user's selection remains pending. No
 armed sheet has been installed. Equipment models, textures and previews remain
 outside Git; only this renderer and notes are committed.
+
+#### H3 red-wood option
+
+The user requested H3 in red. `paint_shield_wood.py` creates the separate
+`Shield_S15_Warrior_Red.glb`. The source has one shared PBR material; its existing
+metallic texture classifies triangle interiors into wood and metal. The 274 wood
+triangles receive a copied material with base-color factor `[1,0.075,0.05,1]`,
+giving a dark red finish while retaining the original grain. The 742 metal
+triangles keep the original material. Both faces are red; rim, boss, crossbar
+and rear fittings remain metal. All 1,016 original triangles, nodes, position,
+normal and UV data are preserved. Embedded images are retained byte-for-byte;
+only material assignment and additional index buffers change.
+
+The original source remains unchanged, SHA256
+`3CE969A5D3F4425A9F51AD97D74A5FA6634DB5952725ADF66C1E414732BFE2BF`.
+Red variant SHA256:
+`34977AA5B6BF1E98296CC4C81917F52DC2EC0CDDCA21CE7A0522C67186D15F23`.
+Front/back views were rendered and visually checked. The red GLB is saved beside
+the original local equipment models; `Equipment Options` contains
+`H3 Red Shield.png`, `H3 Before and After.png` and validation metadata.
+`preview_warrior_equipment.py` now accepts optional explicit model paths after
+its output directory to compare variants. No armed sheet or game executable
+was changed. User equipment selection remains pending. Only source/notes are
+committed; models, textures and previews stay local.

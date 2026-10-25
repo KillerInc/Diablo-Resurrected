@@ -1,6 +1,6 @@
 """Preview the user's local swords and shields without changing source assets.
 
-Blender --python SCRIPT -- ASSET_DIRECTORY OUTPUT_DIRECTORY
+Blender --python SCRIPT -- ASSET_DIRECTORY OUTPUT_DIRECTORY [MODEL.glb ...]
 Renders front/back views at one fixed scale per equipment category.
 No extracted artwork is embedded in this script or committed to Git.
 """
@@ -8,8 +8,9 @@ import bpy,json,math,sys,hashlib
 from pathlib import Path
 from mathutils import Matrix,Vector
 
-source,out=map(Path,sys.argv[sys.argv.index('--')+1:]);out.mkdir(parents=True,exist_ok=True)
+args=sys.argv[sys.argv.index('--')+1:];source,out=map(Path,args[:2]);out.mkdir(parents=True,exist_ok=True)
 assets=[('S1','sword_base00.glb','sword'),('S2','sword_base01.glb','sword'),('S3','sword_base03.glb','sword'),('H1','shield_base02.glb','shield'),('H2','shield_base04.glb','shield'),('H3','Shield_S15_Warrior.glb','shield')]
+if len(args)>2:assets=[(f'V{i+1}',name,'sword' if 'sword' in Path(name).name.lower() else 'shield') for i,name in enumerate(args[2:])]
 report=[]
 for label,name,category in assets:
     path=source/name;assert path.is_file(),path
@@ -29,4 +30,4 @@ for label,name,category in assets:
     for view,pos in [('front',(1.1,-5,1)),('back',(-1.1,5,1))]:
         camera.location=pos;camera.rotation_euler=(-camera.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=str((out/f'{label}-{view}.png').resolve());bpy.ops.render.render(write_still=True)
     report.append({'label':label,'filename':name,'category':category,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'native_dimensions':list(hi-lo),'mesh_objects':len(meshes),'model_scaled':False})
-(out/'equipment-options.json').write_text(json.dumps(report,indent=2));print('Rendered six local equipment options, front and back; source assets unchanged')
+(out/'equipment-options.json').write_text(json.dumps(report,indent=2));print(f'Rendered {len(assets)} local equipment options, front and back; source assets unchanged')
