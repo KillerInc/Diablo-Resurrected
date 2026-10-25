@@ -32,7 +32,7 @@ if info.get('redirect_fall'):
  from redirect_paladin_fall import RedirectFall
  redirect=RedirectFall(rig,info['redirect_fall']['first_frame'])
 sun=info.get('sun_position',[3,-4,6]);assert sun[2]>0
-rig.location=(0,0,0);rig.rotation_euler=(0,0,0);scene.frame_set(1);bpy.context.view_layer.update();initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy()
+rig.location=(0,0,0);rig.rotation_euler=(0,0,0);scene.frame_set(info.get('root_anchor_frame',1));bpy.context.view_layer.update();initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy()
 material=bpy.data.materials.new('Ground shadow silhouette');material.use_nodes=True;nodes=material.node_tree.nodes;nodes.clear();output=nodes.new('ShaderNodeOutputMaterial');emit=nodes.new('ShaderNodeEmission');emit.inputs['Color'].default_value=(0,0,0,1);material.node_tree.links.new(emit.outputs[0],output.inputs['Surface'])
 mesh=bpy.data.meshes.new('Projected character');shadow=bpy.data.objects.new('Projected character',mesh);bpy.context.collection.objects.link(shadow);shadow.data.materials.append(material)
 for d in info.get('render_directions',range(8)):
@@ -52,9 +52,7 @@ for d in info.get('render_directions',range(8)):
   deps=bpy.context.evaluated_depsgraph_get();vertices=[];faces=[]
   for o in parts:
    ev=o.evaluated_get(deps);me=ev.to_mesh();offset=len(vertices);transform=ev.matrix_world
-   for v in me.vertices:
-    p=transform@v.co;h=max(0,p.z);x=p.x-sun[0]/sun[2]*h;y=p.y-sun[1]/sun[2]*h
-    vertices.append((anchor.x+(x-anchor.x)*gain,anchor.y+(y-anchor.y)*gain,.002))
+   coords=np.empty(len(me.vertices)*3,dtype=np.float32);me.vertices.foreach_get('co',coords);matrix=np.asarray(transform,dtype=np.float64);world=coords.reshape(-1,3)@matrix[:3,:3].T+matrix[:3,3];height=np.maximum(world[:,2],0);world[:,0]-=sun[0]/sun[2]*height;world[:,1]-=sun[1]/sun[2]*height;world[:,0]=anchor.x+(world[:,0]-anchor.x)*gain;world[:,1]=anchor.y+(world[:,1]-anchor.y)*gain;world[:,2]=.002;vertices.extend(world.tolist())
    faces.extend(tuple(offset+i for i in poly.vertices) for poly in me.polygons);ev.to_mesh_clear()
   mesh.clear_geometry();mesh.from_pydata(vertices,[],faces);mesh.update()
   scene.render.filepath=str(out/f'shadow-{d}-{row}.png');bpy.ops.render.render(write_still=True)

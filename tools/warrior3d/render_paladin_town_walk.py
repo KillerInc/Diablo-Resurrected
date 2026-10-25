@@ -36,7 +36,7 @@ scene.frame_start=int(round(first));scene.frame_end=int(round(last))
 source_count=int(round(last-first))+1
 times=[int(round(first))+int(i*source_count/rows) for i in range(rows)]
 times=ref.get('source_frames',times)
-scene.frame_set(1);rig.rotation_euler=(0,0,0);rig.location=(0,0,0);bpy.context.view_layer.update();initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy()
+scene.frame_set(ref.get('root_anchor_frame',1));rig.rotation_euler=(0,0,0);rig.location=(0,0,0);bpy.context.view_layer.update();initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy()
 redirect=None
 if ref.get('redirect_fall'):
  sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -86,4 +86,5 @@ metadata={'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_row
 for key in ['canvas_logical','canvas_anchor','preview_prefix','preview_anchor','preview_contact_row','preview_caption','pose_image_offsets','render_rows']:
  if key in ref:metadata[key]=ref[key]
 if equipment:metadata.update(equipment=ref['equipment'],equipment_mesh_count=len(equipment))
+if 'root_anchor_frame' in ref:metadata['root_anchor_frame']=ref['root_anchor_frame']
 (out/'render.json').write_text(json.dumps(metadata,indent=2))

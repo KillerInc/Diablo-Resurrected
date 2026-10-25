@@ -31,6 +31,7 @@ def attach_equipment(rig,settings):
                 point=Vector(item.get('hand_point',[0,.05,0]))
                 if item.get('grip_target_bone'):point=rig.pose.bones[bone].matrix.inverted()@rig.pose.bones[item['grip_target_bone']].matrix@point
                 local.translation+=point-local@Vector(item['grip'])
+            if item.get('local_transform'):local=Matrix(item['local_transform'])
             obj.parent=rig;obj.parent_type='BONE';obj.parent_bone=bone;obj.matrix_parent_inverse=Matrix.Identity(4)
             obj.matrix_basis=Matrix.Translation((0,-rig.data.bones[bone].length,0))@local
             obj['d1r_equipment']=True;obj['d1r_socket']=bone;obj['d1r_asset']=path.name
