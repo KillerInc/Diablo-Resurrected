@@ -741,8 +741,9 @@ The initial full gesture's west/northwest shadow overrun was shown before
 refinement. The casting arm is now kept closer to the body. Original NN8 FM is
 6144 x 15360, twenty 768-square cells per column; the sidecar remains
 `D1R_SHEET_V1 8 48 96`. The installed art scale and full southeast-to-northwest
-shadow projection remain unchanged. No fire particles are baked into the sprite;
-the existing game supplies spell effects. Local work is `paladin-casting`, with
+shadow projection remain unchanged. This replacement currently omits casting
+flames baked into the vanilla FM sprite; the game supplies the separate spell
+projectile. Local work is `paladin-casting`, with
 the selected output under `fire-palm`.
 
 All 160 final body/shadow cells pass rendered-alpha clipping checks, including
@@ -763,3 +764,13 @@ installed hashes were verified, with the other seven unchanged. The eight-view
 GIF adds review-only endpoint holds; gameplay still uses twenty 50 ms frames.
 No executable/build change. Live projectile/cast appearance remains to be checked
 in game. Lightning and other-magic sheets are still the previous installed art.
+
+A synchronized comparison with the original NN8 WLNFM confirmed that vanilla
+contains prominent casting flames within the sheet itself, including frame 14.
+The current character-and-shadow replacement lacks that layer. The prior claim
+that the game would supply the complete casting effect was incorrect; only the
+separate projectile is handled independently. This is a known visual gap to fix
+before considering FM equivalent to vanilla. Comparison GIFs use matching cell
+scale/anchor, all twenty frames at 50 ms, and S/W/NW views. They remain local in
+`Unarmed Fire Casting/Comparison`; no artwork was committed. The installed sheet
+was not changed during this comparison.
