@@ -1367,3 +1367,41 @@ previous and corrected mounts, not vanilla. The mirror and manifest select the
 correction; all ten unarmed hashes remain unchanged and QM stays final. Only
 WLDAS was replaced. No executable or version change. Live gameplay still needs
 visual review; models and renders remain local.
+
+#### Sword seated inside the closed hand
+
+The user approved the forearm shield mount and identified that S1 touched the
+hand without passing through its grip. Close-ups confirmed the old anchor was
+near the wrist and the forced blade-up axis did not match the finger opening.
+The corrected S1 mount uses native `weapon.R` orientation with a -90-degree
+imported Z-axis rotation: its handle crosses the closed-finger opening along
+the native socket X axis. The leather-grip centre is imported coordinate
+`(0,0.075,0)`, aligned to hand-local `(0.0425,0.0825,-0.002)`. The old X-axis
+correction and authored guard rotation are removed. This gives the native
+outward/downward sword guard while placing the leather wrap through the palm,
+between thumb and fingers, with the pommel outside the hand.
+
+Reviewed close-ups from three sides, including the leather section rather than
+the metal pommel. Finger/hand poses and all body animation remain unchanged;
+only the rigid sword mount changes. Across ten idle samples, maximum sword-grip
+anchor error is 1.2644054553268208e-07 m. The blade centreline clears the opaque
+body in all samples. This is not exhaustive blade-edge collision certification.
+The approved shield configuration matches the previous reference exactly,
+with the same forearm parent, basis, source scale and grip target.
+
+`wld_idle_equipment.json` records the corrected mount. Private production files
+are under `paladin-sword-shield/sword-grip-fix`; use this reference for further
+equipped work. Contact previews compare the old wrist contact with the new
+leather-in-palm fit, plus both sides of the corrected grip. The idle comparison
+labels previous/new sword grips rather than vanilla.
+
+All 80 body/equipment and 80 full-shadow bounds checks pass, with minimum
+margins 67 and 3 NN8 pixels. Original dimensions, fixed anchor and body scale
+remain unchanged. Current WLDAS SHA256:
+`3F9EE94085B40D4ECEA89A6CAA41022568472C4BF5994736DA9FF8BF906F3C0D`.
+The local archive is `Sword Shield S1 H3 Red/Sword Grip Fixed`, with close-ups,
+an equipped test scene and `Previous Sword Mount` backup. The current mirror
+and manifest select the corrected grip and record the shield as user-approved.
+All ten unarmed action hashes remain unchanged. Only WLDAS was replaced. No
+executable/version change. In-game visual review remains outstanding; all
+models, images and diagnostic pose data stay local.
