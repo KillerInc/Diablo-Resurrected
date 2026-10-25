@@ -1159,3 +1159,30 @@ previous single-emitter sheet/layout under `Previous Option 2`. The current
 mirror and manifest select dual emitters; Option 1 and all nine other custom
 action hashes remain unchanged. No executable/version change. In-game visuals
 still need gameplay review. Only source and notes enter Git; all art stays local.
+
+#### Dual emitters: slower motion and wider age-driven spacing
+
+The user requested slower motion and more space between particles over time.
+Spin speed is reduced from 2.25 to 1.5, one third slower for both ground sources
+and particle angular travel. Spread strength increases from 3 to 4: angular
+dispersion and radial variation grow more strongly with age squared. Newly
+emitted particles stay close to their source; older particles spread farther
+apart. Particle size, seed, 1,280 births per emitter, rising trajectory and
+brightness remain unchanged. No age fading is added.
+
+`qm_dual_emitter_profile.json` records the current procedural settings without
+artwork. Copy that object into a grounded reference's `fire_effect` setting to
+reproduce this variant; model and camera references remain private. Production
+files are under `paladin-magic/option2-dual-slower`. Previews compare previous
+and current dual emitters, and vanilla/Option 1/current Option 2.
+
+All 160 body/effect and 160 shadow bounds checks pass, with minimum margins
+4 and 5 NN8 pixels. All emission masks exist; idle endpoint masks are empty and
+silhouettes match. The saved procedural profile matches the production render
+metadata exactly. Anatomical shadows are reused after pose/camera comparison.
+The reviewed slower/wider sheet is installed with SHA256
+`9B07727EE5DABB864AAB4F31CFBDF79EC028526DE941EEE621D8F109B3596C2C`.
+The archive is `Unarmed Magic Casting/Option 2 Slower Wider`, with the prior
+dual sheet/layout under `Previous Option 2`. The current mirror and manifest
+select this revision. Option 1 and all nine other custom action hashes remain
+unchanged. No executable/version change; live gameplay still needs review.

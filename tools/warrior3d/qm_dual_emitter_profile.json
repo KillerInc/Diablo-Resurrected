@@ -1,0 +1,12 @@
+{
+  "style": "magic",
+  "seed": 1447,
+  "particle_scale": 2,
+  "motion": "ground_emitter",
+  "spin_speed": 1.5,
+  "emission_density": 2,
+  "disperse": true,
+  "particle_count": 1280,
+  "spread_strength": 4,
+  "emitter_count": 2
+}
