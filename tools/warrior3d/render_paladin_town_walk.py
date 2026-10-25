@@ -17,6 +17,11 @@ assert rig.animation_data and rig.animation_data.action
 scene=bpy.context.scene;scene.render.engine='BLENDER_EEVEE';scene.render.fps=30;scene.render.resolution_x=768;scene.render.resolution_y=768;scene.render.resolution_percentage=100;scene.render.film_transparent=True
 scene.render.image_settings.file_format='PNG';scene.render.image_settings.color_mode='RGBA';scene.world.color=(.13,.13,.13);scene.view_settings.view_transform='AgX'
 ref=json.loads(reference.read_text());cell=ref.get('cell',768)
+equipment=[]
+if ref.get('equipment'):
+ sys.path.insert(0,str(Path(__file__).resolve().parent))
+ from paladin_equipment import attach_equipment
+ equipment=attach_equipment(rig,ref['equipment'])
 scene.render.resolution_x=cell;scene.render.resolution_y=cell
 target=Vector((0,0,.9));bpy.ops.object.camera_add(location=(0,-6,.9+6*math.tan(math.radians(30))));camera=bpy.context.object;camera.rotation_euler=(target-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.type='ORTHO';camera.data.ortho_scale=2.75;scene.camera=camera
 camera.data.ortho_scale=2.75*cell/768
@@ -80,4 +85,5 @@ ground=world_to_camera_view(scene,camera,Vector((0,0,0)))
 metadata={'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_rows':rows,'render_directions':ref.get('render_directions',list(range(8))),'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'ground_origin_pixel':[ground.x*cell,(1-ground.y)*cell],'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'pose_offsets':ref.get('pose_offsets',[]),'direction_pose_offsets':ref.get('direction_pose_offsets',[]),'redirect_fall':ref.get('redirect_fall'),'shadow_overscan':ref.get('shadow_overscan',0),'fire_effect':ref.get('fire_effect'),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'}
 for key in ['canvas_logical','canvas_anchor','preview_prefix','preview_anchor','preview_contact_row','preview_caption','pose_image_offsets','render_rows']:
  if key in ref:metadata[key]=ref[key]
+if equipment:metadata.update(equipment=ref['equipment'],equipment_mesh_count=len(equipment))
 (out/'render.json').write_text(json.dumps(metadata,indent=2))

@@ -1277,3 +1277,58 @@ the original local equipment models; `Equipment Options` contains
 its output directory to compare variants. No armed sheet or game executable
 was changed. User equipment selection remains pending. Only source/notes are
 committed; models, textures and previews stay local.
+
+### Selected S1 and red H3: equipped dungeon idle
+
+The user selected `sword_base00.glb` and `Shield_S15_Warrior_Red.glb`.
+The first armed test uses `palM_1hsShd_nav_idle` and original WLDAS layout:
+ten 768×768 rows, eight directions, 6144×7680, with sidecar
+`D1R_SHEET_V1 8 48 96`. The existing body calibration and southeast sun are
+retained. Source equipment files and character geometry are unchanged.
+
+`paladin_equipment.py` imports rigid equipment, sets its initial orientation
+from native weapon sockets, and parents it to the appropriate hand. It
+compensates Blender's bone-tail parenting offset and supports explicit grip
+points in **Blender imported mesh coordinates**, not raw GLB axes. This matters
+because the importer bakes its axis conversion into these rigid meshes.
+`wld_idle_equipment.json` records the selected assets and authored mounts.
+
+S1 uses a 0.75 instance scale (about 1.04 total length), a 10/0/17-degree guard
+adjustment, and a grip at imported coordinate `(0,0.16,0)` aligned to
+right-hand point `(0,0.05,0)`. H3 retains its source size, rotates its crossbar
+90 degrees into the guard stance, and mounts rear grip `(-0.2,0,-0.1)` to the
+same local point on the left hand. The original exported sword was oversized
+for this stance and the first socket-only mounting sent its blade across the
+lower body. That prototype was shown before correction. The original high
+shield mounting also extended its shadow beyond the sheet. The final grips
+and guard orientation fit without altering body scale, canvas or light/shadow
+length. These instance transforms do not overwrite either source GLB.
+
+The ten sampled idle poses retain maximum grip error 1.228781230931777e-07 m;
+the sword blade centreline does not intersect the opaque body in those poses.
+This is a centreline check, not exhaustive blade-edge collision certification.
+Vertical-only floor corrections are derived from body geometry and remain
+below 0.00003 m. The renderer's optional equipment path leaves unequipped
+references unchanged. The shadow renderer includes tagged rigid equipment
+alongside the six opaque body parts; both sword and shield cast moving shadows.
+
+Private production files are under `paladin-sword-shield`. Ten output rows
+sample native frames 0,16,...,144. The comparison uses original NN8 WLDAS at
+the same cell size, with a separate all-eight-facing idle GIF. Only the first
+dungeon-standing action is being replaced; town, movement, attacks, reactions,
+blocking and casting for WLD still need their own appropriate motions.
+
+Final output passes all 80 body/equipment and 80 full-shadow cell bounds checks,
+with minimum margins 67 and 21 NN8 pixels. The saved equipment profile matches
+the production reference exactly. The south/west vanilla comparison and all
+eight new facings were visually reviewed before installation. Installed WLDAS
+SHA256:
+`FCE48255DF020E6E854547C31F70846E3E8D94189A5DDA112F7B636170C3EC1D`.
+Local archive: `Sword Shield S1 H3 Red/Dungeon Idle`, including the prior
+vanilla PNG, reference, validation, preview GIFs, body GLB and equipped Blender
+test scene. The current mirror and install manifest now record eleven custom
+actions and the selected equipment. All ten previous unarmed sheet hashes are
+unchanged, including approved final QM. Only WLDAS was replaced. No executable
+or build-version change. In-game idle appearance still needs review with a
+light-armored warrior holding sword and shield in a dungeon; this does not yet
+replace the other WLD actions. Models, scene, textures and previews stay local.
