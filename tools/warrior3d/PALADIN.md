@@ -1332,3 +1332,38 @@ unchanged, including approved final QM. Only WLDAS was replaced. No executable
 or build-version change. In-game idle appearance still needs review with a
 light-armored warrior holding sword and shield in a dungeon; this does not yet
 replace the other WLD actions. Models, scene, textures and previews stay local.
+
+#### Shield forearm mount correction
+
+The user identified that the shield sat off the arm. The prior hand-centred
+anchor kept a handle point fixed but did not align the rear brace with the
+forearm. The corrected profile parents H3 to **forearm.L**, with its rear
+crossbar aligned along the forearm rather than inheriting the weapon socket's
+rotation. The imported mesh X axis maps to negative forearm Y; mesh front Z
+maps to forearm X. The hand remains the grip target through optional
+`grip_target_bone = "hand.L"`. `paladin_equipment.py` now supports this separate
+grip target and an authored local basis. Older profiles retain their defaults.
+
+The shield instance is fitted at 0.92 source scale (about 0.70 diameter) so the
+rear brace sits closer to the arm. The original shield GLB, sword, body meshes,
+native animation and hand pose are unchanged. Across all ten idle samples the
+rear-brace/forearm axes remain aligned (reported angle error 0 degrees), and
+maximum handle-to-hand target error is 4.054786402718884e-06 m. A close rear-view
+render was visually checked for arm contact, alongside south/west comparisons
+and all eight facings. This corrects the mount rather than merely translating
+the floating shield in screen space.
+
+All 80 body/equipment and 80 full-shadow bounds checks pass, with minimum
+margins 67 and 3 NN8 pixels. Original 6144×7680 dimensions, fixed registration,
+body scale, southeast sun and full moving shadows are preserved. Installed
+WLDAS SHA256:
+`5029C282F719A0C919E8BF28156BAE39AA8357F5C0B696BF89CAC1067C54F8A6`.
+Production reference and frames are now under
+`paladin-sword-shield/forearm-fix`; use that reference for subsequent work.
+The archive is `Sword Shield S1 H3 Red/Forearm Mount Fixed`, including the
+equipped Blender test scene, contact close-up and `Previous Hand Mount` backup.
+The before/after GIF retains its generic pipeline filename but labels the
+previous and corrected mounts, not vanilla. The mirror and manifest select the
+correction; all ten unarmed hashes remain unchanged and QM stays final. Only
+WLDAS was replaced. No executable or version change. Live gameplay still needs
+visual review; models and renders remain local.
