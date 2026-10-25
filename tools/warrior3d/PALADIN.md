@@ -1476,3 +1476,65 @@ mesh dimensions, limb lengths, sword/shield scale, and projected shadow length
 are unchanged. Full-resolution raster checks determine acceptance after the
 geometry preflight; an initial combined hit render was rejected for touching
 an edge and was replaced before installation.
+
+
+### Attack motion review: native sword and forward shield smash
+
+The user rejected the compact sword cut and the raised-guard shield attack.
+Those experimental revisions were not installed. The user selected the complete
+native sword motion, including the body lunge, with only timing/alignment changed.
+This supersedes the previous 0.1 arm-excursion attack choice. Available exact local
+clips are `palM_1hsShd_attk_swordAndBoard`,
+`palM_1HSShd_attk_weaponAttack`, and `palM_1hsShd_attk_shieldBash`.
+All 330 animation names were inspected; there is no separate clip named 1h swing.
+
+`equipped_attack_recipe.py` now retains all sword pose channels. Native
+swordAndBoard frame 8 is game frame 9; native samples are
+0,1,2,3,4,5,6,7,8,10,40,43,46,50,55,59. The long native hold is skipped.
+Horizontal root normalization is a constant translation, not a pose blend.
+Comparison of both authored sword clips with all sampled native rotation,
+scale, and non-root translation channels found zero error. Root translation
+changes by the same (0.2552620769, 0, 0.0846653283) metres in every sample.
+The existing renderer removes horizontal root travel and grounds the sampled
+poses for tile-based play. No limb, wrist, body-lunge, or weapon-scale edits
+are applied to the selected sword motion. Preflight must not automatically
+attenuate attacks marked preserve_attack_motion.
+
+A root-aligned, full-shadow clipping inspection rendered S/W/NW, 16 frames each.
+Raw body and shadow overscan images were checked for complete capture before
+compositing. At original 128-pixel logical attack dimensions, all 48 body/sword
+cells fit. The full projected shadow extends up to 140 NN8 pixels (17.5 logical
+pixels) outside the cell. Diagnostic GIFs mark the original cell in blue,
+shadow overflow orange, and body/sword overflow pink. They are local in
+`equipped-sets/attack-refinement/native-clipping`. Do not claim this raster
+inspection covers the five other directions.
+
+Padding is a separate user choice; it has not been authorized or installed in
+this revision. A private 176x144 logical canvas with anchor (88,136) was tested
+numerically in eight directions as a candidate. It preserves art scale and the
+world foot anchor. The current executable's existing layout loader accepts
+rectangular, padded cells and explicit anchors; no engine replacement is needed.
+`refine_equipped_attacks.py` accepts an optional local sword-canvas JSON with
+logical and anchor arrays. Without that explicit profile, original-cell
+preflight intentionally rejects clipped native shadows. The optional profile
+applies only to sword-bearing AT sheets. Rendering a padded candidate is not
+an authorization to install it.
+
+The first native shieldBash export holds a charging/guard pose after root travel
+is removed; merely blending into it read as blocking. The forward-smash
+prototype starts from the accepted equipped guard with the unused right arm
+relaxed. It retracts the left hand, drives it forward and across the body with
+two-bone IK, and recoils, maintaining the forearm shield mount and closed grip.
+A small native chest/hip/leg weight shift supports the hit. It uses the original
+128-pixel cell and keeps its frame-9 impact. Node overlays, per-frame overlay
+weights and hand offsets are authored animation controls; mesh/skin/node/image
+records remain untouched. Its local render is `shield-forward-smash` and remains
+subject to visual review. The previously rejected raised-guard plan is marked
+superseded to prevent accidental installation.
+
+`install_equipped_attack_updates.py` verifies all current custom hashes and
+allows only three validated AT replacements, with backups and receipts. It
+rejects superseded plans, altered sword-pose recipes, and shield recipes without
+a forward hand drive. It does not install during rendering/preflight. At this
+review checkpoint all 39 installed custom hashes still match the prior manifest;
+no attack revision or executable/version change has been installed.

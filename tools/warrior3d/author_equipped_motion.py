@@ -44,11 +44,14 @@ def author(recipe,destination):
   for c in g['nodes'][i].get('children',[]):result|=branch(c)
   return result
  overlays=[];keys=set(data)
- for item in spec.get('arms',[]):
-  doc,binary=read(item['source']);assert doc['nodes']==g['nodes'] and doc['skins']==g['skins'];tr=tracks(doc,binary);root=names['m006.'+item['side']];indices=branch(root);overlays.append((item,tr,indices));keys|={k for k in tr if k[0] in indices}
+ for item in spec.get('arms',[])+spec.get('node_overlays',[]):
+  doc,binary=read(item['source']);assert doc['nodes']==g['nodes'] and doc['skins']==g['skins'];tr=tracks(doc,binary);indices={names[n] for n in item['nodes']} if 'nodes' in item else branch(names['m006.'+item['side']]);overlays.append((item,tr,indices));keys|={k for k in tr if k[0] in indices}
  idle=None
  if spec.get('idle'):
   doc,binary=read(spec['idle']);assert doc['nodes']==g['nodes'];idle=tracks(doc,binary);keys|=set(idle)
+ world_arms=[]
+ for item in spec.get('world_arm_sources',[]):
+  doc,binary=read(item['source']);assert doc['nodes']==g['nodes'];world_arms.append((item,tracks(doc,binary)))
  parents={c:i for i,n in enumerate(g['nodes']) for c in n.get('children',[])}
  def world(pose):
   cache={}
@@ -63,21 +66,23 @@ def author(recipe,destination):
   return get
  def set_world_rotation(pose,index,rotation,get):
   q=(get(parents[index]).to_quaternion().inverted()@rotation).normalized();pose[index,'rotation']=np.array([q.x,q.y,q.z,q.w])
- def tuck_arm(pose,side,amount):
-  if amount<=0:return
+ def tuck_arm(pose,side,amount,target_override=None):
+  if amount<=0 and target_override is None:return
   u,e,h=[names[n+'.'+side] for n in ['upperArm','forearm','hand']];get=world(pose);a=get(u).translation.copy();b=get(e).translation.copy();c=get(h).translation.copy();hand_rotation=get(h).to_quaternion();center=get(names['pelvis']).translation;radial=Vector((c.x-center.x,0,c.z-center.z));target=c.copy();target.y-=amount
   if radial.length>1e-5:target-=radial.normalized()*amount*.5
+  if target_override is not None:target=Vector(target_override)
   upper=(b-a).length;lower=(c-b).length;direction=target-a;minimum=(upper*upper+lower*lower+2*upper*lower*math.cos(math.radians(130)))**.5;distance=max(minimum,min(direction.length,(upper+lower)*.99));direction.normalize();target=a+direction*distance;pole=b-a;pole-=direction*pole.dot(direction)
   if pole.length<1e-5:pole=Vector((1 if side=='L' else -1,0,0)).cross(direction)
   pole.normalize();along=(upper*upper-lower*lower+distance*distance)/(2*distance);elbow=a+direction*along+pole*max(0,upper*upper-along*along)**.5
   set_world_rotation(pose,u,(b-a).rotation_difference(elbow-a)@get(u).to_quaternion(),get);get=world(pose);b=get(e).translation;c=get(h).translation;set_world_rotation(pose,e,(c-b).rotation_difference(target-b)@get(e).to_quaternion(),get);get=world(pose);set_world_rotation(pose,h,hand_rotation,get)
- poses=[]
+ if spec.get('align_horizontal_root'):keys.add((names['root'],'translation'))
+ poses=[];root_alignment=None
  for row,frame in enumerate(spec['frames']):
   pose={key:sample(data,*key,frame) for key in keys}
   for item,tr,indices in overlays:
    off_frame=item['frames'][row]
    for key in keys:
-    if key[0] in indices:pose[key]=blend(pose[key],sample(tr,*key,off_frame),item.get('weight',1),key[1])
+    if key[0] in indices:pose[key]=blend(pose[key],sample(tr,*key,off_frame),item.get('weights',[item.get('weight',1)]*rows)[row],key[1])
   if idle is not None:
    weight=spec.get('idle_weights',[0]*rows)[row]
    for key in keys:pose[key]=blend(pose[key],sample(idle,*key,0),weight,key[1])
@@ -89,9 +94,38 @@ def author(recipe,destination):
    motion_gain=spec.get('motion_gain',1)
    if motion_gain<1:
     for key in keys:pose[key]=blend(sample(idle,*key,0),pose[key],motion_gain,key[1])
+  if spec.get('align_horizontal_root'):
+   get=world(pose)
+   if root_alignment is None:
+    pelvis=get(names['pelvis']).translation;root_alignment=Vector((-pelvis.x,0,-pelvis.z))
+   i=names['root'];pose[i,'translation']+=np.array(get(parents[i]).to_3x3().inverted()@root_alignment)
   for side,gain in spec.get('wrist_gain',{}).items():
    key=(names['hand.'+side],'rotation');pose[key]=blend(sample(idle,*key,0),pose[key],gain,'rotation')
+  for root_name,gain in spec.get('branch_gains',{}).items():
+   indices=branch(names[root_name]);assert idle is not None
+   for key in keys:
+    if key[0] in indices:pose[key]=blend(sample(idle,*key,0),pose[key],gain,key[1])
+  for item,tr in world_arms:
+   native=world({key:sample(tr,*key,item['frames'][row]) for key in tr});rest=world({key:sample(idle,*key,0) for key in idle});amount=1-spec.get('idle_weights',[0]*rows)[row]
+   for joint in ['upperArm','forearm','hand']:
+    i=names[joint+'.'+item['side']];rotation=rest(i).to_quaternion().slerp(native(i).to_quaternion(),amount);set_world_rotation(pose,i,rotation,world(pose))
   for side,amount in spec.get('arm_tuck',{}).items():tuck_arm(pose,side,float(amount)*(1-spec.get('idle_weights',[0]*rows)[row]))
+  for side,offsets in spec.get('hand_offsets',{}).items():
+   target=world(pose)(names['hand.'+side]).translation+Vector(offsets[row]);tuck_arm(pose,side,0,target)
+  # Keep a complete weapon arc; adjust the wrist's reach with two-bone IK,
+  # rather than blending away the attack rotations. The rigid grip is unchanged.
+  if spec.get('weapon_envelope'):
+   env=spec['weapon_envelope'];side=env.get('side','R')
+   direction=env.get('directions',[None]*rows)[row]
+   if direction is not None:
+    get=world(pose);i=names['hand.'+side];hand=get(i);current=hand.to_3x3()@Vector(env['tip_local']);rotation=current.rotation_difference(Vector(direction))@hand.to_quaternion();set_world_rotation(pose,i,rotation,get)
+   for iteration in range(3):
+    get=world(pose);hand=get(names['hand.'+side]);tip=hand@Vector(env['tip_local']);pelvis=get(names['pelvis']).translation;radial=Vector((tip.x-pelvis.x,0,tip.z-pelvis.z));height=max(0,tip.y-pelvis.y+env.get('hip_height',.95));limit=min(env.get('horizontal_budget',1.50)-.5*height,env.get('bottom_budget',.72)+2/3*height);excess=radial.length-max(.15,limit)
+    excess_height=max(0,height-env.get('height_limit',100))
+    if excess<=0 and excess_height<=0:break
+    target=hand.translation.copy()
+    if excess>0:target-=radial.normalized()*excess
+    target.y-=excess_height;tuck_arm(pose,side,0,target)
   if spec.get('finger_grip'):
    assert idle is not None
    for side in spec['finger_grip']:

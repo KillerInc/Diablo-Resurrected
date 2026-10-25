@@ -6,6 +6,7 @@ private work directories. Only authored recipes and tooling belong in Git.
 import copy,json,struct,hashlib
 from pathlib import Path
 from PIL import Image
+from equipped_attack_recipe import make_attack_recipe
 
 
 def make_plan(work,previous,assets,originals,cl2,game):
@@ -52,7 +53,7 @@ def make_plan(work,previous,assets,originals,cl2,game):
   if sword:
    overlays=[] if both else [arm('L',idle_u,[0]*16)];base=source/'attack.glb'
   else:base=punch;frames=list(range(16));overlays=[arm('L',idle_a,[0]*16)]
-  name=code+'-attack';model=motion(name,base,frames,overlays,idles[code],grips,[1,.35,0,0,0,0,0,0,0,0,0,0,0,.15,.55,1]);job(code+'at',model,name)
+  name=code+'-attack';model=motion(name,base,frames,overlays,idles[code],grips);attack_recipe=make_attack_recipe(code,idles['wld'] if code=='wlu' else idles[code],source/('sword-cut.glb' if sword else 'shield-smash.glb'),idle_u);(recipes/(name+'.json')).write_text(json.dumps(attack_recipe,indent=2));job(code+'at',model,name)
   frames=[0,4,8,13,19,25];overlays=[] if both else [arm('L' if sword else 'R',hit_u,frames)];name=code+'-hit';model=motion(name,source/'hit.glb',frames,overlays,idles[code],grips,[1,0,0,0,0,1]);job(code+'ht',model,name)
   if not code=='wls':
    name=code+'-block';model=motion(name,idles[code],[0,0],[arm('L',source/'block.glb',[6,14])],idles[code],grips);job(code+'bl',model,name)

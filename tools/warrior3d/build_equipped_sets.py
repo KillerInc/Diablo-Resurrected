@@ -60,6 +60,7 @@ def render(plan,blender,workers=2,watch=False):
  print('All canonical renders validated',flush=True)
 
 def validate(plan):
+ assert not plan.get('attack_only'),'Attack-only revisions must be reviewed and installed as updates, not as a full 29-sheet pack'
  work=Path(plan['work']);pack=work/'pack';pack.mkdir(exist_ok=True);records={};jobs={j['sheet']:j for j in plan['jobs']};source_hashes={str(Path(e['source']).resolve()):e['sha256'] for e in plan['starting_custom_manifest']['sheets'].values()}
  def target(sheet):
   dest=pack/sheet[:3]/(sheet+'.png');dest.parent.mkdir(parents=True,exist_ok=True);return dest

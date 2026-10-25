@@ -18,6 +18,7 @@ def opaque(o):
 
 def check(model,reference):
  ref=json.loads(Path(reference).read_text());bpy.ops.wm.read_factory_settings(use_empty=True);scene=bpy.context.scene;scene.render.fps=30;bpy.ops.import_scene.gltf(filepath=str(model));rig=next(o for o in bpy.data.objects if o.type=='ARMATURE');rig.rotation_mode='XYZ';rig.rotation_euler=(0,0,0);rig.location=(0,0,0);scene.frame_set(0);bpy.context.view_layer.update();equipment=attach_equipment(rig,ref.get('equipment',[]));body=[o for o in bpy.data.objects if o.type=='MESH' and o not in equipment];parts=[o for o in body if opaque(o)];assert len(parts)==6
+ logical=ref.get('canvas_logical',ref['cell']//8);width,height=(logical,logical) if isinstance(logical,int) else logical;width*=8;height*=8
  initial=(rig.matrix_world@rig.pose.bones['pelvis'].head).copy();cell=ref['cell'];anchor=ref['canvas_anchor'];ground=np.array([anchor[0]*8,(anchor[1]-16)*8]);density=1.1334110707181562*768/2.75;floors=[];bounds=[];collisions=[];target_floor=-.0026297522708773613
  def vertices(o,deps,need_faces=False):
   ev=o.evaluated_get(deps);mesh=ev.to_mesh();a=np.empty(len(mesh.vertices)*3,dtype=np.float32);mesh.vertices.foreach_get('co',a);m=np.asarray(ev.matrix_world,dtype=float);world=a.reshape(-1,3)@m[:3,:3].T+m[:3,3];faces=[tuple(p.vertices) for p in mesh.polygons] if need_faces else [];ev.to_mesh_clear();return world,faces
@@ -28,7 +29,7 @@ def check(model,reference):
    for kind,xyz in [('body',world_body),('shadow',world_shadow)]:
     p=xyz@rotation.T
     if kind=='shadow':h=np.maximum(p[:,2],0);p[:,0]-=.5*h;p[:,1]+=2/3*h;p[:,2]=.002
-    xy=np.column_stack((ground[0]+density*p[:,0],ground[1]-density*(.5*p[:,1]+math.sqrt(.75)*p[:,2])));lo=xy.min(0);hi=xy.max(0);margin=float(min(*lo,cell-hi[0],cell-hi[1]));owner=objects[int(np.searchsorted(starts,int(np.argmin(xy[:,0])),side='right')-1)];bounds.append({'row':row,'direction':d,'kind':kind,'margin':margin,'leftmost_object':owner.get('d1r_asset',owner.name),'bounds':[*lo.tolist(),*hi.tolist()]})
+    xy=np.column_stack((ground[0]+density*p[:,0],ground[1]-density*(.5*p[:,1]+math.sqrt(.75)*p[:,2])));lo=xy.min(0);hi=xy.max(0);margin=float(min(*lo,width-hi[0],height-hi[1]));owner=objects[int(np.searchsorted(starts,int(np.argmin(xy[:,0])),side='right')-1)];bounds.append({'row':row,'direction':d,'kind':kind,'margin':margin,'leftmost_object':owner.get('d1r_asset',owner.name),'bounds':[*lo.tolist(),*hi.tolist()]})
   swords=[o for o in equipment if o.get('d1r_asset')=='sword_base00.glb']
   if swords and min(b['margin'] for b in bounds)>3:
    points=[];polygons=[]
@@ -56,11 +57,14 @@ def run(plan_file):
   if motion['name'].endswith('-block'):candidates=[(.25,1,.15),(.25,1,.2),(.2,1,.15),(.15,1,.1)]+candidates+[(.2,1,.05),(.15,1,.05),(.1,1,.05),(.05,1,.05)]
   candidates=[(a,m,t,1) for a,m,t in candidates]
   if motion['name'].endswith('-attack') and 'R' in sides:candidates=[(.2,1,.05,1),(.15,1,.05,1),(.1,1,.05,1)]+[(1,1,{'R':t,'L':.1},w) for w in [0,.35,.65] for t in [.05,.15,.25]]+candidates
+  if spec.get('preserve_attack_motion'):candidates=[(spec.get('arm_gain',1),spec.get('motion_gain',1),spec.get('arm_tuck',{}),spec.get('wrist_gain',{}).get('R',1))]
   for arm_gain,motion_gain,tuck,wrist in candidates:
-   spec['wrist_gain']={'R':wrist} if 'R' in sides else {}
-   spec.update(arm_gain=arm_gain,motion_gain=motion_gain,arm_tuck={side:(tuck.get(side,0) if isinstance(tuck,dict) else tuck) for side in sides});recipe.write_text(json.dumps(spec,indent=2));author(recipe,motion['model']);result=check(motion['model'],jobs[0]['reference']);attempts.append({'arm_gain':arm_gain,'motion_gain':motion_gain,'wrist_gain':spec['wrist_gain'],'arm_tuck':spec['arm_tuck'],**{k:v for k,v in result.items() if k!='pose_offsets'}})
+   if not spec.get('preserve_attack_motion'):
+    spec['wrist_gain']={'R':wrist} if 'R' in sides else {}
+    spec.update(arm_gain=arm_gain,motion_gain=motion_gain,arm_tuck={side:(tuck.get(side,0) if isinstance(tuck,dict) else tuck) for side in sides})
+   recipe.write_text(json.dumps(spec,indent=2));author(recipe,motion['model']);result=check(motion['model'],jobs[0]['reference']);attempts.append({'arm_gain':arm_gain,'motion_gain':motion_gain,'wrist_gain':spec.get('wrist_gain',{}),'arm_tuck':spec.get('arm_tuck',{}),**{k:v for k,v in result.items() if k!='pose_offsets'}})
    if result['safe']:break
-  record={'motion':motion['name'],'safe':result['safe'],'arm_gain':spec['arm_gain'],'motion_gain':spec['motion_gain'],'arm_tuck':spec['arm_tuck'],'attempts':attempts};results.append(record)
+  record={'motion':motion['name'],'safe':result['safe'],'arm_gain':spec['arm_gain'],'motion_gain':spec['motion_gain'],'arm_tuck':spec.get('arm_tuck',{}),'attempts':attempts};results.append(record)
   (Path(plan['work'])/'preflight-progress.json').write_text(json.dumps(results,indent=2))
   if not result['safe']:
    print('PREFLIGHT NEEDS REFINEMENT',motion['name'],flush=True);continue
