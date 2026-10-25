@@ -13,6 +13,7 @@ class MagicEffect(FireEffect):
     def __init__(self,scene,rig,output,settings):
         super().__init__(scene,rig,output,{**settings,'style':'magic'})
         self.particles=np.random.default_rng(settings.get('seed',1447)).random((640,5))
+        self.particle_scale=float(settings.get('particle_scale',1));assert 0<self.particle_scale<=4
         material=self.mesh.materials[0];material.name='Procedural blue casting motes'
         nodes=material.node_tree.nodes;nodes.clear();links=material.node_tree.links
         def op(kind,a,b=None):
@@ -43,7 +44,7 @@ class MagicEffect(FireEffect):
             r=radius+.07*math.sin(t*8+phase*7)+(seed[2]-.5)*.12
             p=Vector((r*math.cos(angle),r*math.sin(angle),.035+t*(.12+1.75*rise)))
             p+=Vector((self.rig.location.x,self.rig.location.y,0))
-            size=.010+.014*seed[3];power=envelope*(.40+.60*seed[4])*(.6+.4*math.sin(math.pi*t))
+            size=(.010+.014*seed[3])*self.particle_scale;power=envelope*(.40+.60*seed[4])*(.6+.4*math.sin(math.pi*t))
             start=len(verts)
             for x,y in [(0,0),(1,0),(1,1),(0,1)]:verts.append(tuple(p+right*((x-.5)*size)+up*((y-.5)*size)));uv.append((x,y));strength.append(power)
             faces.append((start,start+1,start+2,start+3))

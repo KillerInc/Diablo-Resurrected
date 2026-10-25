@@ -991,3 +991,25 @@ sheets, masks and preview art remain local. The executable hash still matches
 version 0.4.1-pre, with no rebuild for this asset-only change. In-game spell
 selection, projectile appearance and visual transitions still need gameplay
 review.
+
+#### Larger QM particles
+
+At the user's request, the installed QM now doubles each particle's diameter
+with `fire_effect.particle_scale = 2`. Particle count, seed, paths, timing,
+colour, lighting and body animation are unchanged. The default scale remains 1
+to reproduce the earlier version; `prepare_paladin_magic_reference.py` accepts
+an optional final particle-scale argument. Only mote geometry changes.
+
+The larger version passes all 160 body/effect and shadow bounds checks, with
+minimum margins of 5 NN8 pixels for both. All emission masks exist, idle masks
+are empty, and idle silhouettes match. Existing anatomical shadows were reused
+after checking identical pose, camera, registration and shadow metadata.
+The before/after south/west preview was reviewed before installation. All nine
+other custom action hashes are unchanged; only QM was replaced.
+
+Current QM SHA256:
+`114A81A5C10832E67E04A393D417317F6615A12FBBF13225DC9A4F07CE8FB873`.
+Private output is `paladin-magic/larger/output`; the archive is
+`Unarmed Magic Casting/Larger Particles`, with the previous sheet/layout under
+`Previous Small Particles`. The current NN8 mirror and manifest were updated.
+No executable/version change; gameplay appearance still needs in-game review.
