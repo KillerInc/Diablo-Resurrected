@@ -36,7 +36,14 @@ for row in range(rows):
         body=Image.open(body_root/f'body-{direction}-{source_row}.png').convert('RGBA');assert body.size==(raw_cell,raw_cell)
         body=body.transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-frame_dx/scale,0,1/scale,-frame_dy/scale),resample=Image.Resampling.BICUBIC)
         rgba=np.array(body);rgb=rgba[:,:,:3].astype(np.float32);lum=rgb@np.array([.2126,.7152,.0722],dtype=np.float32)
-        rgba[:,:,:3]=np.clip((lum[:,:,None]+.86*(rgb-lum[:,:,None]))*.62,0,255).astype(np.uint8);body=Image.fromarray(rgba)
+        graded=(lum[:,:,None]+.86*(rgb-lum[:,:,None]))*.62
+        if info.get('fire_effect'):
+            masks=list((body_root/'fire-masks'/f'{direction}-{source_row}').rglob('*.png'));assert len(masks)==1,('Missing fire emission mask',direction,source_row)
+            mask=Image.open(masks[0]).convert('L').transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-frame_dx/scale,0,1/scale,-frame_dy/scale),resample=Image.Resampling.BICUBIC)
+            mix=np.clip(np.asarray(mask,dtype=np.float32)[:,:,None]/255*2,0,1)
+            fire_rgb=rgb*np.array([1,1.08,.25],dtype=np.float32);fire_rgb[:,:,1]=np.minimum(fire_rgb[:,:,1],fire_rgb[:,:,0])
+            graded=graded*(1-mix)+fire_rgb*mix
+        rgba[:,:,:3]=np.clip(graded,0,255).astype(np.uint8);body=Image.fromarray(rgba)
         shadow=Image.open(shadow_root/f'shadow-{direction}-{source_row}.png');assert shadow.size==(raw_cell+512,raw_cell+512)
         alpha=shadow.getchannel('A').transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-frame_dx/scale+256,0,1/scale,-frame_dy/scale+256),resample=Image.Resampling.BICUBIC)
         alpha=alpha.filter(ImageFilter.GaussianBlur(2)).point(lambda x:round(x*.7))

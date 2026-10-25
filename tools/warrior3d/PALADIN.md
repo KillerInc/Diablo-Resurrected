@@ -741,7 +741,7 @@ The initial full gesture's west/northwest shadow overrun was shown before
 refinement. The casting arm is now kept closer to the body. Original NN8 FM is
 6144 x 15360, twenty 768-square cells per column; the sidecar remains
 `D1R_SHEET_V1 8 48 96`. The installed art scale and full southeast-to-northwest
-shadow projection remain unchanged. This replacement currently omits casting
+shadow projection remain unchanged. This initial replacement omitted casting
 flames baked into the vanilla FM sprite; the game supplies the separate spell
 projectile. Local work is `paladin-casting`, with
 the selected output under `fire-palm`.
@@ -767,10 +767,86 @@ in game. Lightning and other-magic sheets are still the previous installed art.
 
 A synchronized comparison with the original NN8 WLNFM confirmed that vanilla
 contains prominent casting flames within the sheet itself, including frame 14.
-The current character-and-shadow replacement lacks that layer. The prior claim
+That initial character-and-shadow replacement lacked that layer. The prior claim
 that the game would supply the complete casting effect was incorrect; only the
-separate projectile is handled independently. This is a known visual gap to fix
-before considering FM equivalent to vanilla. Comparison GIFs use matching cell
+separate projectile is handled independently. This motivated the fire remake
+described below. Comparison GIFs use matching cell
 scale/anchor, all twenty frames at 50 ms, and S/W/NW views. They remain local in
 `Unarmed Fire Casting/Comparison`; no artwork was committed. The installed sheet
 was not changed during this comparison.
+
+## Fire remake and a closer casting motion
+
+The vanilla sequence gathers inward, expands a fire enclosure around the caster,
+then opens the arms while the upper fire recedes into lower arcs/ground flare.
+Five additional male-class motions were extracted and retargeted for comparison:
+Sorcerer flame-shield, frost-nova, firewall, fireball, and Necromancer blood-surge.
+The closest tested gather/open motion is `sorM_wndoh_attk_firewall`, transferred
+with `retarget_paladin_kick.py` to the same edited Paladin mesh. Fifty-one named
+bones/ancestor helpers were transferred; class-specific muscle tracks were not
+copied. Paladin geometry, bindings, rest nodes and texture buffers are preserved.
+
+The new ritual profile in `create_paladin_cast.py` samples source frames
+`0,0,0,0,2,4,6,8,10,12,14,16,18,20,22,24,27,30,33,35` at strength 0.85. Source
+pose 20 maps to output frame 14. It retains current idle endpoints, anchors the
+stance midpoint, keeps feet oriented for a standing cast, and uses compact arm
+targets/downward elbow poles with a maximum 130-degree elbow bend. This adapts
+the native reach to the original cell/shadow limits while retaining the torso
+and gather/open rhythm. Floor-contact offsets are applied equally to body and
+shadow; no model or shadow scaling changes.
+
+`paladin_fire_effect.py` builds deterministic 3D flame ribbons with turbulent
+shading, hot cores, ground ring, central flare and embers. The broad enclosure
+faces the fixed sprite camera in every direction, as it reads in the reference;
+the actual geometry still passes in front of/behind the rotated character.
+The upper arc fades into the lower flare before recovery. Its seeded twenty-row
+clock starts/ends with fire off and remains synchronized to the vanilla release.
+An orange point light adds brief fire illumination without casting new shadows.
+The standard southeast character-shadow projection still uses only body geometry.
+
+The body renderer writes an emission-only grayscale mask alongside each render
+using Blender 5.1's compositor group/file-output API. The assembler grades the
+character with the existing dark treatment, preserving luminous fire colors
+through that mask. Idle masks are zero. The shadow renderer disables the fire
+compositor so it cannot overwrite masks. `render_rows` permits limited prototype
+renders; full atlas output uses all twenty rows and all eight directions.
+
+The shared assembler rebuilt the existing HT atlas byte-for-byte unchanged
+(`8FC222DC004105F9E70D68A0CE9601B3CC840EB5AA01689C7543CBE23BE1F36B`). The previous
+resurrection-based cast profile also regenerates an identical GLB (SHA256
+`117EF54EB915E98A0AD80CAEECB7E033D1A3F8FA894051B228CA2D48BDF29205`).
+All models, renders, masks, comparisons and candidate data remain local under
+`paladin-fire-remake`; the selected body is `ritual-final/Paladin-fire-cast.glb`.
+The effect is a procedural remake, not a pixel-identical reconstruction of the
+original flames. No proprietary images or animation data are committed.
+
+`prepare_paladin_fire_reference.py` reproduces the twenty vertical floor-contact
+offsets from the body mesh and original FM reference, and writes original-size
+layout, fire seed, source frames and preview settings. The renderer carries
+those settings into its output metadata, so the command-line pipeline does not
+depend on hand-editing the reference or render JSON. Regenerated grounding and
+pose settings were compared to the production reference and match exactly.
+After the AgX render, emission-masked fire colors receive a warm gold tint;
+the existing body grading remains unchanged outside the fire mask.
+
+Final output passes 160 combined body/fire and 160 full-shadow cell bounds checks,
+with minimum margins 18/9 NN8 pixels. All 160 emission masks exist, idle masks are
+zero, and first/last silhouettes match in all directions. The new cast's initial
+silhouette is also pixel-identical to the previous cast in every facing: model
+size and anchor are preserved. Synchronized vanilla/previous/new and all-facing
+contact sheets were visually reviewed before installation. The brightened fire
+pass reused the unchanged character-shadow renders after verifying identical
+pose, camera, ground-origin, sun and shadow settings.
+
+Current installed FM SHA256:
+`E7511559FE0FF181AD3AAF8C40EF9C85DD7A26DD6CA2AC1DB27D61827E6EAABC`.
+Current output is `ritual-final/output-strong`, body frames/masks are
+`ritual-final/frames-strong`, and the local asset archive is
+`Unarmed Fire Casting/Fire Remake`. The previous FD91... hand cast PNG/layout are
+preserved in that archive's `Previous Cast` folder. All eight installed action
+hashes were verified; the other seven are unchanged. The archived GLB is named
+`Paladin-cast-body.glb`: it contains the body animation/textures, while the new
+flames are generated during rendering and baked into the installed PNG.
+Review GIFs pause before/after the synchronized one-second sequence; gameplay
+still uses twenty 50 ms frames with release at frame 14. No executable/version
+change. Live spell/projectile appearance remains to be reviewed in game.

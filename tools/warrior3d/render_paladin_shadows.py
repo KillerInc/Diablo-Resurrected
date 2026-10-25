@@ -19,6 +19,7 @@ for o in list(bpy.data.objects):
  o.hide_render=True
 assert len(parts)==6,len(parts)
 info=json.loads(metadata.read_text());times=info['source_frames']
+if info.get('fire_effect'):scene.compositing_node_group=None
 overscan=info.get('shadow_overscan',0)
 if overscan:
  old_size=scene.render.resolution_x;scene.render.resolution_x+=overscan;scene.render.resolution_y+=overscan;scene.camera.data.ortho_scale*=scene.render.resolution_x/old_size
