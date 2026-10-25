@@ -838,7 +838,7 @@ contact sheets were visually reviewed before installation. The brightened fire
 pass reused the unchanged character-shadow renders after verifying identical
 pose, camera, ground-origin, sun and shadow settings.
 
-Current installed FM SHA256:
+Previous firewall-remake FM SHA256 (superseded by the Gizmo bubble below):
 `E7511559FE0FF181AD3AAF8C40EF9C85DD7A26DD6CA2AC1DB27D61827E6EAABC`.
 Current output is `ritual-final/output-strong`, body frames/masks are
 `ritual-final/frames-strong`, and the local asset archive is
@@ -850,3 +850,51 @@ flames are generated during rendering and baked into the installed PNG.
 Review GIFs pause before/after the synchronized one-second sequence; gameplay
 still uses twenty 50 ms frames with release at frame 14. No executable/version
 change. Live spell/projectile appearance remains to be reviewed in game.
+
+### Native Gizmo Operate and a full fire bubble
+
+The user identified the interaction as **Gizmo Operate**. The local Paladin
+`pal_Interact.ans.json` maps Power `Gizmo_Operate_Generic` to
+`palM_hth_event_use_generic`; it is not named "tinker" in the exported animation
+list. The same Power has separate class-specific clips. This revision uses the
+Paladin clip directly on the matching 193-bone rig, preserving its native hand,
+arm and corrective-bone motion rather than adapting the Sorcerer firewall pose.
+
+`create_paladin_cast.py` samples native frames 32–62 over twenty output frames.
+The middle gesture has full native weight, with smooth transitions to the exact
+existing idle pose at both ends. No arm IK, elbow flex, wrist extension or
+shoulder clamps are applied to this profile. Root stance drift is corrected and
+vertical-only mesh-derived floor offsets keep ground contact; geometry, textures,
+bind data, body height and fixed registration remain unchanged. Gameplay still
+controls the twenty-frame cast and release at frame 14.
+
+`paladin_fire_bubble.py` adds a seeded, animated ellipsoidal flame shell enclosing
+the character, with transparent front veins, a brighter rim and surface flames.
+`paladin_fire_effect.py` selects it with `fire_effect.style = "bubble"`; the prior
+effect remains available without that setting. The bubble is generated in 3D
+and baked into the FM sheet. It casts no character shadow. Fresh anatomical
+shadows were rendered from the unchanged southeast sun. Body grading stays dark
+outside the separate emission mask. To reproduce the reference settings, pass
+the optional `bubble` argument to `prepare_paladin_fire_reference.py`.
+
+Production files remain private under `paladin-fire-bubble/gizmo-final`:
+`frames`, `body-only-frames`, `shadows`, and `output`. The installed sheet remains
+6144×15360 with twenty 768×768 cells per direction and sidecar
+`D1R_SHEET_V1 8 48 96`. Scale is 1.1334110707181562 and the fixed foot origin is
+(384,640). All 160 body/fire and 160 blurred-shadow cells pass strict bounds
+checks, with minimum margins 27 and 5 NN8 pixels respectively. All 160 emission
+masks exist; first/last masks are empty and silhouettes match in every direction.
+The all-facing contact, previous/new comparison and body-only south/west preview
+were visually reviewed. No clipping was corrected by scaling the model, changing
+the canvas or shortening the shadow.
+
+Installed FM SHA256:
+`86BD84E7AD5EA161F255C943DBD74B8A91452F1723515BEDC3080224CA1B83FA`.
+The local archive is `Unarmed Fire Casting/Gizmo Fire Bubble`, with the previous
+E751... sheet/layout under `Previous Cast`. `Paladin-gizmo-body.glb` contains
+the body animation; the procedural bubble is baked during rendering. The current
+NN8 mirror and install manifest were updated, and all eight installed hashes
+were checked before and after: only FM changed. No game executable or version
+change. In-game spell/projectile appearance still needs a gameplay review.
+Only scripts and these notes are committed; no models, animation tracks,
+textures, sheets, masks, extracted metadata or preview artwork enter Git.

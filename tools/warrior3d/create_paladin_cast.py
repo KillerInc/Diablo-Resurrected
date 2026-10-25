@@ -10,7 +10,7 @@ import numpy as np
 from mathutils import Matrix,Quaternion,Vector
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from merge_paladin_walk import read
-arguments=sys.argv[sys.argv.index('--')+1:];source,idle,destination=map(Path,arguments[:3]);strength=float(arguments[3]) if len(arguments)>3 else 1.0;assert 0<strength<=1;g,original_blob=read(source);ig,ib=read(idle);original=copy.deepcopy(g);blob=bytearray(original_blob);ritual=g['animations'][0]['name']=='sorM_wndoh_attk_firewall-Paladin';assert ritual or g['animations'][0]['name']=='palM_HTH_event_use_resurrect','Expected reviewed native gesture'
+arguments=sys.argv[sys.argv.index('--')+1:];source,idle,destination=map(Path,arguments[:3]);strength=float(arguments[3]) if len(arguments)>3 else 1.0;assert 0<strength<=1;g,original_blob=read(source);ig,ib=read(idle);original=copy.deepcopy(g);blob=bytearray(original_blob);ritual=g['animations'][0]['name']=='sorM_wndoh_attk_firewall-Paladin';gizmo=g['animations'][0]['name']=='palM_hth_event_use_generic';assert ritual or gizmo or g['animations'][0]['name']=='palM_HTH_event_use_resurrect','Expected reviewed native gesture'
 assert g['nodes']==ig['nodes'] and g['skins']==ig['skins'],'Matching current rig required'
 names={n.get('name'):i for i,n in enumerate(g['nodes'])};parents={c:i for i,n in enumerate(g['nodes']) for c in n.get('children',[])}
 def array(doc,binary,index):
@@ -59,7 +59,10 @@ def compact_arm(pose,side,amount):
 first=world(base);stance=sum((first[names['ankle.'+s]].translation for s in ['L','R']),Vector())*.5
 poses=[];report=[]
 for row in range(20):
- if ritual:
+ if gizmo:
+  native_frame=32+30*row/19
+  t=min(1,row/3) if row<=13 else (19-row)/6
+ elif ritual:
   native_frame=[0,0,0,0,2,4,6,8,10,12,14,16,18,20,22,24,27,30,33,35][row]
   t=min(1,row/3) if row<=16 else (19-row)/3
  else:
@@ -68,7 +71,7 @@ for row in range(20):
  t=t*t*(3-2*t)*strength
  pose=copy.deepcopy(base)
  for i,path in keys:pose[i][path]=blend(base[i][path],sample(native,i,path,native_frame/30) if not ritual or (i,path) in native else base[i][path],t,path)
- if t>0 and not ritual:
+ if t>0 and not ritual and not gizmo:
   # A compact shoulder gesture plus an anatomical elbow bend raises the palm
   # without reaching far enough forward to overflow the original shadow cell.
   envelope=t/strength
@@ -96,11 +99,11 @@ def add(data,kind):
  data=np.asarray(data,dtype='<f4');blob.extend(b'\0'*((-len(blob))%4));offset=len(blob);raw=data.tobytes();blob.extend(raw);vi=len(g['bufferViews']);g['bufferViews'].append({'buffer':0,'byteOffset':offset,'byteLength':len(raw)});a={'bufferView':vi,'componentType':5126,'count':len(data),'type':kind}
  if kind=='SCALAR':a.update(min=[float(data.min())],max=[float(data.max())])
  index=len(g['accessors']);g['accessors'].append(a);return index
-time=add(np.arange(20)[:,None]/30,'SCALAR');clip={'name':'Paladin-warrior-fire-ritual' if ritual else 'Paladin-warrior-fire-cast','channels':[],'samplers':[]}
+time=add(np.arange(20)[:,None]/30,'SCALAR');clip={'name':'Paladin-gizmo-operate-cast' if gizmo else ('Paladin-warrior-fire-ritual' if ritual else 'Paladin-warrior-fire-cast'),'channels':[],'samplers':[]}
 for i,path in sorted(keys):
  clip['channels'].append({'sampler':len(clip['samplers']),'target':{'node':i,'path':path}});clip['samplers'].append({'input':time,'output':add([p[i][path] for p in poses],'VEC4' if path=='rotation' else 'VEC3'),'interpolation':'LINEAR'})
 g['animations']=[clip];g['buffers'][0]['byteLength']=len(blob)
 for key in ['meshes','skins','nodes','materials','images']:assert g[key]==original[key],key
 assert blob[:len(original_blob)]==original_blob,'Original geometry/texture buffer changed'
 text=json.dumps(g,separators=(',',':')).encode();text+=b' '*((-len(text))%4);blob.extend(b'\0'*((-len(blob))%4));destination.parent.mkdir(parents=True,exist_ok=True);assert destination.resolve() not in [source.resolve(),idle.resolve()];destination.write_bytes(struct.pack('<III',0x46546c67,2,28+len(text)+len(blob))+struct.pack('<II',len(text),0x4e4f534a)+text+struct.pack('<II',len(blob),0x004e4942)+blob)
-destination.with_suffix('.casting.json').write_text(json.dumps({'native_clip':original['animations'][0]['name'],'frames':20,'gesture_strength':strength,'upper_arm_weight_multiplier':1 if ritual else .65,'casting_wrist_extension_degrees':0 if ritual else 25,'additional_elbow_flex_degrees':{} if ritual else {'L':55,'R':20},'release_frame_one_based':14,'native_release_frame':20 if ritual else 26,'exact_idle_endpoints':True,'geometry_bindings_nodes_preserved':True,'horizontal_stance_midpoint_fixed':True,'vertical_stance_midpoint_fixed':ritual,'compact_ritual_arms':ritual,'stable_casting_feet':ritual,'poses':report},indent=2));print('Created twenty cast poses; release 14; exact idle endpoints')
+destination.with_suffix('.casting.json').write_text(json.dumps({'native_clip':original['animations'][0]['name'],'frames':20,'gesture_strength':strength,'upper_arm_weight_multiplier':1 if ritual or gizmo else .65,'casting_wrist_extension_degrees':0 if ritual or gizmo else 25,'additional_elbow_flex_degrees':{} if ritual or gizmo else {'L':55,'R':20},'release_frame_one_based':14,'native_release_frame':(32+30*13/19) if gizmo else (20 if ritual else 26),'exact_idle_endpoints':True,'geometry_bindings_nodes_preserved':True,'horizontal_stance_midpoint_fixed':True,'vertical_stance_midpoint_fixed':ritual,'compact_ritual_arms':ritual,'stable_casting_feet':ritual,'native_arms_unmodified':gizmo,'game_action':'Gizmo_Operate_Generic' if gizmo else None,'poses':report},indent=2));print('Created twenty cast poses; release 14; exact idle endpoints')

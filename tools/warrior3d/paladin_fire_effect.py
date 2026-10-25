@@ -49,6 +49,10 @@ class FireEffect:
         data=bpy.data.lights.new('Casting fire illumination','POINT');data.color=(1,.16,.015);data.shadow_soft_size=.65;data.use_shadow=False;self.light=bpy.data.objects.new('Casting fire illumination',data);scene.collection.objects.link(self.light)
         scene.view_layers[0].use_pass_emit=True
         tree=bpy.data.node_groups.new('Casting fire emission mask','CompositorNodeTree');scene.compositing_node_group=tree;tree.interface.new_socket(name='Image',in_out='OUTPUT',socket_type='NodeSocketColor');layer=tree.nodes.new('CompositorNodeRLayers');group=tree.nodes.new('NodeGroupOutput');tree.links.new(layer.outputs['Image'],group.inputs['Image']);gray=tree.nodes.new('CompositorNodeRGBToBW');tree.links.new(layer.outputs['Emission'],gray.inputs['Image']);clamp=tree.nodes.new('ShaderNodeMath');clamp.operation='MINIMUM';clamp.inputs[1].default_value=1;tree.links.new(gray.outputs[0],clamp.inputs[0]);file=tree.nodes.new('CompositorNodeOutputFile');file.file_output_items.new('FLOAT','Mask');file.format.media_type='IMAGE';file.format.file_format='PNG';file.format.color_mode='BW';file.format.color_depth='8';file.save_as_render=False;tree.links.new(clamp.outputs[0],file.inputs['Mask']);self.file=file;scene.render.use_compositing=True
+        self.bubble=None
+        if settings.get('style')=='bubble':
+            from paladin_fire_bubble import FireBubble
+            self.bubble=FireBubble(scene)
 
     def update(self,direction,row,rows):
         self.matrix=Matrix.Translation(Vector((self.rig.location.x,self.rig.location.y,0)))
@@ -64,18 +68,22 @@ class FireEffect:
                 for u in [0,1]:
                     position=point+flow*lift+side*(sway+(u-.5)*width*bulge);vertices.append(tuple(position));uv.append((u,v));strengths.append(alpha)
             for k in range(8):faces.append((start+2*k,start+2*k+1,start+2*k+3,start+2*k+2))
-        growth=smooth(.04,.35,phase);rx=.08+.54*growth;rz=.10+.58*growth;cz=1.06-.19*growth
-        for i in range(64):
-            a=i*math.tau/64+phase*.8;seed=self.seeds[i];life=(phase*5+seed[0])%1;upper=max(0,math.sin(a));power=envelope*(1-smooth(.40,.68,phase)*smooth(0,.4,upper))*(.62+.38*seed[1])*(.35+.65*math.sin(math.pi*life))
-            local=(rx*math.cos(a),.20*math.sin(a+phase*3),cz+rz*math.sin(a)+life*.06)
-            tongue(local,.075+.10*seed[2],(.15+.20*seed[3])*(.6+.4*math.sin(math.pi*life)),power,seed[0],(-rx*math.sin(a),.20*math.cos(a+phase*3),rz*math.cos(a)+.28))
-        ground=smooth(.14,.36,phase)*(1-smooth(.70,.99,phase));radius=.25+.37*smooth(.14,.45,phase)
-        for j in range(48):
-            seed=self.seeds[96+j];a=j*math.tau/48-phase*1.7;r=radius+.06*math.sin(phase*20+seed[0]*12)+.025*math.sin(a*5+phase*7);tongue((r*math.cos(a),r*math.sin(a),.018),.07+.07*seed[2],.09+.18*seed[3],ground*(.65+.35*seed[1]),seed[0],(-.6*math.sin(a),.6*math.cos(a),1))
-        burst=smooth(.40,.58,phase)*(1-smooth(.72,.95,phase))
-        for j in range(5):
-            tongue((.08*math.sin(j*2),-.15+.04*math.cos(j),.02),.065,.25+.05*j,burst*.8,j*.17)
-        for j in range(20):
-            seed=self.seeds[160+j];life=(phase*1.8+seed[0])%1;a=seed[1]*math.tau+phase;r=.3+.37*seed[2];tongue((r*math.cos(a),r*math.sin(a),.05+1.35*life),.015+.02*seed[3],.03+.06*seed[2],envelope*(1-life)*.65,seed[0])
+        if self.bubble:
+            ground=0
+            self.bubble.update(phase,envelope,self.matrix,tongue,self.seeds)
+        else:
+            growth=smooth(.04,.35,phase);rx=.08+.54*growth;rz=.10+.58*growth;cz=1.06-.19*growth
+            for i in range(64):
+                a=i*math.tau/64+phase*.8;seed=self.seeds[i];life=(phase*5+seed[0])%1;upper=max(0,math.sin(a));power=envelope*(1-smooth(.40,.68,phase)*smooth(0,.4,upper))*(.62+.38*seed[1])*(.35+.65*math.sin(math.pi*life))
+                local=(rx*math.cos(a),.20*math.sin(a+phase*3),cz+rz*math.sin(a)+life*.06)
+                tongue(local,.075+.10*seed[2],(.15+.20*seed[3])*(.6+.4*math.sin(math.pi*life)),power,seed[0],(-rx*math.sin(a),.20*math.cos(a+phase*3),rz*math.cos(a)+.28))
+            ground=smooth(.14,.36,phase)*(1-smooth(.70,.99,phase));radius=.25+.37*smooth(.14,.45,phase)
+            for j in range(48):
+                seed=self.seeds[96+j];a=j*math.tau/48-phase*1.7;r=radius+.06*math.sin(phase*20+seed[0]*12)+.025*math.sin(a*5+phase*7);tongue((r*math.cos(a),r*math.sin(a),.018),.07+.07*seed[2],.09+.18*seed[3],ground*(.65+.35*seed[1]),seed[0],(-.6*math.sin(a),.6*math.cos(a),1))
+            burst=smooth(.40,.58,phase)*(1-smooth(.72,.95,phase))
+            for j in range(5):
+                tongue((.08*math.sin(j*2),-.15+.04*math.cos(j),.02),.065,.25+.05*j,burst*.8,j*.17)
+            for j in range(20):
+                seed=self.seeds[160+j];life=(phase*1.8+seed[0])%1;a=seed[1]*math.tau+phase;r=.3+.37*seed[2];tongue((r*math.cos(a),r*math.sin(a),.05+1.35*life),.015+.02*seed[3],.03+.06*seed[2],envelope*(1-life)*.65,seed[0])
         self.mesh.clear_geometry();self.mesh.from_pydata(vertices,[],faces);self.mesh.update();layer=self.mesh.uv_layers.get('UVMap') or self.mesh.uv_layers.new(name='UVMap');layer.data.foreach_set('uv',np.asarray([uv[x.vertex_index] for x in self.mesh.loops],dtype=np.float32).ravel());attribute=self.mesh.attributes.get('fire_strength') or self.mesh.attributes.new('fire_strength','FLOAT','POINT');attribute.data.foreach_set('value',np.asarray(strengths,dtype=np.float32));self.obj.hide_render=envelope==0 and ground==0
         folder=self.output/f'{direction}-{row}';folder.mkdir(parents=True,exist_ok=True);self.file.directory=str(folder.resolve());self.file.file_name='mask'
