@@ -41,7 +41,7 @@ for row in range(rows):
             masks=list((body_root/'fire-masks'/f'{direction}-{source_row}').rglob('*.png'));assert len(masks)==1,('Missing fire emission mask',direction,source_row)
             mask=Image.open(masks[0]).convert('L').transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-frame_dx/scale,0,1/scale,-frame_dy/scale),resample=Image.Resampling.BICUBIC)
             mix=np.clip(np.asarray(mask,dtype=np.float32)[:,:,None]/255*2,0,1)
-            if info['fire_effect'].get('style')=='lightning':fire_rgb=rgb*np.array([.85,.92,1.10],dtype=np.float32)
+            if info['fire_effect'].get('style') in ('lightning','magic'):fire_rgb=rgb*np.array([.85,.92,1.10],dtype=np.float32)
             else:
                 fire_rgb=rgb*np.array([1,1.08,.25],dtype=np.float32);fire_rgb[:,:,1]=np.minimum(fire_rgb[:,:,1],fire_rgb[:,:,0])
             graded=graded*(1-mix)+fire_rgb*mix

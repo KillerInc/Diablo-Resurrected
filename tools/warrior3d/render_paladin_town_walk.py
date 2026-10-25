@@ -44,6 +44,9 @@ if ref.get('fire_effect'):
  if ref['fire_effect'].get('style')=='lightning':
   from paladin_lightning_effect import LightningEffect
   fire=LightningEffect(scene,rig,out,ref['fire_effect'])
+ elif ref['fire_effect'].get('style')=='magic':
+  from paladin_magic_effect import MagicEffect
+  fire=MagicEffect(scene,rig,out,ref['fire_effect'])
  else:fire=FireEffect(scene,rig,out,ref['fire_effect'])
 def pose(direction,row):
  rig.location=(0,0,0);rig.rotation_euler.z=-direction*math.pi/4;scene.frame_set(times[row]);bpy.context.view_layer.update()

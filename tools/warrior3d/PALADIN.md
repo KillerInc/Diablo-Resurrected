@@ -943,3 +943,51 @@ installation. Only LM changed. Scripts and documentation are committed; all
 proprietary source data, models, sheets, masks and comparisons stay local.
 The executable remains 0.4.1-pre; this asset-only change requires no rebuild.
 Live lightning spell/projectile appearance remains to be checked in game.
+
+### Other-magic casting (QM)
+
+The vanilla NN8 QM reference is 6144×15360 and each of its eight original CL2
+directions has twenty frames. Its baked casting effect consists of blue motes
+spiralling upward around the character. This revision retains the approved
+twenty-pose native Paladin Gizmo Operate body animation and replaces only the
+casting effect. Model geometry, armor, scale, registration and floor offsets
+remain identical to the approved FM cast; gameplay release stays at frame 14.
+
+`prepare_paladin_magic_reference.py` verifies the original QM frame counts and
+derives a QM reference from the approved grounded FM reference.
+`paladin_magic_effect.py` creates 640 seeded blue motes in four rising spiral
+streams. The particles are placed in 3D, so the body occludes the rear streams.
+The effect uses a separate emission mask and a small shadowless blue light.
+The existing dark body grade is retained outside emission, and the cool grading
+path used by LM also handles QM. Fire and lightning effect selection are unchanged.
+The spiral grows upward, then fades to empty masks at both idle endpoints;
+unlike vanilla's lingering final particles, this avoids a jump back to idle.
+No spell missiles or gameplay behavior are changed.
+
+Private files remain under `paladin-magic`: `reference.json`, `prototype`,
+`frames`, `shadows` and `output`. New anatomical shadow renders retain the
+southeast sun and full shadow length. The final sheet uses twenty 768×768 cells
+per facing, sidecar `D1R_SHEET_V1 8 48 96`, scale 1.1334110707181562 and foot
+origin (384,640). Synchronized south/west GIFs compare vanilla NN8 and the new
+effect at the same cell size; a second preview shows all eight new facings.
+
+All 160 body/effect cells and 160 blurred-shadow cells pass strict bounds
+checks, with minimum margins of 7 and 5 NN8 pixels. All 160 emission masks
+exist, idle endpoint masks are empty, and endpoint silhouettes match in all
+eight directions. Initial raw body silhouettes are also pixel-identical to
+the approved FM cast in every facing. No canvas expansion, scale change or
+shadow shortening was used to fit the effect.
+
+Installed QM SHA256:
+`29115ECCB7D17C6C41A3D52A594A6A9933D714261AC60631BEE7D84F23D31AAC`.
+The local archive is `Paladin Candidate 1 Edited/Unarmed Magic Casting`, with
+the previous installed vanilla sheet in `Previous Vanilla Sheet`. The current
+NN8 mirror and install manifest now contain ten custom actions. All nine
+previous custom sheet hashes, including FM and LM, were checked before and
+after installation and remain unchanged. Only QM was replaced. Source and
+notes are committed; proprietary models, textures, animation data, references,
+sheets, masks and preview art remain local. The executable hash still matches
+`52B3E407DE77ABC1E0CA5B4D567736388BE4046B31BA036269F615D0941AA28B`:
+version 0.4.1-pre, with no rebuild for this asset-only change. In-game spell
+selection, projectile appearance and visual transitions still need gameplay
+review.
