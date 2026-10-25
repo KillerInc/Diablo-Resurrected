@@ -14,6 +14,7 @@ class MagicEffect(FireEffect):
         super().__init__(scene,rig,output,{**settings,'style':'magic'})
         self.particles=np.random.default_rng(settings.get('seed',1447)).random((640,5))
         self.particle_scale=float(settings.get('particle_scale',1));assert 0<self.particle_scale<=4
+        self.motion=settings.get('motion','spiral');assert self.motion in ('spiral','ground_emitter')
         material=self.mesh.materials[0];material.name='Procedural blue casting motes'
         nodes=material.node_tree.nodes;nodes.clear();links=material.node_tree.links
         def op(kind,a,b=None):
@@ -37,14 +38,20 @@ class MagicEffect(FireEffect):
         verts=[];faces=[];uv=[];strength=[]
         right=Vector((1,0,0));up=Vector((0,.5,.866))
         rise=smooth(.03,.65,phase);radius=.20+.40*smooth(.03,.5,phase)
-        for i,seed in enumerate(self.particles):
+        samples=[]
+        if self.motion=='ground_emitter':
+            from paladin_magic_emitter import emitted_particles
+            samples=[(p,size,power*envelope) for p,size,power in emitted_particles(phase,self.particles,self.particle_scale)]
+        for i,seed in enumerate(self.particles if self.motion=='spiral' else []):
             t=(seed[0]+phase*.70)%1
             # Four winding streams of separate motes, rather than an opaque shell.
             angle=(i%4)*math.pi/2+t*math.tau*1.5+phase*math.tau*1.6+(seed[1]-.5)*.23
             r=radius+.07*math.sin(t*8+phase*7)+(seed[2]-.5)*.12
             p=Vector((r*math.cos(angle),r*math.sin(angle),.035+t*(.12+1.75*rise)))
-            p+=Vector((self.rig.location.x,self.rig.location.y,0))
             size=(.010+.014*seed[3])*self.particle_scale;power=envelope*(.40+.60*seed[4])*(.6+.4*math.sin(math.pi*t))
+            samples.append((p,size,power))
+        for position,size,power in samples:
+            p=Vector(position)+Vector((self.rig.location.x,self.rig.location.y,0))
             start=len(verts)
             for x,y in [(0,0),(1,0),(1,1),(0,1)]:verts.append(tuple(p+right*((x-.5)*size)+up*((y-.5)*size)));uv.append((x,y));strength.append(power)
             faces.append((start,start+1,start+2,start+3))

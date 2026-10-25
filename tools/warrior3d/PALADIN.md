@@ -1013,3 +1013,39 @@ Private output is `paladin-magic/larger/output`; the archive is
 `Unarmed Magic Casting/Larger Particles`, with the previous sheet/layout under
 `Previous Small Particles`. The current NN8 mirror and manifest were updated.
 No executable/version change; gameplay appearance still needs in-game review.
+
+#### QM Option 2: orbiting ground emitter
+
+The user retained the doubled-particle spiral as **Option 1** and requested an
+alternative emitter orbiting the character at ground level, with its emitted
+particles circling and rising. `paladin_magic_emitter.py` implements this as
+birth-time-driven motion: one compact source follows a radius-0.53 ground orbit,
+each mote retains its emission angle, then advances in angle and height with
+age. Motes do not wrap or teleport from the top back to the ground. The source
+has a short ground trail; particles disperse slightly as they rise. It uses
+320 seeded birth events, the same doubled particle sizes, blue material and
+shadowless illumination, and fades out at the existing idle endpoint.
+
+Select this profile with `fire_effect.motion = "ground_emitter"`; omitted motion
+or `"spiral"` retains Option 1. `prepare_paladin_magic_reference.py` accepts an
+optional motion argument after particle scale (`2 ground_emitter`). Body poses,
+floor offsets, scale, canvas, timing and registration remain unchanged.
+Anatomical shadows were reused after comparing all relevant render metadata.
+Particle angular and vertical progression were verified across angle wrapping.
+
+All 160 body/effect cells and 160 shadow cells pass strict bounds checks, with
+minimum margins 40 and 5 NN8 pixels. All 160 emission masks exist, endpoint
+masks are empty, and idle silhouettes match. The south/west comparison includes
+**vanilla NN8, Option 1 and Option 2** at the same cell size and twenty 50 ms
+frames. That contact sheet and the eight-facing review were checked visually.
+
+Option 1's exact PNG/layout are preserved under
+`Unarmed Magic Casting/Option 1 Larger Particles`, SHA256
+`114A81A5C10832E67E04A393D417317F6615A12FBBF13225DC9A4F07CE8FB873`.
+Option 2 is installed for testing and archived under
+`Unarmed Magic Casting/Option 2 Ground Emitter`, SHA256
+`1D484CB8638CDB523F32E250D6909AC052457D6DF58734E906CC6DCA1784B245`.
+The current mirror and install manifest record both options and select Option 2.
+All nine other custom sheet hashes remain unchanged. Private production files
+are under `paladin-magic/option2`; no artwork or extracted data enters Git.
+No executable/version change. In-game visual transitions still need review.
