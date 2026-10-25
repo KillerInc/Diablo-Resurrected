@@ -1132,3 +1132,30 @@ The local archive is `Unarmed Magic Casting/Option 2 Wider Spacing`, including
 `Previous Option 2`. The current mirror and manifest select it; preserved
 Option 1 and all nine other custom action hashes are unchanged. No executable
 or version change. Gameplay appearance still needs in-game review.
+
+#### Option 2: second emitter
+
+The user requested a second copy of the emitter. The reference now sets
+`emitter_count = 2`: the second source and its full particle stream are rotated
+180 degrees around the character's vertical axis. Both sources orbit in the
+same direction on opposite sides. Each retains 1,280 birth events, spin speed
+2.25, doubled particle size and spread strength 3. Total birth events are 2,560.
+The copy preserves each mote's age, height, brightness and outward spacing;
+no age fading, extra body lighting, geometry or gameplay changes are introduced.
+Default emitter count 1 reproduces the previous version.
+
+Projected positions of both sources were checked against the original canvas
+before rendering. Private data is under `paladin-magic/option2-dual`. Previews
+include previous single/new dual, vanilla/Option 1/latest Option 2 and all eight
+facings. Body poses, camera, anchor and shadows remain the approved settings.
+
+All 160 body/effect and 160 shadow bounds checks pass, with minimum margins
+11 and 5 NN8 pixels. All emission masks exist; idle masks are empty and idle
+silhouettes match in every direction. Reviewed raw release-frame appearance
+and the all-facing contact before installation. Current QM SHA256:
+`CB52CA9524AB2B0A463CF0A71B7269D62696355B41CD4DF6B21C4027E13B29D0`.
+The archive is `Unarmed Magic Casting/Option 2 Dual Emitters`, including the
+previous single-emitter sheet/layout under `Previous Option 2`. The current
+mirror and manifest select dual emitters; Option 1 and all nine other custom
+action hashes remain unchanged. No executable/version change. In-game visuals
+still need gameplay review. Only source and notes enter Git; all art stays local.
