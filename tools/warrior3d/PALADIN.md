@@ -1106,3 +1106,29 @@ The local archive is `Unarmed Magic Casting/Option 2 Faster Denser v2`, with the
 previous sheet/layout under `Previous Option 2`. The mirror and manifest select
 this revision; Option 1 and all nine other custom sheets retain their hashes.
 No executable/version change. Live gameplay still needs visual review.
+
+#### Option 2: stronger spacing that increases with age
+
+The user requested more spacing that grows over time. The new reference sets
+`spread_strength = 3` (default 1 reproduces the previous version). Angular
+dispersion is tripled, and the radial distribution broadens progressively with
+particle age squared. Young particles remain concentrated at the ground source;
+older particles fan into a wider, looser cloud. The modest radial centre shift
+keeps this within the original canvas without changing the body or its anchor.
+Vertical trajectories, 1,280 birth events, spin speed 2.25, particle size,
+colour and brightness are unchanged. No age fading was added. A trajectory
+check confirms much greater separation late in life with identical size and
+brightness. Projected particle positions were checked before rendering.
+
+Private output is under `paladin-magic/option2-spacing`. Previous/new Option 2,
+vanilla/Option 1/latest Option 2 and all-eight-facing previews are retained.
+
+All 160 body/effect and 160 shadow cell bounds checks pass, with minimum margins
+11 and 5 NN8 pixels. All 160 emission masks exist and idle endpoints match.
+Reused unchanged anatomical shadows after comparing pose/camera metadata.
+The reviewed wider-spacing sheet is installed with SHA256
+`F497B71F89A0613CFE9ED7AAE6A5037D94A0942B545F765BE12EBD385EE52368`.
+The local archive is `Unarmed Magic Casting/Option 2 Wider Spacing`, including
+`Previous Option 2`. The current mirror and manifest select it; preserved
+Option 1 and all nine other custom action hashes are unchanged. No executable
+or version change. Gameplay appearance still needs in-game review.

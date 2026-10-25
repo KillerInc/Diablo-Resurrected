@@ -17,6 +17,7 @@ class MagicEffect(FireEffect):
         self.particle_scale=float(settings.get('particle_scale',1));assert 0<self.particle_scale<=4
         self.motion=settings.get('motion','spiral');assert self.motion in ('spiral','ground_emitter')
         self.emitter_speed=float(settings.get('spin_speed',1));self.emission_density=int(settings.get('emission_density',1));self.disperse=bool(settings.get('disperse',False))
+        self.spread_strength=float(settings.get('spread_strength',1))
         material=self.mesh.materials[0];material.name='Procedural blue casting motes'
         nodes=material.node_tree.nodes;nodes.clear();links=material.node_tree.links
         def op(kind,a,b=None):
@@ -43,7 +44,7 @@ class MagicEffect(FireEffect):
         samples=[]
         if self.motion=='ground_emitter':
             from paladin_magic_emitter import emitted_particles
-            samples=[(p,size,power*envelope) for p,size,power in emitted_particles(phase,self.particles,self.particle_scale,self.emitter_speed,self.emission_density,self.disperse)]
+            samples=[(p,size,power*envelope) for p,size,power in emitted_particles(phase,self.particles,self.particle_scale,self.emitter_speed,self.emission_density,self.disperse,self.spread_strength)]
         for i,seed in enumerate(self.particles if self.motion=='spiral' else []):
             t=(seed[0]+phase*.70)%1
             # Four winding streams of separate motes, rather than an opaque shell.
