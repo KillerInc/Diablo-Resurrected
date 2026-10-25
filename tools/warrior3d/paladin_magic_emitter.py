@@ -6,17 +6,17 @@ rather than filling a pre-existing spiral or wrapping particles to the floor.
 import math
 
 
-def emitted_particles(phase,seeds,scale,spin_speed=1,density=1,disperse=False,spread_strength=1):
+def emitted_particles(phase,seeds,scale,spin_speed=1,density=1,disperse=False,spread_strength=1,radius=.53):
     assert spin_speed>0 and density in (1,2)
     assert 1<=spread_strength<=4
-    radius=.53
+    assert radius>0
     for seed in seeds[::(2 if density==1 else 1)]:
         birth=.035+seed[0]*.72
         age=(phase-birth)/.48
         if not 0<=age<=1:continue
         birth_angle=math.tau*1.25*birth*spin_speed
         angle=birth_angle+math.tau*1.45*age*spin_speed+(seed[1]-.5)*(.10+.22*age)
-        r=radius+.025*math.sin(age*10)+(seed[2]-.5)*(.07+.09*age)
+        r=.53+(radius-.53)*(1-age)**2+.025*math.sin(age*10)+(seed[2]-.5)*(.07+.09*age)
         z=.035+1.73*age+(seed[3]-.5)*.06*age
         fade=min(1,age/.035)*min(1,(1-age)/.20)
         if disperse:

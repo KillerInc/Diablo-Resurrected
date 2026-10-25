@@ -8,5 +8,6 @@
   "disperse": true,
   "particle_count": 1280,
   "spread_strength": 4,
-  "emitter_count": 2
+  "emitter_count": 2,
+  "emitter_radius": 0.68
 }

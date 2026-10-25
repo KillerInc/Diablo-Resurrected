@@ -19,6 +19,7 @@ class MagicEffect(FireEffect):
         self.emitter_speed=float(settings.get('spin_speed',1));self.emission_density=int(settings.get('emission_density',1));self.disperse=bool(settings.get('disperse',False))
         self.spread_strength=float(settings.get('spread_strength',1))
         self.emitter_count=int(settings.get('emitter_count',1));assert self.emitter_count in (1,2)
+        self.emitter_radius=float(settings.get('emitter_radius',.53))
         material=self.mesh.materials[0];material.name='Procedural blue casting motes'
         nodes=material.node_tree.nodes;nodes.clear();links=material.node_tree.links
         def op(kind,a,b=None):
@@ -45,7 +46,7 @@ class MagicEffect(FireEffect):
         samples=[]
         if self.motion=='ground_emitter':
             from paladin_magic_emitter import emitted_particles
-            samples=[(p,size,power*envelope) for p,size,power in emitted_particles(phase,self.particles,self.particle_scale,self.emitter_speed,self.emission_density,self.disperse,self.spread_strength)]
+            samples=[(p,size,power*envelope) for p,size,power in emitted_particles(phase,self.particles,self.particle_scale,self.emitter_speed,self.emission_density,self.disperse,self.spread_strength,self.emitter_radius)]
             if self.emitter_count==2:samples+=[((-p[0],-p[1],p[2]),size,power) for p,size,power in samples]
         for i,seed in enumerate(self.particles if self.motion=='spiral' else []):
             t=(seed[0]+phase*.70)%1

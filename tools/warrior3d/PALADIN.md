@@ -1186,3 +1186,30 @@ The archive is `Unarmed Magic Casting/Option 2 Slower Wider`, with the prior
 dual sheet/layout under `Previous Option 2`. The current mirror and manifest
 select this revision. Option 1 and all nine other custom action hashes remain
 unchanged. No executable/version change; live gameplay still needs review.
+
+#### Dual emitters: wider ground orbit
+
+The user requested greater emitter distance from the character. Ground radius
+increases from 0.53 to 0.68, about 28%. `emitter_radius` is optional and defaults
+to 0.53 to reproduce earlier variants. Both opposite sources and their ground
+trails use the wider orbit. New particles start at this radius; the added radial
+offset decreases with `(1-age)^2` as they enter the existing rising cloud.
+This changes the ground-source distance without lifting or expanding the upper
+cloud beyond the original sheet. Age-driven spacing, vertical motion, particle
+count, size, brightness and spin speed remain unchanged.
+
+`qm_dual_emitter_profile.json` records the selected radius. Projected geometry
+was checked before rendering. Private production files are under
+`paladin-magic/option2-ground-radius`; previews compare previous/new ground
+orbits and vanilla/Option 1/latest Option 2.
+
+All 160 body/effect and 160 shadow cell bounds checks pass, with minimum margins
+4 and 5 NN8 pixels. All emission masks exist; idle masks are empty and endpoint
+silhouettes match. The saved procedural profile matches production metadata.
+Reviewed the early rising trail and all-facing contact before installation.
+Current QM SHA256:
+`6EF285E90AA21292CCBEAE1D53AF94A5A0D20CCF2273F58FE795E5FA008CB97B`.
+The archive is `Unarmed Magic Casting/Option 2 Wider Ground Orbit`, including
+the previous sheet/layout under `Previous Option 2`. The mirror and manifest
+select the wider orbit. Option 1 and all nine other custom action hashes remain
+unchanged. No executable/version change; live gameplay still needs review.
