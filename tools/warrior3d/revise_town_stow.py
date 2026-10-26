@@ -18,6 +18,7 @@ shield=Matrix(((0,0,.92,.22),(0,.92,0,-.025),(-.92,0,0,.92*.0059919655),(0,0,0,1
 # Native endpoint puts this different, wider outfit's sheath into its leg.
 # Preserve the native angle; fit the rigid assembly around outfit and hand.
 sword.translation+=(rig.matrix_world@rig.pose.bones['pelvis'].matrix).to_3x3().inverted()@Vector((.10,.18,-.08))
+if manifest.get('town_sword_roll_revision'):sword=Matrix(manifest['town_sword_roll_revision']['mount'])
 plan=copy.deepcopy(base);plan.update(work=str(work),equipment_family='light-town-stow',town_back_stow_revision=True,native_sheathe_reference={'path':str(native.resolve()),'clip':'palM_1hsShd_event_sheathe','last_frame':end,'socket':'weapon.R','mount_relative_to':'pelvis','outfit_clearance_offset_world':[.10,.18,-.08]},starting_custom_manifest=manifest,starting_game_hashes={},jobs=[],motions=[],copies=[],inventory={})
 for code in ['wls','wld','wlh','wlu']:
  plan['inventory'][code]={}

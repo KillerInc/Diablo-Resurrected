@@ -23,7 +23,9 @@ def install(plan_file,archive):
   for kind,source in [('previous-installed',live/n[:3]/(n+'.png')),('Final',Path(r['path']))]:
    dest=archive/kind/n[:3]/source.name;dest.parent.mkdir(parents=True,exist_ok=True)
    for suffix in ['', '.layout']:shutil.copy2(source.with_name(source.name+suffix),dest.with_name(dest.name+suffix))
- updated=copy.deepcopy(current);changed=[];actual_changed=sorted(n for n,r in records.items() if r['sha256'].upper()!=current['sheets'][n]['sha256'].upper())
+ updated=copy.deepcopy(current);
+ if plan.get('town_sword_roll_revision'):updated['town_sword_roll_revision']=plan['town_sword_roll_revision']
+ changed=[];actual_changed=sorted(n for n,r in records.items() if r['sha256'].upper()!=current['sheets'][n]['sha256'].upper())
  try:
   for n,r in records.items():
    source=archive/'Final'/n[:3]/(n+'.png');changed.append(n)
