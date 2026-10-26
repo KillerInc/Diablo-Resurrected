@@ -88,9 +88,9 @@ def validate(plan):
    with Image.open(dest) as image:assert list(image.size)==expected['size'];assert image.mode=='RGBA';image.verify()
    logical=expected['cell']//8;anchor=expected.get('canvas_anchor',[logical//2,logical]);layout=f'D1R_SHEET_V1 8 {anchor[0]} {anchor[1]}';assert dest.with_name(dest.name+'.layout').read_text().strip()==layout
    records[sheet].update(size=expected['size'],rows=expected['rows'],layout=layout,path=str(dest),sha256=sha(dest))
- expected_count=19 if plan.get('equipment_family')=='light-mace' else 29
+ expected_count={'light-mace':19,'light-axe':9}.get(plan.get('equipment_family'),29)
  assert len(records)==expected_count
- report={'sheets':records,'sheet_count':expected_count,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':True,'death_shared_unarmed':True,'attack_action_frame':9,'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete '+str(expected_count)+'-sheet pack',flush=True);return report
+ report={'sheets':records,'sheet_count':expected_count,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':True,'death_shared_unarmed':True,'attack_action_frame':plan.get('attack_action_frame',9),'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete '+str(expected_count)+'-sheet pack',flush=True);return report
 
 def make_previews(plan,pack):
  work=Path(plan['work']);dest=work/'review';dest.mkdir(exist_ok=True);directions=['S','SW','W','NW','N','NE','E','SE'];priority=['as','aw','at','ht','bl','st','wl','fm','lm','qm']
@@ -101,7 +101,7 @@ def make_previews(plan,pack):
    image=images[action];width=image.width//8;height=image.height//inventory[code+action]['rows'];tile=image.crop((direction*width,row*height,(direction+1)*width,(row+1)*height));factor=pixels/(192*8);anchor=anchors[action];dx=pixels/2-factor*anchor[0]*8;dy=pixels*160/192-factor*(anchor[1]-16)*8;tile=tile.transform((pixels,pixels),Image.Transform.AFFINE,(1/factor,0,-dx/factor,0,1/factor,-dy/factor),resample=Image.Resampling.BICUBIC);bg=Image.new('RGBA',(pixels,pixels),(32,32,32,255));bg.alpha_composite(tile);return bg.convert('RGB')
   size=128;overview=Image.new('RGB',(len(actions)*size,8*(size+24)),(32,32,32));draw=ImageDraw.Draw(overview)
   for col,a in enumerate(actions):
-   rows=inventory[code+a]['rows'];row=8 if a=='at' else 1 if a=='bl' else min(rows-1,13 if a in ['fm','lm','qm'] else rows//2);cell=inventory[code+a]['cell']
+   rows=inventory[code+a]['rows'];row=plan.get('attack_action_frame',9)-1 if a=='at' else 1 if a=='bl' else min(rows-1,13 if a in ['fm','lm','qm'] else rows//2);cell=inventory[code+a]['cell']
    for d in range(8):
     overview.paste(thumbnail(a,d,row,size),(col*size,d*(size+24)+24));draw.text((col*size+5,d*(size+24)+6),a.upper()+' '+directions[d],fill='white')
   overview.save(dest/(code+'-all-actions-all-directions.png'))

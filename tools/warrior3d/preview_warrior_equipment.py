@@ -14,6 +14,13 @@ if len(args)>2:
     assets=[];counts={}
     for name in args[2:]:
         category=next((c for c in ['shield','sword','mace','axe','bow','staff'] if c in Path(name).name.lower()),'weapon');counts[category]=counts.get(category,0)+1;prefix={'shield':'H','sword':'S','mace':'M','axe':'A','bow':'B','staff':'T','weapon':'V'}[category];assets.append((f'{prefix}{counts[category]}',name,category))
+# Measure a shared camera per family so long two-handed weapons remain fully
+# visible and two candidates can be compared without per-model zoom changes.
+framing={}
+for label,name,category in assets:
+    bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False);bpy.ops.import_scene.gltf(filepath=str((source/name).resolve()));rotation=Matrix.Rotation(-math.pi/2,4,'X');meshes=[o for o in bpy.data.objects if o.type=='MESH']
+    for o in meshes:o.matrix_world=rotation@o.matrix_world
+    corners=[o.matrix_world@Vector(v) for o in meshes for v in o.bound_box];height=max(p.z for p in corners)-min(p.z for p in corners);width=max(p.x for p in corners)-min(p.x for p in corners);framing[category]=max(framing.get(category,1.05 if category=='shield' else 1.65),1.18*height,1.18*width*1.5)
 report=[]
 for label,name,category in assets:
     path=source/name;assert path.is_file(),path
@@ -29,8 +36,8 @@ for label,name,category in assets:
     scene=bpy.context.scene;scene.render.engine='BLENDER_EEVEE';scene.render.resolution_x=512;scene.render.resolution_y=768;scene.render.resolution_percentage=100;scene.render.film_transparent=True;scene.render.image_settings.file_format='PNG';scene.render.image_settings.color_mode='RGBA';scene.world.color=(.15,.15,.15);scene.view_settings.view_transform='AgX'
     for pos,energy,size in [((2,-4,4),450,4),((-3,-2,1),180,3),((0,3,3),350,3)]:
         bpy.ops.object.light_add(type='AREA',location=pos);lamp=bpy.context.object;lamp.data.energy=energy;lamp.data.size=size;lamp.rotation_euler=(-lamp.location).to_track_quat('-Z','Y').to_euler()
-    bpy.ops.object.camera_add();camera=bpy.context.object;camera.data.type='ORTHO';camera.data.ortho_scale=1.05 if category=='shield' else 1.65;scene.camera=camera
+    bpy.ops.object.camera_add();camera=bpy.context.object;camera.data.type='ORTHO';camera.data.ortho_scale=framing[category];scene.camera=camera
     for view,pos in [('front',(1.1,-5,1)),('back',(-1.1,5,1))]:
         camera.location=pos;camera.rotation_euler=(-camera.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=str((out/f'{label}-{view}.png').resolve());bpy.ops.render.render(write_still=True)
-    report.append({'label':label,'filename':name,'category':category,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'native_dimensions':list(hi-lo),'mesh_objects':len(meshes),'model_scaled':False})
+    report.append({'label':label,'filename':name,'category':category,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'native_dimensions':list(hi-lo),'mesh_objects':len(meshes),'model_scaled':False,'camera_ortho_scale':framing[category]})
 (out/'equipment-options.json').write_text(json.dumps(report,indent=2));print(f'Rendered {len(assets)} local equipment options, front and back; source assets unchanged')
