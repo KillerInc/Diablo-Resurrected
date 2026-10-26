@@ -1671,3 +1671,10 @@ revise_town_hilt.py applies the appearance to an existing stow plan. The install
 Latest approved behavior restores the complete original S1 sword, including its blade, in WLS/WLD ST/WL. The hilt-only interpretation is superseded. The custom scabbard and hanger stay removed; the approved flat orientation/hip mount and closest centered back shield stay unchanged. restore_town_sword.py replaces only the town hilt instances with original sword_base00.glb, reusing the other four bundle renders. Full-pose audits pass. Four sheet hashes change; 63 other custom sheets and the executable are preserved.
 
 The installer removes town_hilt_only_revision and saves town_bare_sword_revision with the complete sword's archive-local path. Future stow planning retains the full blade without a sheath and rejects accidental reversion to hilt-only/sheath recipes. Private archive: I:/Diablo Sprites/3D Assests/Paladin Candidate 1 Edited/Light Warrior Full Sword No Sheath 2026-10-26. Original D4 files and combat sheets remain intact; no proprietary assets are committed.
+
+
+## 2026-10-26 â€” sword moved up along the user's arrow
+
+The complete town sword slides 0.05 m toward its hilt along its existing shaft axis in WLS/WLD ST/WL. Rotation, scale, broad-face orientation, full blade, no-sheath appearance and closer centered shield are retained. No sideways clearance offset is applied. All idle/walk poses pass body-intersection and full-shadow bounds checks at this translation.
+
+raise_town_sword.py prepares the four changed sword sheets and reuses the other four bundle renders. It stores the new pelvis-local mount in town_sword_roll_revision, so future stow rebuilds retain the raised position. Translations are stored in Blender's float32 precision for repeatable rebuilds. Four sheet hashes change, preserving 63 other custom sheets and the executable. Private archive: I:/Diablo Sprites/3D Assests/Paladin Candidate 1 Edited/Light Warrior Raised Town Sword 2026-10-26. Models/sheets/reviews stay outside Git.
