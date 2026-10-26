@@ -1,4 +1,4 @@
-"""Render and package the local 29-sheet light-warrior equipment plan.
+"""Render and package the local light-warrior sword/shield or mace equipment plan.
 
 python SCRIPT render PLAN.json --blender BLENDER.exe [--workers 2] [--watch]
 python SCRIPT validate PLAN.json
@@ -88,8 +88,9 @@ def validate(plan):
    with Image.open(dest) as image:assert list(image.size)==expected['size'];assert image.mode=='RGBA';image.verify()
    logical=expected['cell']//8;anchor=expected.get('canvas_anchor',[logical//2,logical]);layout=f'D1R_SHEET_V1 8 {anchor[0]} {anchor[1]}';assert dest.with_name(dest.name+'.layout').read_text().strip()==layout
    records[sheet].update(size=expected['size'],rows=expected['rows'],layout=layout,path=str(dest),sha256=sha(dest))
- assert len(records)==29
- report={'sheets':records,'sheet_count':29,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':True,'death_shared_unarmed':True,'attack_action_frame':9,'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete 29-sheet pack',flush=True);return report
+ expected_count=19 if plan.get('equipment_family')=='light-mace' else 29
+ assert len(records)==expected_count
+ report={'sheets':records,'sheet_count':expected_count,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':True,'death_shared_unarmed':True,'attack_action_frame':9,'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete '+str(expected_count)+'-sheet pack',flush=True);return report
 
 def make_previews(plan,pack):
  work=Path(plan['work']);dest=work/'review';dest.mkdir(exist_ok=True);directions=['S','SW','W','NW','N','NE','E','SE'];priority=['as','aw','at','ht','bl','st','wl','fm','lm','qm']
