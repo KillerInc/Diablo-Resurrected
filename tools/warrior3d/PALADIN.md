@@ -1655,3 +1655,12 @@ The sheathed S1 and its scabbard now roll together around the preserved native s
 revise_town_sword.py prepares four WLS/WLD ST/WL updates from the existing centered town plan. Full-pose audits pass for sword, scabbard and body; the hanger's intentional belt contact retains its existing exception. WLU/WLH town sheets and centered shield transforms are reused unchanged. The eight-sheet validation bundle includes four cached sheets; only four installed hashes change, preserving 63 other custom sheets and the executable. Private archive: I:/Diablo Sprites/3D Assests/Paladin Candidate 1 Edited/Light Warrior Flat Town Sword 2026-10-26.
 
 The installer saves town_sword_roll_revision with the exact pelvis-local mount. Subsequent revise_town_stow.py runs reuse that approved mount; revise_town_sword.py also reuses it when already installed so repeated planning cannot lower or rotate it cumulatively. Source models/textures remain unchanged and outside Git.
+
+
+## 2026-10-26 â€” hilt/guard only in town; shield another 8 cm closer
+
+Latest user direction supersedes the custom sheath: remove the scabbard and belt hanger entirely, keeping only the D4 sword handle and guard close to the hip. make_town_hilt.py creates a private town-only S1 derivative, cuts away the blade below raw Y=-0.035, and caps the cut. Source sword geometry/materials on disk and all combat sheets remain untouched. The approved flat sword mount is retained for this hilt; no floating scabbard or hanger is rendered.
+
+The centered shield mount moves inward along chest-local X from 0.22 to 0.14. Rear-band/body overlap remains allowed, while shield face, rim and boss are checked against every opaque body part through all town frames. Full preflight passes at the new offset. Town WLS/WLD/WLH/WLU ST/WL form the eight-sheet update: WLS/WLD gain the hilt-only asset, and all three shield variants gain the closer shield. All other 59 custom sheets and the executable are preserved.
+
+revise_town_hilt.py applies the appearance to an existing stow plan. The installer records town_hilt_only_revision with an archive-local asset path; future revise_town_stow.py plans reuse the hilt and omit the sheath/hanger, and the installer rejects an attempted reversion to the older sheath recipe. Private source derivative, fit metadata, backups, final sheets/layouts, native reference, audits and reviews are archived at I:/Diablo Sprites/3D Assests/Paladin Candidate 1 Edited/Light Warrior Town Hilt Close Shield 2026-10-26. All proprietary artwork remains outside Git.

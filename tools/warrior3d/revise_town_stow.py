@@ -14,7 +14,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True);bpy.context.scene.render.fps=30
 # Chest X points backward, Y follows the spine, Z points across the shoulders.
 # Center on that anatomical frame instead of the world axes of the twisted idle.
 # Compensate the source rim's small local-X center offset (0.005992).
-shield=Matrix(((0,0,.92,.22),(0,.92,0,-.025),(-.92,0,0,.92*.0059919655),(0,0,0,1)))
+shield=Matrix(((0,0,.92,.14),(0,.92,0,-.025),(-.92,0,0,.92*.0059919655),(0,0,0,1)))
 # Native endpoint puts this different, wider outfit's sheath into its leg.
 # Preserve the native angle; fit the rigid assembly around outfit and hand.
 sword.translation+=(rig.matrix_world@rig.pose.bones['pelvis'].matrix).to_3x3().inverted()@Vector((.10,.18,-.08))
@@ -25,10 +25,13 @@ for code in ['wls','wld','wlh','wlu']:
  for action in ['st','wl']:
   name=code+action;donor=jobs[('wls' if code=='wlu' else code)+action];j=copy.deepcopy(donor);ref=json.loads(Path(j['reference']).read_text());gear=[]
   for item in ref['equipment']:
+   if manifest.get('town_hilt_only_revision') and item['town_role']=='sword_sheath':continue
    if item['town_role']=='carried_shield' or code=='wlu':continue
    item=copy.deepcopy(item)
    if item['town_role'] in ['sheathed_sword','sword_sheath']:item['local_transform']=[list(r) for r in sword]
+   if manifest.get('town_hilt_only_revision') and item['town_role']=='sheathed_sword':item.update(path=manifest['town_hilt_only_revision']['path'],town_role='town_sword_hilt')
    gear.append(item)
-  if code!='wls':gear.append({'path':str(back_shield.resolve()),'bone':'chest','local_transform':[list(r) for r in shield],'town_role':'back_shield','shield_grip_revision':'small-handgrip-180-v1','town_stow_revision':'centered-chest-frame-v3','allow_rear_band_body_overlap':True})
+  if code!='wls':gear.append({'path':str(back_shield.resolve()),'bone':'chest','local_transform':[list(r) for r in shield],'town_role':'back_shield','shield_grip_revision':'small-handgrip-180-v1','town_stow_revision':'centered-close-chest-frame-v4','allow_rear_band_body_overlap':True})
   root=work/'jobs'/name;root.mkdir(parents=True);rp=root/'reference.json';ref.update(sheet=name+'.png',equipment=gear,preview_prefix=name,preview_caption=name.upper()+' | native final-frame sword / back shield',root_anchor_frame=0);rp.write_text(json.dumps(ref,indent=2));j.update(sheet=name,code=code,action=action,model=unarmed[action],motion=name,root=str(root),reference=str(rp));plan['jobs'].append(j);plan['motions'].append({'name':name});inv=copy.deepcopy(base['inventory'][donor['code']][donor['sheet']]);plan['inventory'][code][name]=inv;plan['starting_game_hashes'][name]=manifest['sheets'][name]['sha256']
+if manifest.get('town_hilt_only_revision'):plan['town_hilt_only_revision']=manifest['town_hilt_only_revision']
 (work/'plan.json').write_text(json.dumps(plan,indent=2));print('Prepared eight town revisions from native sheathe final frame',end)
