@@ -6,6 +6,7 @@ from pathlib import Path
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 sys.path.insert(0,str(Path(__file__).parent));from preflight_equipped_sets import check,opaque
+from back_shield_contact import shell_triangles
 file=Path(sys.argv[sys.argv.index('--')+1]);plan=json.loads(file.read_text());work=Path(plan['work']);checks=[];audits=[];padding=[]
 def geometry(o):
  ev=o.evaluated_get(bpy.context.evaluated_depsgraph_get());m=ev.to_mesh();m.calc_loop_triangles();v=[ev.matrix_world@x.co for x in m.vertices];t=[tuple(x.vertices) for x in m.loop_triangles];ev.to_mesh_clear();return v,t
@@ -18,7 +19,8 @@ for j in plan['jobs']:
    v,t=geometry(o);body.append((o,v,t,bounds(v),None))
   for o in gear:
    if o.get('town_contact_ok'):continue
-   v,t=geometry(o);box=bounds(v);tree=None;asset=o.get('d1r_asset','')
+   v,t=geometry(o);box=bounds(v);tree=None;asset=o.get('d1r_asset','');rear=[]
+   if any(Path(e['path']).name==asset and e.get('town_role')=='back_shield' and e.get('allow_rear_band_body_overlap') for e in ref['equipment']):t,rear=shell_triangles(o.data)
    for k,(part,bv,bt,bb,cached) in enumerate(body):
     material=part.data.materials[0].name
     if 'Shield_' in asset and not plan.get('town_back_stow_revision') and 'P00_HED' not in material:continue

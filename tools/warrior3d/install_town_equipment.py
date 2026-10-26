@@ -23,7 +23,7 @@ def install(plan_file,archive):
   for kind,source in [('previous-installed',live/n[:3]/(n+'.png')),('Final',Path(r['path']))]:
    dest=archive/kind/n[:3]/source.name;dest.parent.mkdir(parents=True,exist_ok=True)
    for suffix in ['', '.layout']:shutil.copy2(source.with_name(source.name+suffix),dest.with_name(dest.name+suffix))
- updated=copy.deepcopy(current);changed=[]
+ updated=copy.deepcopy(current);changed=[];actual_changed=sorted(n for n,r in records.items() if r['sha256'].upper()!=current['sheets'][n]['sha256'].upper())
  try:
   for n,r in records.items():
    source=archive/'Final'/n[:3]/(n+'.png');changed.append(n)
@@ -32,7 +32,7 @@ def install(plan_file,archive):
    updated['sheets'][n].update(source=str(source),size=r['size'],layout=r['layout'],sha256=r['sha256'],status='vanilla-style equipment-specific town carry/stow')
   for n,r in updated['sheets'].items():assert sha(live/n[:3]/(n+'.png'))==r['sha256'].upper(),n
   assert len(updated['sheets'])==len(current['sheets']) and sha(exe)==exe_hash
-  receipt={'changed_sheets':sorted(records),'other_custom_sheets_preserved':len(current['sheets'])-count,'custom_sheet_count':len(updated['sheets']),'executable_sha256':exe_hash,'version':current['version'],'archive':str(archive),'unchanged_shield_only_town':[] if back else ['wlust','wluwl'],'native_sheathe_reference':plan.get('native_sheathe_reference'),'unchanged_unarmed_town':['wlnst','wlnwl'],'original_bow_staff_and_other_armor_preserved':True};updated['town_equipment_revision']=receipt;text=json.dumps(updated,indent=2);manifest.write_text(text);(mirror/'install-manifest.json').write_text(text);(archive/'install-manifest.json').write_text(text)
+  receipt={'changed_sheets':actual_changed,'installed_bundle_sheets':sorted(records),'other_custom_sheets_preserved':len(current['sheets'])-len(actual_changed),'custom_sheet_count':len(updated['sheets']),'executable_sha256':exe_hash,'version':current['version'],'archive':str(archive),'unchanged_shield_only_town':[] if back else ['wlust','wluwl'],'native_sheathe_reference':plan.get('native_sheathe_reference'),'unchanged_unarmed_town':['wlnst','wlnwl'],'original_bow_staff_and_other_armor_preserved':True};updated['town_equipment_revision']=receipt;text=json.dumps(updated,indent=2);manifest.write_text(text);(mirror/'install-manifest.json').write_text(text);(archive/'install-manifest.json').write_text(text)
   for name in ['town-audit.json','canvas-padding.json','preflight-progress.json','pack-validation.json']:shutil.copy2(work/name,archive/name)
   if back:
    native=Path(plan['native_sheathe_reference']['path']);assert native.is_file();(archive/'NativeReference').mkdir();shutil.copy2(native,archive/'NativeReference'/native.name)

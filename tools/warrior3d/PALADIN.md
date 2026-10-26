@@ -1632,3 +1632,10 @@ Reproduce: select_paladin_animation.py selects the exact named clip; merge_palad
 
 
 Back-stow fit: fit_back_shield.py makes a private stowed H3 variant with negative-normal depth compressed to 20 percent, folding its forearm loops. The positive-normal face/boss vertices and the source combat asset remain unchanged. Supply this GLB as BACK_SHIELD.glb before NEW_WORK in revise_town_stow.py. The rigid stowed shield is centered at world (0,0.245,1.22) in the initial approved town pose, mounted relative to chest. This removes the high, floating placement of the first uninstalled prototype. Final full-pose audits include the folded loops; no strap/body contact exception is used.
+
+
+## 2026-10-26 â€” closer town shield; rear bands may overlap the body
+
+User-authorized correction: rear shield bands may clip into the body. The town H3 mount moves 0.075 m inward (initial world Y 0.245 to 0.170); height, scale, facing, sword placement and body animation stay fixed. It uses the original red shield with its full rear bands rather than the folded-loop derivative. WLD/WLH/WLU ST/WL are refreshed; WLS town sheets are reused unchanged.
+
+back_shield_contact.py classifies disconnected source-mesh components that extend behind local Z=0 as rear bands, asserts those components remain below the front-face depth, and excludes only their triangles from the body-intersection rejection. Face, boss, wood and rim geometry remain strictly checked. The exemption is opt-in on the back-shield reference only and never affects combat mounts. Full-pose preflight passes at this closer offset. Pack validation covers 896 directional cells, including 224 unchanged sword-only cells. The installer now records actual changed hashes separately from the installed bundle, preserving 61 other custom sheets and the unchanged executable. New private archive: I:/Diablo Sprites/3D Assests/Paladin Candidate 1 Edited/Light Warrior Close Back Stow 2026-10-26. Pass the original Shield_S15_Warrior_Red.glb as BACK_SHIELD to revise_town_stow.py; the prior folded-loop fit is superseded for town use.
