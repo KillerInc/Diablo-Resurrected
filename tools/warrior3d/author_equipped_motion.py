@@ -76,6 +76,8 @@ def author(recipe,destination):
   pole.normalize();along=(upper*upper-lower*lower+distance*distance)/(2*distance);elbow=a+direction*along+pole*max(0,upper*upper-along*along)**.5
   set_world_rotation(pose,u,(b-a).rotation_difference(elbow-a)@get(u).to_quaternion(),get);get=world(pose);b=get(e).translation;c=get(h).translation;set_world_rotation(pose,e,(c-b).rotation_difference(target-b)@get(e).to_quaternion(),get);get=world(pose);set_world_rotation(pose,h,hand_rotation,get)
  if spec.get('align_horizontal_root'):keys.add((names['root'],'translation'))
+ for item in spec.get('attachment_constraints',[]):
+  for path in ['translation','rotation','scale']:keys.add((names[item['bone']],path))
  poses=[];root_alignment=None
  for row,frame in enumerate(spec['frames']):
   pose={key:sample(data,*key,frame) for key in keys}
@@ -134,6 +136,34 @@ def author(recipe,destination):
     for key in keys:
      if key[0] in finger_nodes:pose[key]=sample(idle,*key,0)
   poses.append(pose)
+ # Optional attack-only temporal smoothing. Locked rows retain the start,
+ # gameplay impact and end poses; bone lengths and bind data stay untouched.
+ for smoothing_pass in range(spec.get('temporal_smoothing_passes',0)):
+  previous=poses;poses=[];locked=set(spec.get('locked_rows',[0,rows-1]))
+  for row,pose in enumerate(previous):
+   if row in locked or row==0 or row==rows-1:poses.append(pose);continue
+   poses.append({key:blend(blend(previous[row-1][key],pose[key],2/3,key[1]),previous[row+1][key],.25,key[1]) for key in keys})
+ # Wrist-only shield tilt: preserve shoulder, elbow and hand position.
+ for item in spec.get('wrist_shield_vertical',[]):
+  hand_index=names[item['hand']];weapon_index=names[item['bone']];reference=world(poses[0]);relative=reference(hand_index).inverted()@reference(weapon_index)
+  for row,pose in enumerate(poses):
+   get=world(pose);hand=get(hand_index);shield=hand@relative;normal=(shield.to_3x3().inverted().transposed()@Vector(item['normal_local'])).normalized();target=Vector((normal.x,0,normal.z))
+   if target.length<1e-5:continue
+   target.normalize();correction=normal.rotation_difference(target);rotation=hand.to_quaternion().slerp(correction@hand.to_quaternion(),item['weights'][row]);set_world_rotation(pose,hand_index,rotation,get)
+ # Equipment-only attachment bones can keep a rigid item's face upright while
+ # its grip follows the native hand. They must have no weighted body vertices.
+ for row,pose in enumerate(poses):
+  for item in spec.get('attachment_constraints',[]):
+   assert item.get('weighted_body_vertices')==0
+   get=world(pose);i=names[item['bone']];hand=get(names[item['hand']]);current=get(i);normal=(current.to_3x3().inverted().transposed()@Vector(item['normal_local'])).normalized();rotation=current.to_quaternion();desired=normal.rotation_difference(Vector(item.get('forward',[0,0,1])))@rotation
+   if item.get('up_local'):
+    source_normal=Vector(item['normal_local']).normalized();source_up=Vector(item['up_local']);source_up=(source_up-source_normal*source_up.dot(source_normal)).normalized();target_normal=Vector(item.get('forward',[0,0,1])).normalized();target_up=Vector((0,1,0));target_up=(target_up-target_normal*target_up.dot(target_normal)).normalized();source_basis=Matrix((source_up,source_normal,source_up.cross(source_normal))).transposed();target_basis=Matrix((target_up,target_normal,target_up.cross(target_normal))).transposed();desired=(target_basis@source_basis.transposed()).to_quaternion()
+   if item.get('follow_hand'):
+    # Carry the approved mount with the hand, or fit a hand-relative
+    # contact orientation. Never change any body bone to compensate.
+    reference_get=world(poses[item.get('reference_row',8)]);reference_hand=reference_get(names[item['hand']]).to_quaternion()
+    desired=hand.to_quaternion()@(reference_hand.inverted()@reference_get(i).to_quaternion()) if item.get('preserve_mount_rotation') else hand.to_quaternion()@(reference_hand.inverted()@desired)
+   rotation=rotation.slerp(desired,item.get('weights',[1]*rows)[row]);matrix=Matrix.LocRotScale(Vector((0,0,0)),rotation,Vector(item['scale']));matrix.translation=hand@Vector(item['hand_grip_local'])-matrix.to_3x3()@Vector(item['grip_local']);local=get(parents[i]).inverted()@matrix;position,q,scale=local.decompose();pose[i,'translation']=np.array(position);pose[i,'rotation']=np.array([q.x,q.y,q.z,q.w]);pose[i,'scale']=np.array(scale)
  def add(values,kind):
   a=np.asarray(values,dtype='<f4');blob.extend(b'\0'*((-len(blob))%4));offset=len(blob);raw=a.tobytes();blob.extend(raw);view=len(g['bufferViews']);g['bufferViews'].append({'buffer':0,'byteOffset':offset,'byteLength':len(raw)});acc={'bufferView':view,'componentType':5126,'count':len(a),'type':kind}
   if kind=='SCALAR':acc.update(min=[float(a.min())],max=[float(a.max())])

@@ -4,6 +4,7 @@ Only timing and horizontal alignment change in the sword animation. Attack
 contact is output row 8 (game frame 9). All artwork is supplied locally.
 """
 from pathlib import Path
+import copy,json
 
 
 def make_attack_recipe(code,idle,native,empty_idle):
@@ -11,5 +12,13 @@ def make_attack_recipe(code,idle,native,empty_idle):
  idle,native=map(str,[idle,native])
  if code!='wlu':
   return {'name':code+' full native swordAndBoard','source':native,'frames':[0,1,2,3,4,5,6,7,8,10,40,43,46,50,55,59],'arms':[],'idle':idle,'finger_grip':[],'arm_gain':1,'motion_gain':1,'align_horizontal_root':True,'preserve_attack_motion':True}
- pulse=[0,-.04,-.07,-.09,-.09,-.04,.10,.26,.34,.29,.18,.08,.01,0,0,0];body=[0,0,.02,.03,.03,.05,.12,.22,.3,.24,.16,.08,.03,0,0,0]
- return {'name':'Forward shield-face smash, frame-9 impact','source':idle,'frames':[0]*16,'arms':[{'side':'R','source':str(empty_idle),'frames':[0]*16}],'idle':idle,'finger_grip':['L'],'arm_gain':1,'motion_gain':1,'preserve_attack_motion':True,'node_overlays':[{'nodes':['chest','pelvis','thigh.L','thigh.R','shin.L','shin.R','foot.L','foot.R'],'source':native,'frames':[0]*16,'weights':body}],'hand_offsets':{'L':[[-.22*q/.34,-.04*q/.34,.28*q/.34] for q in pulse]}}
+ frames=[0,0,1,2,3,4,5,6,7,8,9,9,9,9,9,9];weights=[1,.75,.45,.15,0,0,0,0,0,0,.05,.2,.4,.65,.85,1]
+ profile=json.loads((Path(__file__).parent/'shield_attack_equipment.json').read_text());constraint={k:profile[k] for k in ['bone','hand','up_local','normal_local','grip_local','hand_grip_local','scale','weighted_body_vertices']};constraint.update(follow_hand=True,preserve_mount_rotation=True,reference_row=0,forward=[0,0,1],weights=[0,.4,.8,1,1,1,1,1,1,1,1,1,.8,.5,.2,0])
+ return {'name':'Native ShieldCharge_3units smooth upright bash','native_source_clip':'palM_1hsShd_attk_shieldCharge_3units','source':native,'frames':frames,'idle':idle,'idle_weights':weights,'arms':[],'finger_grip':[],'arm_gain':1,'motion_gain':1,'align_horizontal_root':False,'preserve_attack_motion':True,'temporal_smoothing_passes':2,'locked_rows':[0,8,15],'wrist_shield_vertical':[{k:constraint[k] for k in ['bone','hand','normal_local','weights']}],'attachment_constraints':[constraint]}
+
+
+def shield_attack_equipment(equipment):
+ profile=json.loads((Path(__file__).parent/'shield_attack_equipment.json').read_text());result=copy.deepcopy(equipment)
+ for item in result:
+  if Path(item['path']).name==profile['filename']:item.update(bone=profile['bone'],local_transform=profile['local_transform'],grip=profile['grip'],shield_grip_revision=profile['shield_grip_revision'])
+ return result

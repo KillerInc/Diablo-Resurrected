@@ -172,7 +172,7 @@ direct-buffer result was installed.
 `measure_paladin_stride.py` evaluates every pose's boot geometry. Its measured
 ground offset is applied to the root translation so one boot maintains ground
 contact without changing the waist/chest joint relationship. Final minimum
-boot height across 40 poses is 0.00299988Ã¢â‚¬â€œ0.00300016 metres (target 0.003).
+boot height across 40 poses is 0.00299988â€“0.00300016 metres (target 0.003).
 Forward foot excursion falls from approximately 1.117 / 1.084 metres to
 0.695 / 0.709 metres: about 36% shorter on average. All eight views were rendered
 and the 64 output cells validated without clipping. Shadows were regenerated
@@ -238,7 +238,7 @@ not a literal 30% reduction in measured foot travel.
 `measure_paladin_attack.py` evaluates boot geometry and supporting-foot position.
 The sampler's optional measurement input corrects root translation, locking the
 left foot horizontally and grounding the boots. Final sixteen-pose boot minimum
-Z is 0.002999946Ã¢â‚¬â€œ0.003000137 metres; supporting-foot XY drift is below 1.2e-7 m.
+Z is 0.002999946â€“0.003000137 metres; supporting-foot XY drift is below 1.2e-7 m.
 Horizontal pelvis tracking is disabled for this action so the supporting foot
 stays planted while the body leans. Shadows follow exactly the same poses.
 The full projected attack shadow exceeded the cell's bottom edge. This action
@@ -297,7 +297,7 @@ Height was audited against the edited static GLB and current idle. Mesh, skin,
 node and material records are identical, and both actions use pixel scale
 1.1334110707181562. After removing the attack cell's padding, the starting-pose
 body height matches idle within one 8x-sheet pixel in all eight directions.
-The grounding correction shifts that pose about 2â€“3 sheet pixels upward; it does
+The grounding correction shifts that pose about 2–3 sheet pixels upward; it does
 not increase model height. Pose changes during the kick alter the silhouette.
 The correction changes only the shadow, retaining that body placement.
 
@@ -307,7 +307,7 @@ Local `height-audit.json` records per-direction measurements. The uniquely named
 `attack-preview-shadow-fixed.gif` shows the replacement without preview-cache
 ambiguity. Gameplay verification of this shadow revision remains outstanding.
 
-## Project-wide lighting direction â€” user requirement
+## Project-wide lighting direction — user requirement
 
 The user approved the southeast-sun preview and explicitly requires **all shadows
 to follow that direction**: sun southeast, cast shadows northwest, consistently
@@ -328,7 +328,7 @@ the final lighting standard.
 ## Knee attack review replacing the kick
 
 The user requested a knee strike. `sample_paladin_knee.py` uses only the kick's
-early chamber samples (0â€“3), adds a weighted 50-degree right-shin fold, and blends
+early chamber samples (0–3), adds a weighted 50-degree right-shin fold, and blends
 from/to the current idle over sixteen frames. The knee leads the tucked boot at
 contact: world forward is negative Y, knee Y is -0.46937 m and foot Y is
 -0.39118 m. Contact remains on row 8 / action frame 9. Meshes, bindings, model
@@ -346,7 +346,7 @@ not been relit by this code change.
 `preview_paladin_attack.py` composes an uncropped review using a 256-pixel
 overscan shadow render. The red rectangle marks the actual 1024-pixel cell.
 All 128 body poses fit. Six northwest-facing shadow poses (one-based frames
-6â€“11) cross the left boundary, by up to 56 NN8 pixels / 7 logical pixels.
+6–11) cross the left boundary, by up to 56 NN8 pixels / 7 logical pixels.
 The user explicitly asked to see clipping issues before they are fixed, so this
 is a review candidate and has **not** replaced the installed WLNAT sheet.
 Do not hide the overflow by shortening the shadow or rescaling the character.
@@ -360,7 +360,7 @@ and installed game sheets remain intact. No engine or build-version change.
 
 Reproduce by sampling the retargeted kick and idle without measurement, evaluating
 that result with `measure_paladin_attack.py`, then resampling with the measured
-ground/support input. Render with the existing attack reference (frames 0â€“15,
+ground/support input. Render with the existing attack reference (frames 0–15,
 horizontal root motion preserved, sun (3,-4,6), shadow distance gain 1). For the
 review, expand only the shadow render canvas from 1024 to 1536 and multiply the
 camera's orthographic scale by 1.5, preserving pixels per metre; pass those
@@ -860,7 +860,7 @@ list. The same Power has separate class-specific clips. This revision uses the
 Paladin clip directly on the matching 193-bone rig, preserving its native hand,
 arm and corrective-bone motion rather than adapting the Sorcerer firewall pose.
 
-`create_paladin_cast.py` samples native frames 32â€“62 over twenty output frames.
+`create_paladin_cast.py` samples native frames 32–62 over twenty output frames.
 The middle gesture has full native weight, with smooth transitions to the exact
 existing idle pose at both ends. No arm IK, elbow flex, wrist extension or
 shoulder clamps are applied to this profile. Root stance drift is corrected and
@@ -879,7 +879,7 @@ the optional `bubble` argument to `prepare_paladin_fire_reference.py`.
 
 Production files remain private under `paladin-fire-bubble/gizmo-final`:
 `frames`, `body-only-frames`, `shadows`, and `output`. The installed sheet remains
-6144Ã—15360 with twenty 768Ã—768 cells per direction and sidecar
+6144×15360 with twenty 768×768 cells per direction and sidecar
 `D1R_SHEET_V1 8 48 96`. Scale is 1.1334110707181562 and the fixed foot origin is
 (384,640). All 160 body/fire and 160 blurred-shadow cells pass strict bounds
 checks, with minimum margins 27 and 5 NN8 pixels respectively. All 160 emission
@@ -903,10 +903,10 @@ textures, sheets, masks, extracted metadata or preview artwork enter Git.
 
 LM continues the approved native Paladin Gizmo Operate motion without changing
 the body animation, armor, geometry, scale or anchor. The original NN8 LM PNG is
-6144Ã—16128, and all eight original CL2 direction headers contain 21 frames.
+6144×16128, and all eight original CL2 direction headers contain 21 frames.
 Warrior `animations.tsv` still specifies twenty gameplay casting frames and
 release at frame 14. The original-size output therefore retains 21 stored rows:
-rows 0â€“19 use the approved twenty poses and the spare row 20 repeats final idle.
+rows 0–19 use the approved twenty poses and the spare row 20 repeats final idle.
 The hand motion is not stretched across an extra gameplay frame.
 
 `prepare_paladin_lightning_reference.py` verifies the original LM direction
@@ -922,7 +922,7 @@ selection and timing remain unchanged.
 Private production data is under `paladin-lightning`: `reference.json`, `frames`,
 `shadows` and `output`. Fresh anatomical shadow renders use the southeast sun,
 full original shadow length and the same fixed registration. The sheet sidecar
-is `D1R_SHEET_V1 8 48 96`, with 768Ã—768 cells and fixed foot origin (384,640).
+is `D1R_SHEET_V1 8 48 96`, with 768×768 cells and fixed foot origin (384,640).
 Review GIFs compare vanilla NN8 and the new caster at the same cell size in
 south/west views, and show all eight new facings. The GIF plays the twenty
 gameplay frames at 50 ms each; the PNG retains all 21 original stored rows.
@@ -946,7 +946,7 @@ Live lightning spell/projectile appearance remains to be checked in game.
 
 ### Other-magic casting (QM)
 
-The vanilla NN8 QM reference is 6144Ã—15360 and each of its eight original CL2
+The vanilla NN8 QM reference is 6144×15360 and each of its eight original CL2
 directions has twenty frames. Its baked casting effect consists of blue motes
 spiralling upward around the character. This revision retains the approved
 twenty-pose native Paladin Gizmo Operate body animation and replaces only the
@@ -966,7 +966,7 @@ No spell missiles or gameplay behavior are changed.
 
 Private files remain under `paladin-magic`: `reference.json`, `prototype`,
 `frames`, `shadows` and `output`. New anatomical shadow renders retain the
-southeast sun and full shadow length. The final sheet uses twenty 768Ã—768 cells
+southeast sun and full shadow length. The final sheet uses twenty 768×768 cells
 per facing, sidecar `D1R_SHEET_V1 8 48 96`, scale 1.1334110707181562 and foot
 origin (384,640). Synchronized south/west GIFs compare vanilla NN8 and the new
 effect at the same cell size; a second preview shows all eight new facings.
@@ -1282,7 +1282,7 @@ committed; models, textures and previews stay local.
 
 The user selected `sword_base00.glb` and `Shield_S15_Warrior_Red.glb`.
 The first armed test uses `palM_1hsShd_nav_idle` and original WLDAS layout:
-ten 768Ã—768 rows, eight directions, 6144Ã—7680, with sidecar
+ten 768×768 rows, eight directions, 6144×7680, with sidecar
 `D1R_SHEET_V1 8 48 96`. The existing body calibration and southeast sun are
 retained. Source equipment files and character geometry are unchanged.
 
@@ -1354,7 +1354,7 @@ and all eight facings. This corrects the mount rather than merely translating
 the floating shield in screen space.
 
 All 80 body/equipment and 80 full-shadow bounds checks pass, with minimum
-margins 67 and 3 NN8 pixels. Original 6144Ã—7680 dimensions, fixed registration,
+margins 67 and 3 NN8 pixels. Original 6144×7680 dimensions, fixed registration,
 body scale, southeast sun and full moving shadows are preserved. Installed
 WLDAS SHA256:
 `5029C282F719A0C919E8BF28156BAE39AA8357F5C0B696BF89CAC1067C54F8A6`.
@@ -1538,3 +1538,23 @@ rejects superseded plans, altered sword-pose recipes, and shield recipes without
 a forward hand drive. It does not install during rendering/preflight. At this
 review checkpoint all 39 installed custom hashes still match the prior manifest;
 no attack revision or executable/version change has been installed.
+
+
+### 2026-10-25 shield wrist review checkpoint
+
+The selected shield attack remains `palM_1hsShd_attk_shieldCharge_3units`, sampled to 16 game rows with the existing two-pass smoothing and contact row 8. The shield now follows the approved hand-relative mount instead of a world-locked orientation. At the user's request, only `hand.L` rotation is corrected to make the shield plane vertical during the strike; shoulder, elbow, reach, all translations and all other body animation channels remain unchanged. This replaces the rejected independent world-upright shield constraint. A private evaluated-mesh check found zero shield/head triangle intersections in 61 quarter-frame samples spanning rows 0 through 15. All 575 non-wrist/non-equipment animation channels match the prior follow-hand preview exactly. This is a preview checkpoint, not an installed WLUAT update; do not treat the earlier rejected shield previews as approved. The two padded native sword attacks were already installed separately; retain them. Proprietary models, clips, rendered sheets and previews remain outside Git.
+
+
+### 2026-10-25 shared shield grip correction
+
+The H3 red shield was reversed **within its face**, not front-to-back. Inspection of the original mesh's rear straps confirmed that the former mesh-local hand anchor `[-0.2, 0, -0.1]` was at the large-strap end. The small handgrip is at `[0.23, 0, -0.1]`. The corrected mount turns 180 degrees about the measured shield-plane normal, preserves the outward boss face and the existing hand target, and places the larger strap toward the elbow. `shield_mount.py` records this authored numeric adjustment as `small-handgrip-180-v1`; it is idempotent and changes neither scale nor body animation.
+
+All 20 WLD/WLU sheets require this correction, including the formerly copied WLDAS combined idle. Fourteen distinct render jobs supply those 20 sheets through six aliases. The nine WLS sheets are copied from the current installed manifest, including the already installed padded native sword attack. The ten WLN sheets and shared unarmed death remain unchanged. WLDAT retains the complete native swordAndBoard motion, its approved timing, contact at game frame 9, and the existing 176x144 logical attack cells. WLUAT uses the selected native `palM_1hsShd_attk_shieldCharge_3units` bash with the requested smoothing and wrist-only tilt; shoulder, elbow, reach and other body animation channels remain unchanged.
+
+The corrected grip adds a small amount of shadow extent in AW/WL and WLD BL. WLD AW, WLU AW, WLD WL, WLU WL and WLD BL therefore receive one transparent logical pixel on each horizontal side: 98x96 logical cells, anchor `[49,96]`. This changes the source rectangle only; the character scale, on-screen foot anchor, southeast sun and full shadow stay unchanged. No other non-attack cell dimensions change.
+
+Validation covers all 14 animations and all eight raster directions. The evaluated-mesh mounting audit checks 254 poses, including quarter-frame samples in both attacks: zero shield/head triangle intersections, zero poses with the large strap on the hand side of the elbow, and maximum grip-target error 0.00884 meters during the unchanged native sword swing. Other states remain within approximately 0.000005 meters. The correction preserves the shield face normal, grip target and scale mathematically; recapturing the corrected idle binding matches the authored profile within 0.0000003. The public preparation script reproduces the active 29-sheet inventory and all 14 corrected references exactly.
+
+Reproduce using the existing private equipment plan, native sword revision plan, wrist-bash revision plan, combined-idle body model and combined-idle reference. `prepare_shield_mount_updates.py` accepts those five inputs plus a new private work directory; `audit_shield_mounts.py` prepares/checks it in Blender; `build_equipped_sets.py render` and `validate` render and validate all 29 target sheets; `install_shield_mount_updates.py` backs up and replaces only the 20 shield sheets after validating the complete current manifest. The installer rechecks all 39 custom sheets and the executable, updates both manifest copies, and rolls back on failure. The engine remains 0.4.1-pre because this is an asset correction using the existing loader. Models, animations, rendered sheets, GIFs and backups remain private and outside Git.
+
+Installation completed: all 20 corrected WLD/WLU sheets are installed in `D:/Games/Diablo/HD/plrgfx/warrior`. Exact previous-sheet backups, final art, the 254-pose strap audit, the complete 29-sheet pack report and updated manifest are in the private asset archive `Light Warrior Equipment Sets 2026-10-25/Shield Grip Correction`. All 39 installed custom-sheet hashes were verified; the nine WLS and ten WLN sheets are unchanged. The executable SHA-256 remains `52B3E407DE77ABC1E0CA5B4D567736388BE4046B31BA036269F615D0941AA28B`. The corrected northwest bash steps and GIF are included with the private review artifacts.

@@ -86,7 +86,7 @@ def validate(plan):
   for sheet,expected in inventory.items():
    dest=target(sheet)
    with Image.open(dest) as image:assert list(image.size)==expected['size'];assert image.mode=='RGBA';image.verify()
-   logical=expected['cell']//8;layout=f'D1R_SHEET_V1 8 {logical//2} {logical}';assert dest.with_name(dest.name+'.layout').read_text().strip()==layout
+   logical=expected['cell']//8;anchor=expected.get('canvas_anchor',[logical//2,logical]);layout=f'D1R_SHEET_V1 8 {anchor[0]} {anchor[1]}';assert dest.with_name(dest.name+'.layout').read_text().strip()==layout
    records[sheet].update(size=expected['size'],rows=expected['rows'],layout=layout,path=str(dest),sha256=sha(dest))
  assert len(records)==29
  report={'sheets':records,'sheet_count':29,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':True,'death_shared_unarmed':True,'attack_action_frame':9,'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete 29-sheet pack',flush=True);return report
@@ -94,17 +94,21 @@ def validate(plan):
 def make_previews(plan,pack):
  work=Path(plan['work']);dest=work/'review';dest.mkdir(exist_ok=True);directions=['S','SW','W','NW','N','NE','E','SE'];priority=['as','aw','at','ht','bl','st','wl','fm','lm','qm']
  for code,inventory in plan['inventory'].items():
-  actions=[a for a in priority if code+a in inventory];images={a:Image.open(pack/code/(code+a+'.png')).convert('RGBA') for a in actions};size=128;overview=Image.new('RGB',(len(actions)*size,8*(size+24)),(32,32,32));draw=ImageDraw.Draw(overview)
+  actions=[a for a in priority if code+a in inventory];images={a:Image.open(pack/code/(code+a+'.png')).convert('RGBA') for a in actions}
+  anchors={a:list(map(int,(pack/code/(code+a+'.png.layout')).read_text().split()[2:4])) for a in actions}
+  def thumbnail(action,direction,row,pixels):
+   image=images[action];width=image.width//8;height=image.height//inventory[code+action]['rows'];tile=image.crop((direction*width,row*height,(direction+1)*width,(row+1)*height));factor=pixels/(192*8);anchor=anchors[action];dx=pixels/2-factor*anchor[0]*8;dy=pixels*160/192-factor*(anchor[1]-16)*8;tile=tile.transform((pixels,pixels),Image.Transform.AFFINE,(1/factor,0,-dx/factor,0,1/factor,-dy/factor),resample=Image.Resampling.BICUBIC);bg=Image.new('RGBA',(pixels,pixels),(32,32,32,255));bg.alpha_composite(tile);return bg.convert('RGB')
+  size=128;overview=Image.new('RGB',(len(actions)*size,8*(size+24)),(32,32,32));draw=ImageDraw.Draw(overview)
   for col,a in enumerate(actions):
    rows=inventory[code+a]['rows'];row=8 if a=='at' else 1 if a=='bl' else min(rows-1,13 if a in ['fm','lm','qm'] else rows//2);cell=inventory[code+a]['cell']
    for d in range(8):
-    tile=images[a].crop((d*cell,row*cell,(d+1)*cell,(row+1)*cell));bg=Image.new('RGBA',tile.size,(32,32,32,255));bg.alpha_composite(tile);overview.paste(bg.convert('RGB').resize((size,size),Image.Resampling.LANCZOS),(col*size,d*(size+24)+24));draw.text((col*size+5,d*(size+24)+6),a.upper()+' '+directions[d],fill='white')
+    overview.paste(thumbnail(a,d,row,size),(col*size,d*(size+24)+24));draw.text((col*size+5,d*(size+24)+6),a.upper()+' '+directions[d],fill='white')
   overview.save(dest/(code+'-all-actions-all-directions.png'))
   frames=[];thumb=256;cols=4;grid_rows=(len(actions)+cols-1)//cols
   for tick in range(80):
    canvas=Image.new('RGB',(cols*thumb,grid_rows*(thumb+24)),(32,32,32));draw=ImageDraw.Draw(canvas)
    for i,a in enumerate(actions):
-    count=inventory[code+a]['rows'];step=4 if a in ['as','st'] else 3 if a=='bl' else 1;row=(tick//step)%count;cell=inventory[code+a]['cell'];tile=images[a].crop((0,row*cell,cell,(row+1)*cell));bg=Image.new('RGBA',tile.size,(32,32,32,255));bg.alpha_composite(tile);x=(i%cols)*thumb;y=(i//cols)*(thumb+24);canvas.paste(bg.convert('RGB').resize((thumb,thumb),Image.Resampling.LANCZOS),(x,y+24));draw.text((x+8,y+7),code.upper()+' '+a.upper(),fill='white')
+    count=inventory[code+a]['rows'];step=4 if a in ['as','st'] else 3 if a=='bl' else 1;row=(tick//step)%count;cell=inventory[code+a]['cell'];x=(i%cols)*thumb;y=(i//cols)*(thumb+24);canvas.paste(thumbnail(a,0,row,thumb),(x,y+24));draw.text((x+8,y+7),code.upper()+' '+a.upper(),fill='white')
    frames.append(canvas)
   frames[0].save(dest/(code+'-all-actions.gif'),save_all=True,append_images=frames[1:],duration=50,loop=0,optimize=False)
 
