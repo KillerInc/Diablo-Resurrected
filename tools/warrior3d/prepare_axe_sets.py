@@ -14,7 +14,7 @@ for png in sorted((Path(plan['originals'])/'wla').glob('*.png')):
  with Image.open(png) as im:size=list(im.size)
  inv={'original_size':size,'cell':size[0]//8,'rows':rows};plan['inventory']['wla'][name]=inv;live=Path(plan['game'])/'HD/plrgfx/warrior/wla'/png.name;assert live.is_file();plan['starting_game_hashes'][name]=hashlib.sha256(live.read_bytes()).hexdigest().upper()
  if action in ['st','wl','fm','lm','qm']:
-  donor=manifest['sheets']['wls'+action];plan['copies'].append({'sheet':name,'path':donor['source']});inv.update(size=donor['size'],canvas_anchor=list(map(int,donor['layout'].split()[2:4])));continue
+  donor=manifest['sheets'][name] if action in ['st','wl'] and manifest.get('town_equipment_revision') and name in manifest['sheets'] else manifest['sheets']['wls'+action];plan['copies'].append({'sheet':name,'path':donor['source']});inv.update(size=donor['size'],canvas_anchor=list(map(int,donor['layout'].split()[2:4])));continue
  assert len(frames[action])==rows;recipe={'name':'A1 native two-handed '+action,'source':str(sources/(tags[action]+'.glb')),'frames':frames[action],'arms':[],'idle':str(sources/'idle.glb'),'preserve_attack_motion':True}
  if action=='at':recipe['idle_weights']=[1,.67,.33]+[0]*17
  if action=='ht':recipe['idle_weights']=[1,0,0,0,0,1]

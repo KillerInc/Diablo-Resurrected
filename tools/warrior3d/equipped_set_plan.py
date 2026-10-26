@@ -72,6 +72,12 @@ def make_plan(work,previous,assets,originals,cl2,game,attack_canvas_profile=None
  name='shield-cast';model=motion(name,cast,range(20),[arm('L',idle_a,[0]*20)],as_u,['L'])
  for action,folder in [('fm','paladin-fire-bubble/gizmo-final'),('lm','paladin-lightning'),('qm','paladin-magic/option2-ground-radius')]:
   effect=json.loads((previous/folder/'reference.json').read_text())['fire_effect'];job('wld'+action,model,name,effect);copy_sheet('wlu'+action,'wld'+action);copy_sheet('wls'+action,path=manifest['sheets']['wln'+action]['source'],crop_rows=20 if action=='lm' else None)
+ # Preserve equipment-specific town carry/stow instead of reverting to unarmed aliases.
+ if manifest.get('town_equipment_revision'):
+  town={code+action for code in ['wld','wls','wlu'] for action in ['st','wl']};jobs[:]=[j for j in jobs if j['sheet'] not in town];copies[:]=[c for c in copies if c['sheet'] not in town]
+  for name in sorted(town):
+   record=manifest['sheets'][name];copy_sheet(name,path=record['source']);inventory[name[:3]][name].update(size=record['size'],canvas_anchor=list(map(int,record['layout'].split()[2:4])))
+  active={j['motion'] for j in jobs};motions[:]=[m for m in motions if m['name'] in active]
  targets={j['sheet'] for j in jobs}|{c['sheet'] for c in copies};expected={k for sheets in inventory.values() for k in sheets};assert targets==expected and len(targets)==29
  result={'work':str(work),'previous':str(previous),'assets':str(assets),'originals':str(originals),'cl2':str(cl2),'game':str(game),'inventory':inventory,'starting_game_hashes':starting,'starting_custom_manifest':manifest,'motions':motions,'jobs':jobs,'copies':copies,'calibration':str(previous/'paladin-short-stride-final/output/validation.json'),'death_is_shared_unarmed':True,'attack_action_frame':9,'casting_action_frame':14}
  (work/'plan.json').write_text(json.dumps(result,indent=2));print('Planned',len(jobs),'render jobs and',len(copies),'validated copies/aliases for 29 sheets');return result

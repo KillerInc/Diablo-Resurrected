@@ -88,7 +88,7 @@ def validate(plan):
    with Image.open(dest) as image:assert list(image.size)==expected['size'];assert image.mode=='RGBA';image.verify()
    logical=expected['cell']//8;anchor=expected.get('canvas_anchor',[logical//2,logical]);layout=f'D1R_SHEET_V1 8 {anchor[0]} {anchor[1]}';assert dest.with_name(dest.name+'.layout').read_text().strip()==layout
    records[sheet].update(size=expected['size'],rows=expected['rows'],layout=layout,path=str(dest),sha256=sha(dest))
- expected_count={'light-mace':19,'light-axe':9}.get(plan.get('equipment_family'),29)
+ expected_count={'light-mace':19,'light-axe':9,'light-town':10}.get(plan.get('equipment_family'),29)
  assert len(records)==expected_count
  report={'sheets':records,'sheet_count':expected_count,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':True,'death_shared_unarmed':True,'attack_action_frame':plan.get('attack_action_frame',9),'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete '+str(expected_count)+'-sheet pack',flush=True);return report
 
