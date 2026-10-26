@@ -1678,3 +1678,10 @@ The installer removes town_hilt_only_revision and saves town_bare_sword_revision
 The complete town sword slides 0.05 m toward its hilt along its existing shaft axis in WLS/WLD ST/WL. Rotation, scale, broad-face orientation, full blade, no-sheath appearance and closer centered shield are retained. No sideways clearance offset is applied. All idle/walk poses pass body-intersection and full-shadow bounds checks at this translation.
 
 raise_town_sword.py prepares the four changed sword sheets and reuses the other four bundle renders. It stores the new pelvis-local mount in town_sword_roll_revision, so future stow rebuilds retain the raised position. Translations are stored in Blender's float32 precision for repeatable rebuilds. Four sheet hashes change, preserving 63 other custom sheets and the executable. Private archive: I:/Diablo Sprites/3D Assests/Paladin Candidate 1 Edited/Light Warrior Raised Town Sword 2026-10-26. Models/sheets/reviews stay outside Git.
+
+
+## 2026-10-26 â€” another 5 cm sword raise (10 cm cumulative)
+
+The complete town sword moves another 0.05 m toward the hilt along the same shaft, for 0.10 m cumulative from the initial low mount. At the exact second raise the guard intersects eight armor triangles in walking row 2; a 0.01 m outward broad-face-normal clearance removes that contact. Rotation, scale, body animation, full blade, no-sheath appearance and closer centered shield are preserved. All full-pose/body/shadow preflights pass with this clearance.
+
+raise_town_sword.py now accepts optional OUTWARD metres after the shaft distance, defaulting to zero for existing recipes. This update uses the first raised plan as input with 0.05 shaft and 0.01 outward. The authoritative float32 mount is saved for future stow rebuilds. Four sword town hashes change and 63 other custom sheets/executable remain intact. Private archive: I:/Diablo Sprites/3D Assests/Paladin Candidate 1 Edited/Light Warrior Town Sword Raised 10cm 2026-10-26. No proprietary assets are in Git.
