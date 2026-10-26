@@ -1,4 +1,4 @@
-"""Preview the user's local swords and shields without changing source assets.
+"""Preview the user's local weapons and shields without changing source assets.
 
 Blender --python SCRIPT -- ASSET_DIRECTORY OUTPUT_DIRECTORY [MODEL.glb ...]
 Renders front/back views at one fixed scale per equipment category.
@@ -10,7 +10,10 @@ from mathutils import Matrix,Vector
 
 args=sys.argv[sys.argv.index('--')+1:];source,out=map(Path,args[:2]);out.mkdir(parents=True,exist_ok=True)
 assets=[('S1','sword_base00.glb','sword'),('S2','sword_base01.glb','sword'),('S3','sword_base03.glb','sword'),('H1','shield_base02.glb','shield'),('H2','shield_base04.glb','shield'),('H3','Shield_S15_Warrior.glb','shield')]
-if len(args)>2:assets=[(f'V{i+1}',name,'sword' if 'sword' in Path(name).name.lower() else 'shield') for i,name in enumerate(args[2:])]
+if len(args)>2:
+    assets=[];counts={}
+    for name in args[2:]:
+        category=next((c for c in ['shield','sword','mace','axe','bow','staff'] if c in Path(name).name.lower()),'weapon');counts[category]=counts.get(category,0)+1;prefix={'shield':'H','sword':'S','mace':'M','axe':'A','bow':'B','staff':'T','weapon':'V'}[category];assets.append((f'{prefix}{counts[category]}',name,category))
 report=[]
 for label,name,category in assets:
     path=source/name;assert path.is_file(),path
@@ -26,7 +29,7 @@ for label,name,category in assets:
     scene=bpy.context.scene;scene.render.engine='BLENDER_EEVEE';scene.render.resolution_x=512;scene.render.resolution_y=768;scene.render.resolution_percentage=100;scene.render.film_transparent=True;scene.render.image_settings.file_format='PNG';scene.render.image_settings.color_mode='RGBA';scene.world.color=(.15,.15,.15);scene.view_settings.view_transform='AgX'
     for pos,energy,size in [((2,-4,4),450,4),((-3,-2,1),180,3),((0,3,3),350,3)]:
         bpy.ops.object.light_add(type='AREA',location=pos);lamp=bpy.context.object;lamp.data.energy=energy;lamp.data.size=size;lamp.rotation_euler=(-lamp.location).to_track_quat('-Z','Y').to_euler()
-    bpy.ops.object.camera_add();camera=bpy.context.object;camera.data.type='ORTHO';camera.data.ortho_scale=1.65 if category=='sword' else 1.05;scene.camera=camera
+    bpy.ops.object.camera_add();camera=bpy.context.object;camera.data.type='ORTHO';camera.data.ortho_scale=1.05 if category=='shield' else 1.65;scene.camera=camera
     for view,pos in [('front',(1.1,-5,1)),('back',(-1.1,5,1))]:
         camera.location=pos;camera.rotation_euler=(-camera.location).to_track_quat('-Z','Y').to_euler();scene.render.filepath=str((out/f'{label}-{view}.png').resolve());bpy.ops.render.render(write_still=True)
     report.append({'label':label,'filename':name,'category':category,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'native_dimensions':list(hi-lo),'mesh_objects':len(meshes),'model_scaled':False})
