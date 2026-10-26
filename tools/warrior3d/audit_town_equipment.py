@@ -21,7 +21,7 @@ for j in plan['jobs']:
    v,t=geometry(o);box=bounds(v);tree=None;asset=o.get('d1r_asset','')
    for k,(part,bv,bt,bb,cached) in enumerate(body):
     material=part.data.materials[0].name
-    if 'Shield_' in asset and 'P00_HED' not in material:continue
+    if 'Shield_' in asset and not plan.get('town_back_stow_revision') and 'P00_HED' not in material:continue
     if 'twoHandAxe' in asset and 'base01_GLV' in material:continue
     if any(box[1][a]<bb[0][a] or box[0][a]>bb[1][a] for a in range(3)):continue
     if tree is None:tree=BVHTree.FromPolygons(v,t,all_triangles=True)

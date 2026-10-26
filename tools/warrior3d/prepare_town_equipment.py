@@ -1,6 +1,7 @@
 """Blender --background --python SCRIPT -- SHIELD_PLAN.json PRIVATE_TOWN_WORK
 Use approved town poses; add belt-stowed sword/mace and carried axe/shield.
 Run build_town_props.py for the private equipment directory first.
+For the corrected native-sheathe/back-shield recipe use revise_town_stow.py.
 """
 import bpy,copy,json,sys,struct,hashlib,math
 from pathlib import Path
