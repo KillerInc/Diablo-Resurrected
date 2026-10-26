@@ -11,8 +11,10 @@ assert rig.animation_data.action.name.startswith('palM_1hsShd_event_sheathe')
 sword=rig.pose.bones['pelvis'].matrix.inverted()@rig.pose.bones['weapon.R'].matrix@Matrix.Rotation(-math.pi/2,4,'Z')@Matrix.Scale(.75,4)
 jobs={j['sheet']:j for j in base['jobs']};unarmed={a:jobs['wls'+a]['model'] for a in ['st','wl']}
 bpy.ops.wm.read_factory_settings(use_empty=True);bpy.context.scene.render.fps=30;bpy.ops.import_scene.gltf(filepath=unarmed['st']);rig=next(o for o in bpy.data.objects if o.type=='ARMATURE');bpy.context.scene.frame_set(0);bpy.context.view_layer.update();chest=rig.matrix_world@rig.pose.bones['chest'].matrix
-# Shield local XY is the face. +Z points outward from the back; +Y stays up.
-shield_world=Matrix(((-.92,0,0,0),(0,0,.92,.170),(0,.92,0,1.22),(0,0,0,1)));shield=chest.inverted()@shield_world
+# Chest X points backward, Y follows the spine, Z points across the shoulders.
+# Center on that anatomical frame instead of the world axes of the twisted idle.
+# Compensate the source rim's small local-X center offset (0.005992).
+shield=Matrix(((0,0,.92,.22),(0,.92,0,-.025),(-.92,0,0,.92*.0059919655),(0,0,0,1)))
 # Native endpoint puts this different, wider outfit's sheath into its leg.
 # Preserve the native angle; fit the rigid assembly around outfit and hand.
 sword.translation+=(rig.matrix_world@rig.pose.bones['pelvis'].matrix).to_3x3().inverted()@Vector((.10,.18,-.08))
@@ -26,6 +28,6 @@ for code in ['wls','wld','wlh','wlu']:
    item=copy.deepcopy(item)
    if item['town_role'] in ['sheathed_sword','sword_sheath']:item['local_transform']=[list(r) for r in sword]
    gear.append(item)
-  if code!='wls':gear.append({'path':str(back_shield.resolve()),'bone':'chest','local_transform':[list(r) for r in shield],'town_role':'back_shield','shield_grip_revision':'small-handgrip-180-v1','town_stow_revision':'close-back-original-bands-v2','allow_rear_band_body_overlap':True})
+  if code!='wls':gear.append({'path':str(back_shield.resolve()),'bone':'chest','local_transform':[list(r) for r in shield],'town_role':'back_shield','shield_grip_revision':'small-handgrip-180-v1','town_stow_revision':'centered-chest-frame-v3','allow_rear_band_body_overlap':True})
   root=work/'jobs'/name;root.mkdir(parents=True);rp=root/'reference.json';ref.update(sheet=name+'.png',equipment=gear,preview_prefix=name,preview_caption=name.upper()+' | native final-frame sword / back shield',root_anchor_frame=0);rp.write_text(json.dumps(ref,indent=2));j.update(sheet=name,code=code,action=action,model=unarmed[action],motion=name,root=str(root),reference=str(rp));plan['jobs'].append(j);plan['motions'].append({'name':name});inv=copy.deepcopy(base['inventory'][donor['code']][donor['sheet']]);plan['inventory'][code][name]=inv;plan['starting_game_hashes'][name]=manifest['sheets'][name]['sha256']
 (work/'plan.json').write_text(json.dumps(plan,indent=2));print('Prepared eight town revisions from native sheathe final frame',end)
