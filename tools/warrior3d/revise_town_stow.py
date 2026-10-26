@@ -25,13 +25,15 @@ for code in ['wls','wld','wlh','wlu']:
  for action in ['st','wl']:
   name=code+action;donor=jobs[('wls' if code=='wlu' else code)+action];j=copy.deepcopy(donor);ref=json.loads(Path(j['reference']).read_text());gear=[]
   for item in ref['equipment']:
-   if manifest.get('town_hilt_only_revision') and item['town_role']=='sword_sheath':continue
+   if (manifest.get('town_hilt_only_revision') or manifest.get('town_bare_sword_revision')) and item['town_role']=='sword_sheath':continue
    if item['town_role']=='carried_shield' or code=='wlu':continue
    item=copy.deepcopy(item)
    if item['town_role'] in ['sheathed_sword','sword_sheath']:item['local_transform']=[list(r) for r in sword]
    if manifest.get('town_hilt_only_revision') and item['town_role']=='sheathed_sword':item.update(path=manifest['town_hilt_only_revision']['path'],town_role='town_sword_hilt')
+   if manifest.get('town_bare_sword_revision') and item['town_role'] in ['sheathed_sword','town_sword_hilt']:item.update(path=manifest['town_bare_sword_revision']['path'],town_role='town_sword')
    gear.append(item)
   if code!='wls':gear.append({'path':str(back_shield.resolve()),'bone':'chest','local_transform':[list(r) for r in shield],'town_role':'back_shield','shield_grip_revision':'small-handgrip-180-v1','town_stow_revision':'centered-close-chest-frame-v4','allow_rear_band_body_overlap':True})
   root=work/'jobs'/name;root.mkdir(parents=True);rp=root/'reference.json';ref.update(sheet=name+'.png',equipment=gear,preview_prefix=name,preview_caption=name.upper()+' | native final-frame sword / back shield',root_anchor_frame=0);rp.write_text(json.dumps(ref,indent=2));j.update(sheet=name,code=code,action=action,model=unarmed[action],motion=name,root=str(root),reference=str(rp));plan['jobs'].append(j);plan['motions'].append({'name':name});inv=copy.deepcopy(base['inventory'][donor['code']][donor['sheet']]);plan['inventory'][code][name]=inv;plan['starting_game_hashes'][name]=manifest['sheets'][name]['sha256']
 if manifest.get('town_hilt_only_revision'):plan['town_hilt_only_revision']=manifest['town_hilt_only_revision']
+if manifest.get('town_bare_sword_revision'):plan['town_bare_sword_revision']=manifest['town_bare_sword_revision'];plan.pop('town_hilt_only_revision',None)
 (work/'plan.json').write_text(json.dumps(plan,indent=2));print('Prepared eight town revisions from native sheathe final frame',end)

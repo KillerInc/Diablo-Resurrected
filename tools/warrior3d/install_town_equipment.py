@@ -13,10 +13,11 @@ def install(plan_file,archive):
  checks=json.loads((work/'preflight-progress.json').read_text());assert len(checks)==count and all(c['safe'] for c in checks)
  for j in plan['jobs']:
   ref=json.loads(Path(j['reference']).read_text());assert ref['root_anchor_frame']==0;mark=json.loads((Path(j['root'])/'completed.json').read_text());assert mark['fingerprint']==fingerprint(j)
-  roles={e['town_role'] for e in ref['equipment']};required={'wls':{'sheathed_sword','sword_sheath'},'wld':{'sheathed_sword','sword_sheath','carried_shield'},'wlm':{'holstered_mace','mace_frog'},'wlh':{'holstered_mace','mace_frog','carried_shield'},'wla':{'carried_axe'},'wlu':{'carried_shield'}}[j['code']];required=({'town_sword_hilt'}|(required-{'sheathed_sword','sword_sheath'})) if plan.get('town_hilt_only_revision') and j['code'] in ['wls','wld'] else required;required={('back_shield' if r=='carried_shield' and back else r) for r in required};assert required<=roles
+  roles={e['town_role'] for e in ref['equipment']};required={'wls':{'sheathed_sword','sword_sheath'},'wld':{'sheathed_sword','sword_sheath','carried_shield'},'wlm':{'holstered_mace','mace_frog'},'wlh':{'holstered_mace','mace_frog','carried_shield'},'wla':{'carried_axe'},'wlu':{'carried_shield'}}[j['code']];required=({'town_sword_hilt'}|(required-{'sheathed_sword','sword_sheath'})) if plan.get('town_hilt_only_revision') and j['code'] in ['wls','wld'] else required;required=({'town_sword'}|(required-{'sheathed_sword','sword_sheath','town_sword_hilt'})) if plan.get('town_bare_sword_revision') and j['code'] in ['wls','wld'] else required;required={('back_shield' if r=='carried_shield' and back else r) for r in required};assert required<=roles
  manifest=Path(plan['previous'])/'paladin-vanilla-dimensions/install-manifest.json';before=manifest.read_bytes();current=json.loads(before);assert current==plan['starting_custom_manifest'] and expected<=set(current['sheets']);live=Path(plan['game'])/'HD/plrgfx/warrior';mirror=Path(plan['assets'])/'Vanilla NN8 Dimensions';exe=Path(plan['game'])/'Diablo Reincarnated.exe';exe_hash=sha(exe)
  for n,r in current['sheets'].items():assert sha(live/n[:3]/(n+'.png'))==r['sha256'].upper(),n
- assert plan.get('town_hilt_only_revision') or not current.get('town_hilt_only_revision'),'Preserve the approved hilt-only town appearance'
+ assert plan.get('town_bare_sword_revision') or plan.get('town_hilt_only_revision') or not current.get('town_hilt_only_revision'),'Preserve the approved hilt-only town appearance'
+ assert plan.get('town_bare_sword_revision') or not current.get('town_bare_sword_revision'),'Preserve the full sword without custom sheath'
  assert back or not current.get('town_equipment_revision',{}).get('native_sheathe_reference'),'Use revise_town_stow.py to preserve the approved back shield and native sword endpoint'
  for n,r in records.items():assert sha(r['path'])==r['sha256'];assert Path(r['path']+'.layout').read_text().strip()==r['layout']
  archive=Path(archive);assert not archive.exists();archive.mkdir(parents=True);(archive/'previous-install-manifest.json').write_bytes(before)
@@ -28,6 +29,8 @@ def install(plan_file,archive):
  if plan.get('town_sword_roll_revision'):updated['town_sword_roll_revision']=plan['town_sword_roll_revision']
  if plan.get('town_hilt_only_revision'):
   updated['town_hilt_only_revision']=dict(plan['town_hilt_only_revision']);updated['town_hilt_only_revision']['path']=str(archive/'Equipment'/Path(plan['town_hilt_only_revision']['path']).name)
+ if plan.get('town_bare_sword_revision'):
+  updated.pop('town_hilt_only_revision',None);updated['town_bare_sword_revision']=dict(plan['town_bare_sword_revision']);updated['town_bare_sword_revision']['path']=str(archive/'Equipment'/Path(plan['town_bare_sword_revision']['path']).name)
  changed=[];actual_changed=sorted(n for n,r in records.items() if r['sha256'].upper()!=current['sheets'][n]['sha256'].upper())
  try:
   for n,r in records.items():
