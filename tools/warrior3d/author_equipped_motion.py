@@ -132,7 +132,7 @@ def author(recipe,destination):
    assert idle is not None
    for side in spec['finger_grip']:
     finger_nodes=branch(names['hand.'+side])-{names['weapon.'+side]}
-    if side=='R':finger_nodes.discard(names['hand.R'])
+    if side=='R' or spec.get('preserve_grip_wrist_motion'):finger_nodes.discard(names['hand.'+side])
     for key in keys:
      if key[0] in finger_nodes:pose[key]=sample(idle,*key,0)
   poses.append(pose)

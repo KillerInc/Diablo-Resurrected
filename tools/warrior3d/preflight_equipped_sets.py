@@ -1,8 +1,8 @@
 """Prepare authored equipment motions and check all poses before raster rendering.
 
 Blender --python SCRIPT -- PLAN.json
-Only pose excursions may be blended toward the corresponding existing idle.
-Body/equipment geometry, canvas, anchor and southeast shadow length stay fixed.
+Full authored motion is retained. Canvases expand to cover every pose and
+full southeast shadow; automatic pose attenuation is not permitted.
 """
 import bpy,json,sys,math,gc
 from pathlib import Path
@@ -53,7 +53,7 @@ def check(model,reference):
   if actor_name:
    actor=rig.matrix_world@rig.pose.bones[actor_name].head;center=rig.matrix_world@rig.pose.bones['pelvis'].head;gain=ref.get('root_motion_scale',0)*ref.get('root_motion_return',[1]*ref['rows'])[row];sway=[center.x-actor.x+actor_initial.x-initial.x+(actor.x-actor_initial.x)*gain,center.y-actor.y+actor_initial.y-initial.y+(actor.y-actor_initial.y)*gain]
    if drive is not None:sway=[center.x-actor.x+actor_initial.x-initial.x+drive[row][0],center.y-actor.y+actor_initial.y-initial.y+drive[row][1]]
-  floors.append([sway[0],sway[1],offset]);pelvis=rig.matrix_world@rig.pose.bones['pelvis'].head;rig.location=(initial.x-pelvis.x+sway[0],initial.y-pelvis.y+sway[1],offset);bpy.context.view_layer.update();deps=bpy.context.evaluated_depsgraph_get()
+  floors.append([sway[0],sway[1],offset]);pelvis=rig.matrix_world@rig.pose.bones['pelvis'].head;rig.location=(sway[0],sway[1],offset) if ref.get('preserve_horizontal_root_motion') else (initial.x-pelvis.x+sway[0],initial.y-pelvis.y+sway[1],offset);bpy.context.view_layer.update();deps=bpy.context.evaluated_depsgraph_get()
   if actor_name:root_positions.append(list(rig.matrix_world@rig.pose.bones[actor_name].head))
   objects=parts+equipment;chunks=[vertices(o,deps)[0] for o in objects];starts=np.cumsum([0]+[len(p) for p in chunks]);world_body=np.concatenate(chunks);world_shadow=world_body.copy()
   for d in range(8):
@@ -76,38 +76,7 @@ def check(model,reference):
  return result
 
 def run(plan_file):
- plan=json.loads(Path(plan_file).read_text());progress=Path(plan['work'])/'preflight-progress.json';results=json.loads(progress.read_text()) if progress.exists() else [];results=[r for r in results if r['safe']]
- for motion in plan['motions']:
-  if any(r['motion']==motion['name'] for r in results):continue
-  jobs=[j for j in plan['jobs'] if j['motion']==motion['name']];assert jobs;recipe=Path(motion['recipe']);spec=json.loads(recipe.read_text());attempts=[];result=None
-  # Prefer the complete source gesture. Smaller excursions stay joint-based;
-  # they never shrink the model, equipment or ground shadow.
-  candidates=[(1,1,0),(1,1,.025),(1,1,.05),(1,1,.075),(.9,1,.05),(.8,1,.05),(.7,1,.05),(.6,1,.05),(.5,1,.05),(.4,1,.05),(.35,.9,.05),(.35,.8,.05),(.25,.7,.05)]
-  equipped=json.loads(Path(jobs[0]['reference']).read_text()).get('equipment',[]);sides=['R' if Path(e['path']).name.startswith('sword') else 'L' for e in equipped]
-  if 'L' in sides:candidates=candidates[:4]+[(1,1,{'L':.10,'R':0}),(1,1,{'L':.15,'R':0}),(1,1,{'L':.20,'R':0})]+candidates[4:]
-  if motion['name'].endswith('-attack') and 'R' in sides:candidates=candidates[:4]+[(1,1,{'R':.15,'L':.10}),(1,1,{'R':.25,'L':.15}),(1,1,{'R':.35,'L':.15}),(.8,1,{'R':.25,'L':.15}),(.6,1,{'R':.25,'L':.15})]+candidates[4:]
-  if motion['name'].endswith('-attack') and 'R' in sides:candidates += [(.2,1,.05),(.15,1,.05),(.1,1,.05)]
-  if motion['name'].endswith('-hit'):candidates=[(1,.5,.1),(1,.4,.1)]+candidates
-  if motion['name'].endswith('-block'):candidates=[(.25,1,.15),(.25,1,.2),(.2,1,.15),(.15,1,.1)]+candidates+[(.2,1,.05),(.15,1,.05),(.1,1,.05),(.05,1,.05)]
-  candidates=[(a,m,t,1) for a,m,t in candidates]
-  if motion['name'].endswith('-attack') and 'R' in sides:candidates=[(.2,1,.05,1),(.15,1,.05,1),(.1,1,.05,1)]+[(1,1,{'R':t,'L':.1},w) for w in [0,.35,.65] for t in [.05,.15,.25]]+candidates
-  if spec.get('preserve_attack_motion'):candidates=[(spec.get('arm_gain',1),spec.get('motion_gain',1),spec.get('arm_tuck',{}),spec.get('wrist_gain',{}).get('R',1))]
-  for arm_gain,motion_gain,tuck,wrist in candidates:
-   if not spec.get('preserve_attack_motion'):
-    spec['wrist_gain']={'R':wrist} if 'R' in sides else {}
-    spec.update(arm_gain=arm_gain,motion_gain=motion_gain,arm_tuck={side:(tuck.get(side,0) if isinstance(tuck,dict) else tuck) for side in sides})
-   recipe.write_text(json.dumps(spec,indent=2));author(recipe,motion['model']);result=check(motion['model'],jobs[0]['reference']);attempts.append({'arm_gain':arm_gain,'motion_gain':motion_gain,'wrist_gain':spec.get('wrist_gain',{}),'arm_tuck':spec.get('arm_tuck',{}),**{k:v for k,v in result.items() if k!='pose_offsets'}})
-   if result['safe']:break
-  record={'motion':motion['name'],'safe':result['safe'],'arm_gain':spec['arm_gain'],'motion_gain':spec['motion_gain'],'arm_tuck':spec.get('arm_tuck',{}),'attempts':attempts};results.append(record)
-  (Path(plan['work'])/'preflight-progress.json').write_text(json.dumps(results,indent=2))
-  if not result['safe']:
-   print('PREFLIGHT NEEDS REFINEMENT',motion['name'],flush=True);continue
-  for job in jobs:
-   path=Path(job['reference']);ref=json.loads(path.read_text());ref['pose_offsets']=result['pose_offsets'];path.write_text(json.dumps(ref,indent=2));(Path(job['root'])/'preflight.json').write_text(json.dumps(record,indent=2))
-  print('PREFLIGHT OK',motion['name'],spec['arm_gain'],spec['motion_gain'],flush=True);gc.collect()
- (Path(plan['work'])/'preflight.json').write_text(json.dumps(results,indent=2))
- failed=[r['motion'] for r in results if not r['safe']]
- if failed:raise RuntimeError('Motions still requiring refinement: '+', '.join(failed))
- print('All equipped motions prepared and checked',flush=True)
+ from fit_motion_canvases import fit
+ fit(plan_file,author_models=True)
 
 if __name__=='__main__':run(sys.argv[sys.argv.index('--')+1])

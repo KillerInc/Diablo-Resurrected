@@ -73,6 +73,23 @@ Warnings also enter the normal application log. `HD_PNG_WARNING` includes source
 
 Memory flags are cumulative: **1 = at least 75%**, **3 = at least 90%**, **7 = at least 100%** of the specified target. Cache/process high-water warnings are deduplicated until HD assets reset; individual PNG/decode-peak warnings are associated with each load. Each diagnostic records `action=continue`. Malformed files, integer overflow and genuine allocation failures remain errors. The SDL3 application log now labels TRACE/INFO/WARN/ERROR/CRITICAL correctly.
 
+## Full-motion sheet authoring
+
+The equipment preflight now expands transparent canvases and raw capture space
+around the authored motion and its full shadow. It never searches for smaller
+arm/body excursions to make a fixed cell fit. Capture enlargement preserves
+camera pixels per metre, character scale and the layout's world-ground anchor.
+Physical contact is reported for review instead of hidden through attenuation.
+
+The 27 October restoration replaces 22 light-warrior sheets whose earlier
+recipes reduced movement or redirected a fall to fit old cells. It keeps the
+approved walking stride, equipment choices and unrelated fitting corrections.
+The death fall uses its native path; full blocks retain native body/wrist poses
+and the approved shield grip converted to hand-relative attachment. Bounds,
+contacts, source-bone comparisons and previous-file preservation are recorded
+by the local restoration pipeline. Artwork and private reports remain outside
+Git; see `tools/warrior3d/PALADIN.md` for the source workflow and sheet inventory.
+
 ## Validation on 23 October 2026
 
 - All 1,102 installed original-named PNGs have matching extracted CL2/CEL originals; all direction/frame grids divide exactly, and none is interlaced. This is a structural audit, not a visual pass through every animation.

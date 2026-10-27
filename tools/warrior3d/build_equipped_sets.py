@@ -89,11 +89,13 @@ def validate(plan):
    logical=expected['cell']//8;anchor=expected.get('canvas_anchor',[logical//2,logical]);layout=f'D1R_SHEET_V1 8 {anchor[0]} {anchor[1]}';assert dest.with_name(dest.name+'.layout').read_text().strip()==layout
    records[sheet].update(size=expected['size'],rows=expected['rows'],layout=layout,path=str(dest),sha256=sha(dest))
  expected_count={'light-mace':19,'light-axe':9,'light-town':10,'light-town-stow':8,'light-town-two-hand-back':2,'light-town-bow':2,'light-bow':9,'light-staff':9}.get(plan.get('equipment_family'),29)
+ if plan.get('equipment_family')=='full-motion-restoration':
+  expected_count=len(plan['restoration_targets']);assert set(records)==set(plan['restoration_targets'])
  assert len(records)==expected_count
- report={'sheets':records,'sheet_count':expected_count,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':True,'death_shared_unarmed':True,'attack_action_frame':plan.get('attack_action_frame',9),'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete '+str(expected_count)+'-sheet pack',flush=True);return report
+ report={'sheets':records,'sheet_count':expected_count,'stored_directional_frames':sum(v['rows']*8 for v in records.values()),'approved_unarmed_preserved':not any(n.startswith('wln') for n in records),'death_shared_unarmed':True,'attack_action_frame':plan.get('attack_action_frame',9),'casting_action_frame':14};(work/'pack-validation.json').write_text(json.dumps(report,indent=2));make_previews(plan,pack);print('Validated complete '+str(expected_count)+'-sheet pack',flush=True);return report
 
 def make_previews(plan,pack):
- work=Path(plan['work']);dest=work/'review';dest.mkdir(exist_ok=True);directions=['S','SW','W','NW','N','NE','E','SE'];priority=['as','aw','at','ht','bl','st','wl','fm','lm','qm']
+ work=Path(plan['work']);dest=work/'review';dest.mkdir(exist_ok=True);directions=['S','SW','W','NW','N','NE','E','SE'];priority=['as','aw','at','ht','bl','st','wl','fm','lm','qm','dt']
  for code,inventory in plan['inventory'].items():
   actions=[a for a in priority if code+a in inventory];images={a:Image.open(pack/code/(code+a+'.png')).convert('RGBA') for a in actions}
   anchors={a:list(map(int,(pack/code/(code+a+'.png.layout')).read_text().split()[2:4])) for a in actions}
