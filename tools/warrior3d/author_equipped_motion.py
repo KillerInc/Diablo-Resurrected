@@ -128,6 +128,9 @@ def author(recipe,destination):
     target=hand.translation.copy()
     if excess>0:target-=radial.normalized()*excess
     target.y-=excess_height;tuck_arm(pose,side,0,target)
+  # Fit an actual closed-hand opening to a rigid shaft without moving gear.
+  for side,targets in spec.get('hand_grip_poses',{}).items():
+   target=targets[row];tuck_arm(pose,side,0,Vector(target['position']));set_world_rotation(pose,names['hand.'+side],Quaternion(target['rotation_wxyz']),world(pose))
   if spec.get('finger_grip'):
    assert idle is not None
    for side in spec['finger_grip']:
