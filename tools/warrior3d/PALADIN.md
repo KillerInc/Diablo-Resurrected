@@ -1782,3 +1782,6 @@ This is a preview, not a game installation. The previously installed native-sock
 
 
 The user then requested another 15 cm through the same grip: the current preview is 30 cm total (`grip_slide=-0.375` at scale 0.8). Hands and body are byte-identical to the preceding 15 cm clearance candidate; only the rigid staff placement changes. The public preview preparer accepts an optional total slide in centimetres. Private work: `warrior-3d/staff-sorcerer-grip-30cm`. The 16-pose mesh contact audit remains clear, with nearest-vertex grip distances below 3.6 cm right and 2.4 cm left. This remains a preview; the game installation is unchanged.
+
+
+The user approved the existing staff rotation and requested a closed left-hand grip after inspecting the close-up. The original two-handed idle supplies only the left finger channels, using `finger_grip=["L"]` and `preserve_grip_wrist_motion=True`. No wrist or attachment transform changes. The finger-only audit finds 15 changed left finger joints and zero error in 8,496 non-finger channel samples. The exact existing 30 cm staff GLB is reused. Private preview: `warrior-3d/staff-sorcerer-left-grip`, with tracked left-hand close-ups in south, west and northwest. This remains a preview; no game sheets were replaced.
