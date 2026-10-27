@@ -1,5 +1,5 @@
 """Blender --python SCRIPT -- RESTORED_PLAN.json
-Compare restored death/block channels with raw sampled source bone animation.
+Compare sampled native body channels; optionally select --actions at.
 Closed finger poses are an approved grip choice; hands/wrists stay in the audit.
 """
 import sys,json,numpy as np
@@ -7,9 +7,9 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parent))
 from merge_paladin_walk import read
 from author_equipped_motion import tracks,blend
-plan=json.loads(Path(sys.argv[sys.argv.index('--')+1]).read_text());reports=[]
+args=sys.argv[sys.argv.index('--')+1:];plan=json.loads(Path(args[0]).read_text());reports=[];actions=args[args.index('--actions')+1:] if '--actions' in args else ['bl','dt']
 for j in plan['jobs']:
- if j['action'] not in ['bl','dt']:continue
+ if j['action'] not in actions:continue
  model=Path(j['model']);spec=json.loads(model.with_suffix('.motion.json').read_text())['recipe'];g,b=read(model);sg,sb=read(spec['source']);actual=tracks(g,b);original=tracks(sg,sb);names={n.get('name'):i for i,n in enumerate(g['nodes'])}
  def branch(i):return {i}|set().union(*(branch(c) for c in g['nodes'][i].get('children',[])))
  excluded=set()
@@ -28,4 +28,4 @@ for j in plan['jobs']:
    if path=='rotation':error=min(error,float(np.max(np.abs(values[row]+expected))))
    errors.append(error)
  maximum=max(errors,default=0);assert maximum<1e-5,(j['sheet'],maximum);reports.append({'sheet':j['sheet'],'source':spec['source'],'comparisons':len(errors),'maximum_native_channel_error':maximum,'finger_pose_excluded_only':True})
-(Path(plan['work'])/'native-bone-audit.json').write_text(json.dumps(reports,indent=2));print('Verified complete native body/wrist channels for',len(reports),'death/block sheets')
+(Path(plan['work'])/'native-bone-audit.json').write_text(json.dumps(reports,indent=2));print('Verified complete native body/wrist channels for',len(reports),'sheets')
