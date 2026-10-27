@@ -38,7 +38,8 @@ and bottom alignment. PNG and sidecar resolve from the same asset provider;
 malformed metadata or out-of-range anchors preserve the Classic fallback.
 
 Density is explicitly 1, 2, 4, 8 or 16, independent of canvas dimensions. Source
-dimensions, streaming decode, retained 2x density and cache limits still apply.
+format rules, streaming decode and retained 2x density still apply. Version
+0.4.2 replaces arbitrary PNG size caps with diagnostics described below.
 Only the drawing canvas grows; neither the sprite nor game tiles are enlarged.
 The Paladin test art uses one fixed camera-projected ground origin for every
 direction and action, with the previously approved uniform art scale preserved.
@@ -57,7 +58,20 @@ Sheet colors pass through the sprite's accumulated palette translation, the draw
 
 PNG decoding streams one row at a time, avoiding full 8x-atlas allocations. The installed files stay at their original resolution. The current world compositor supports vanilla 1x/2x world mapping and retains up to 2x sampled sheet density for that output. It does not yet render an independently zoomable 8x GPU world. SDL_GPU continues to upload and present the composed image; sprite composition and the sheet cache use system RAM, not VRAM.
 
-The LRU sheet cache defaults to 1 GiB. `D1R_SHEET_CACHE_MB` can set 128–4096 MiB. Individual retained sheets are capped at 128 MiB, source dimensions at 65536 per axis, and compressed bytes at the existing provider limit. Invalid dimensions, unsupported/interlaced PNGs and decode failures fall back rather than being used as sheets. The palette-matching cache is bounded too. F10 clears loaded sheets with the other HD assets.
+As of 0.4.2-pre, PNGs are no longer rejected at 128 MiB retained, 256 MiB compressed or 65536 source pixels per axis. The PNG format's own dimension range, representable allocation sizes, available memory and valid direction/frame grids still apply. Unsupported/interlaced PNGs and decode failures retain the Classic fallback. The palette-matching cache remains bounded. F10 clears loaded sheets with the other HD assets.
+
+The LRU cache defaults to a **4 GiB target**, with an **8 GiB process warning target**. These are system-memory targets, not VRAM allocations or a hard game-memory cap. LRU eviction removes older sheets when space is needed. A single sheet larger than the target is still admitted after other cached sheets are evicted.
+
+| Environment setting | Default | Meaning |
+| --- | --- | --- |
+| `D1R_SHEET_CACHE_MB` | 4096 | LRU cache target in MiB; positive representable values accepted |
+| `D1R_SHEET_WARN_MB` | 128 | Per-sheet retained-memory warning threshold; never rejects a sheet |
+| `D1R_PROCESS_WARN_MB` | 8192 | Windows process-private-commit warning target |
+| `D1R_SHEET_LOG` | config directory + `hd-sprite-loader.log` | Append-only dedicated warning log |
+
+Warnings also enter the normal application log. `HD_PNG_WARNING` includes source path, PNG dimensions, compressed/retained memory and flags for crossing the former dimension/compressed-size caps. `HD_MEMORY_WARNING` identifies cache pressure, Windows process private commit, and transient decode pressure while staging and retained buffers coexist. Windows private commit includes committed pageable memory; it is not a VRAM or working-set measurement. Process checks occur during sheet loading, not as a continuous whole-game monitor.
+
+Memory flags are cumulative: **1 = at least 75%**, **3 = at least 90%**, **7 = at least 100%** of the specified target. Cache/process high-water warnings are deduplicated until HD assets reset; individual PNG/decode-peak warnings are associated with each load. Each diagnostic records `action=continue`. Malformed files, integer overflow and genuine allocation failures remain errors. The SDL3 application log now labels TRACE/INFO/WARN/ERROR/CRITICAL correctly.
 
 ## Validation on 23 October 2026
 

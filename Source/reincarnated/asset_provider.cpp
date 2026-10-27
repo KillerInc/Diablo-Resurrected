@@ -8,8 +8,8 @@
 namespace reincarnated {
 
 namespace {
-// Single image resources may be high resolution, but should not exhaust RAM
-// because of an accidental or maliciously huge file.
+// Keep the existing bound on non-PNG resources. PNG sizes are diagnosed by
+// the sheet loader instead of being rejected by an arbitrary byte budget.
 constexpr std::uintmax_t MaxLooseAssetBytes = 256ULL * 1024ULL * 1024ULL;
 }
 
@@ -56,9 +56,15 @@ bool LooseFileAssetProvider::read(const std::string &assetId, AssetBytes &bytes)
     if (!input)
         return false;
     const std::streampos fileSize = input.tellg();
-    if (fileSize <= 0 || static_cast<std::uintmax_t>(fileSize) > MaxLooseAssetBytes)
+    const size_t n = assetId.size();
+    const bool png = n >= 4 && assetId[n-4] == '.'
+        && (assetId[n-3] == 'p' || assetId[n-3] == 'P')
+        && (assetId[n-2] == 'n' || assetId[n-2] == 'N')
+        && (assetId[n-1] == 'g' || assetId[n-1] == 'G');
+    if (fileSize <= 0 || (!png && static_cast<std::uintmax_t>(fileSize) > MaxLooseAssetBytes))
         return false;
-    if (fileSize > std::numeric_limits<std::streamsize>::max())
+    if (fileSize > std::numeric_limits<std::streamsize>::max()
+        || static_cast<std::uintmax_t>(fileSize) > AssetBytes{}.max_size())
         return false;
 
     AssetBytes contents(static_cast<size_t>(fileSize));

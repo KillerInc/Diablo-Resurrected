@@ -14,6 +14,8 @@
 #include "game_mode.hpp"
 #include "dds_decode.hpp"
 #include "sheet_png.hpp"
+#include "sheet_memory.hpp"
+#include "sheet_diagnostics.hpp"
 #include "engine/palette.h"
 #include "engine/surface.hpp"
 #include "utils/display.h"
@@ -45,19 +47,25 @@ std::unordered_map<uint32_t, uint8_t> nearestColors;
 std::array<SDL_Color, 256> matchingPalette {};
 size_t sheetBytes = 0;
 uint64_t sheetClock = 0;
+unsigned cacheWarningFlags = 0, processWarningFlags = 0;
 size_t SheetBudget()
 {
-    static const size_t bytes = [] {
-        unsigned megabytes = 1024;
-        if (const char *value = SDL_getenv("D1R_SHEET_CACHE_MB")) {
-            unsigned requested = 0;
-            const auto end = value + std::strlen(value);
-            const auto parsed = std::from_chars(value, end, requested);
-            if (parsed.ec == std::errc() && parsed.ptr == end && requested >= 128 && requested <= 4096) megabytes = requested;
-        }
-        return size_t(megabytes) * 1024 * 1024;
-    }();
+    static const size_t bytes = MemoryTarget(SDL_getenv("D1R_SHEET_CACHE_MB"), 4096);
     return bytes;
+}
+void WarnMemory(const char *kind, size_t bytes, size_t target, unsigned &seen, const std::string &source)
+{
+    const unsigned flags = MemoryWarningFlags(bytes, target);
+    if ((flags & ~seen) == 0) return;
+    seen |= flags;
+    SheetWarning(
+        "HD_MEMORY_WARNING kind={} flags={} used_mib={:.2f} target_mib={:.2f} source={} action=continue",
+        kind, flags, double(bytes) / MemoryMiB, double(target) / MemoryMiB, source);
+}
+void WarnProcessMemory(const std::string &source)
+{
+    static const size_t target = MemoryTarget(SDL_getenv("D1R_PROCESS_WARN_MB"), 8192);
+    WarnMemory("process_private_commit", ProcessPrivateMemoryBytes(), target, processWarningFlags, source);
 }
 
 CachedSheet *LoadSheet(const SheetSource &source)
@@ -68,10 +76,13 @@ CachedSheet *LoadSheet(const SheetSource &source)
     CachedSheet entry;
     AssetBytes bytes, sidecar;
     if (GetHdAssetStore().readWithSidecar(source.path, bytes, sidecar)) {
+        WarnProcessMemory(source.path);
         SheetLayout layout;
         const bool validLayout = sidecar.empty() || ParseSheetLayout(sidecar, layout);
         if (validLayout && DecodeSheetPng(bytes, source, entry.image, sidecar.empty() ? nullptr : &layout)) {
-            while (sheetBytes + entry.image.rgba.size() > SheetBudget()) {
+            const size_t added = entry.image.rgba.size();
+            // Compare using subtraction so even extreme targets cannot wrap.
+            while (added > SheetBudget() || sheetBytes > SheetBudget() - added) {
                 auto victim = sheets.end();
                 for (auto it = sheets.begin(); it != sheets.end(); ++it)
                     if (!it->second.image.rgba.empty() && (victim == sheets.end() || it->second.used < victim->second.used)) victim = it;
@@ -80,6 +91,8 @@ CachedSheet *LoadSheet(const SheetSource &source)
                 sheets.erase(victim);
             }
             sheetBytes += entry.image.rgba.size();
+            WarnMemory("sheet_cache", sheetBytes, SheetBudget(), cacheWarningFlags, source.path);
+            WarnProcessMemory(source.path);
             devilution::Log("Loaded HD sheet: {} ({}x{}, {} directions, {} frames, {}x retained density)", source.path,
                 entry.image.width, entry.image.height, source.columns, source.rows, entry.image.density);
         } else devilution::Log("HD sheet layout/decode rejected; preserving Classic fallback: {}", source.path);
@@ -334,20 +347,23 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
     const unsigned group = devilution::LoadLE16(header + 14), frame = devilution::LoadLE16(header + 16);
     if (group >= source->columns || frame >= source->rows || image.cellHeight / image.density < sprite.height()) return false;
     const int logicalHeight = image.cellHeight / image.density;
-    const int top = y + 1 - image.anchorY;
-    const int left = (x + int(source->width / 2) - image.anchorX + out.region.x) * scale + offsetX;
-    const int upper = (top + out.region.y) * scale;
-    const int w = image.logicalWidth * scale, h = logicalHeight * scale;
+    const int64_t top = int64_t(y) + 1 - image.anchorY;
+    const int64_t left = (int64_t(x) + source->width / 2 - image.anchorX + out.region.x) * scale + offsetX;
+    const int64_t upper = (top + out.region.y) * scale;
+    const int64_t w = int64_t(image.logicalWidth) * scale, h = int64_t(logicalHeight) * scale;
     const auto *bakedTranslation = header + 18;
     // Clip in the caller's local coordinates as well as to the world viewport.
-    const int xBegin = std::max({left, clip.x, out.region.x * scale + offsetX, 0});
-    const int xEnd = std::min({left + w, clip.x + clip.w, (out.region.x + out.w()) * scale + offsetX, world->w});
-    const int yBegin = std::max({upper, out.region.y * scale, 0});
-    const int yEnd = std::min({upper + h, clip.h, (out.region.y + out.h()) * scale, world->h});
-    for (int py = yBegin; py < yEnd; ++py) {
+    const int64_t xBegin = std::max<int64_t>({left, clip.x, out.region.x * scale + offsetX, 0});
+    const int64_t xEnd = std::min<int64_t>({left + w, clip.x + clip.w, (out.region.x + out.w()) * scale + offsetX, world->w});
+    const int64_t yBegin = std::max<int64_t>({upper, out.region.y * scale, 0});
+    const int64_t yEnd = std::min<int64_t>({upper + h, clip.h, (out.region.y + out.h()) * scale, world->h});
+    if (xBegin >= xEnd || yBegin >= yEnd) return true;
+    // Nonempty clipped bounds are inside the actual screen, even when the
+    // source canvas/anchor is too large for 32-bit intermediate arithmetic.
+    for (int py = static_cast<int>(yBegin); py < yEnd; ++py) {
         const unsigned sy = frame * image.cellHeight + (py - upper) * image.density / scale;
         auto *dst = static_cast<uint8_t *>(world->pixels) + py * world->pitch;
-        for (int px = xBegin; px < xEnd; ++px) {
+        for (int px = static_cast<int>(xBegin); px < xEnd; ++px) {
             const unsigned sx = group * image.cellWidth + (px - left) * image.density / scale;
             const auto *src = image.rgba.data() + (size_t(sy) * image.width + sx) * 4;
             unsigned alpha = src[3];
@@ -411,6 +427,7 @@ void ResetHdAssets()
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;
     sheets.clear(); sheetBytes = 0; nearestColors.clear();
+    cacheWarningFlags = 0; processWarningFlags = 0;
 }
 }
 #endif

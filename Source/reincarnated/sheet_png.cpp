@@ -5,6 +5,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
+#include <limits>
+#include <SDL3/SDL_log.h>
+#include <SDL3/SDL_stdinc.h>
+#include "sheet_memory.hpp"
+#include "sheet_diagnostics.hpp"
 
 namespace reincarnated {
 namespace {
@@ -31,7 +36,7 @@ bool ParseSheetLayout(const std::vector<uint8_t> &bytes, SheetLayout &layout)
     input >> std::ws;
     if (!input.eof() || !(parsed.density == 1 || parsed.density == 2 || parsed.density == 4
         || parsed.density == 8 || parsed.density == 16)
-        || parsed.anchorX < 0 || parsed.anchorY < 0 || parsed.anchorX > 65536 || parsed.anchorY > 65536) return false;
+        || parsed.anchorX < 0 || parsed.anchorY < 0) return false;
     layout = parsed;
     return true;
 }
@@ -52,7 +57,9 @@ bool DecodeSheetPng(const std::vector<uint8_t> &bytes, const SheetSource &source
     }
     Reader reader { bytes.data(), bytes.size(), 0 };
     png_set_read_fn(png, &reader, Read);
-    png_set_user_limits(png, 65536, 65536);
+    // PNG's format limit, not an artwork-size policy. Allocation/overflow and
+    // grid checks below still reject images that cannot actually be decoded.
+    png_set_user_limits(png, PNG_UINT_31_MAX, PNG_UINT_31_MAX);
     png_read_info(png, info);
     const unsigned width = png_get_image_width(png, info), height = png_get_image_height(png, info);
     if (width % source.columns || height % source.rows) png_error(png, "Invalid sheet grid");
@@ -67,8 +74,18 @@ bool DecodeSheetPng(const std::vector<uint8_t> &bytes, const SheetSource &source
     if (png_get_interlace_type(png, info) != PNG_INTERLACE_NONE) png_error(png, "Interlaced sheets need offline conversion");
     const unsigned step = std::max(1U, density / 2);
     if (width % step || height % step) png_error(png, "Invalid sample grid");
+    if (size_t(width) > std::numeric_limits<size_t>::max() / 4
+        || size_t(width / step) > std::numeric_limits<size_t>::max() / 4 / (height / step))
+        png_error(png, "Sheet allocation size overflows address space");
     const size_t size = size_t(width / step) * (height / step) * 4;
-    if (size > 128 * 1024 * 1024) png_error(png, "Sheet cache entry exceeds budget");
+    const size_t warning = MemoryTarget(SDL_getenv("D1R_SHEET_WARN_MB"), 128);
+    const unsigned flags = MemoryWarningFlags(size, warning);
+    if (flags || width > 65536 || height > 65536 || bytes.size() > 256 * MemoryMiB)
+        SheetWarning(
+            "HD_PNG_WARNING flags={} source={} png={}x{} compressed_mib={:.2f} retained_mib={:.2f} warning_mib={:.2f} dimension_over_65536={} compressed_over_256mib={} action=continue",
+            flags, source.path, width, height, double(bytes.size()) / MemoryMiB,
+            double(size) / MemoryMiB, double(warning) / MemoryMiB,
+            int(width > 65536 || height > 65536), int(bytes.size() > 256 * MemoryMiB));
     const int type = png_get_color_type(png, info), depth = png_get_bit_depth(png, info);
     if (depth == 16) png_set_strip_16(png);
     if (type == PNG_COLOR_TYPE_PALETTE) png_set_palette_to_rgb(png);
@@ -97,6 +114,15 @@ bool DecodeSheetPng(const std::vector<uint8_t> &bytes, const SheetSource &source
     image.anchorX = layout ? layout->anchorX : int(source.width / 2);
     image.anchorY = layout ? layout->anchorY : int(cellHeight / density);
     image.rgba.assign(pixels, pixels + size);
+    // Sample while both retained buffers exist, before the staging copy frees.
+    // This captures transient decode pressure as well as steady cache usage.
+    const size_t process = ProcessPrivateMemoryBytes();
+    const size_t processTarget = MemoryTarget(SDL_getenv("D1R_PROCESS_WARN_MB"), 8192);
+    const unsigned processFlags = MemoryWarningFlags(process, processTarget);
+    if (processFlags)
+        SheetWarning(
+            "HD_MEMORY_WARNING kind=decode_peak_private_commit flags={} used_mib={:.2f} target_mib={:.2f} source={} action=continue",
+            processFlags, double(process) / MemoryMiB, double(processTarget) / MemoryMiB, source.path);
     std::free(row); std::free(pixels);
     png_destroy_read_struct(&png, &info, nullptr);
     return true;

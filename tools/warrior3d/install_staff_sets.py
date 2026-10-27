@@ -13,7 +13,9 @@ def install(plan_file,archive):
  manifest=Path(plan['previous'])/'paladin-vanilla-dimensions/install-manifest.json';before=manifest.read_bytes();current=json.loads(before);assert current==plan['starting_custom_manifest'] and not (expected&set(current['sheets'])),'Use an explicit revision for existing staff sheets';live=Path(plan['game'])/'HD/plrgfx/warrior';mirror=Path(plan['assets'])/'Vanilla NN8 Dimensions';exe=Path(plan['game'])/'Diablo Reincarnated.exe';exe_hash=sha(exe)
  for n,r in current['sheets'].items():assert sha(live/n[:3]/(n+'.png'))==r['sha256'].upper(),n
  for n,r in records.items():assert sha(r['path'])==r['sha256'] and sha(live/n[:3]/(n+'.png'))==plan['starting_game_hashes'][n]
- assert all(r['size'][0]*r['size'][1]/4<=128*1024**2 for r in records.values());archive=Path(archive);assert not archive.exists();archive.mkdir(parents=True);(archive/'previous-install-manifest.json').write_bytes(before);previous={}
+ for n,r in records.items():
+  if r['size'][0]*r['size'][1]/4>=96*1024**2:print('PNG memory warning (continue):',n,r['size'][0]*r['size'][1]/4/1024**2,'MiB retained')
+ archive=Path(archive);assert not archive.exists();archive.mkdir(parents=True);(archive/'previous-install-manifest.json').write_bytes(before);previous={}
  for n,r in records.items():
   dest=archive/'Final'/n[:3]/(n+'.png');dest.parent.mkdir(parents=True,exist_ok=True)
   for suffix in ['', '.layout']:shutil.copy2(Path(r['path']).with_name(n+'.png'+suffix),dest.with_name(dest.name+suffix))

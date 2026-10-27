@@ -1029,16 +1029,22 @@ FILE *SdlLogFile = nullptr;
 extern "C" void SdlLogToFile(void *userdata, int /*category*/, SDL_LogPriority priority, const char *message)
 {
 	FILE *file = reinterpret_cast<FILE *>(userdata);
-	static const char *const LogPriorityPrefixes[SDL_LOG_PRIORITY_COUNT] = {
-		"",
-		"VERBOSE",
-		"DEBUG",
-		"INFO",
-		"WARN",
-		"ERROR",
-		"CRITICAL"
-	};
-	std::fprintf(file, "%s: %s\n", LogPriorityPrefixes[priority], message);
+	// SDL3 adds TRACE before VERBOSE; positional SDL2 labels misclassify every
+	// priority. Select by enum value so diagnostics retain their real severity.
+	const char *prefix = "UNKNOWN";
+	switch (priority) {
+#ifdef USE_SDL3
+	case SDL_LOG_PRIORITY_TRACE: prefix = "TRACE"; break;
+#endif
+	case SDL_LOG_PRIORITY_VERBOSE: prefix = "VERBOSE"; break;
+	case SDL_LOG_PRIORITY_DEBUG: prefix = "DEBUG"; break;
+	case SDL_LOG_PRIORITY_INFO: prefix = "INFO"; break;
+	case SDL_LOG_PRIORITY_WARN: prefix = "WARN"; break;
+	case SDL_LOG_PRIORITY_ERROR: prefix = "ERROR"; break;
+	case SDL_LOG_PRIORITY_CRITICAL: prefix = "CRITICAL"; break;
+	default: break;
+	}
+	std::fprintf(file, "%s: %s\n", prefix, message);
 	std::fflush(file);
 }
 #endif

@@ -1,5 +1,8 @@
 // Integration checks for provenance, streaming decode and the real compositor.
 #include <array>
+#include <algorithm>
+#include <chrono>
+#include <filesystem>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -17,8 +20,12 @@
 #include "reincarnated/hd_renderer.hpp"
 #include "reincarnated/raster_bridge.hpp"
 #include "reincarnated/sheet_png.hpp"
+#include "reincarnated/sheet_memory.hpp"
 #include "utils/display.h"
 #include "utils/endian_write.hpp"
+namespace devilution {
+extern "C" void SdlLogToFile(void *, int, SDL_LogPriority, const char *);
+}
 
 namespace {
 void Check(bool condition, const std::source_location location = std::source_location::current()) { if (!condition) throw std::runtime_error("HD sheet check failed at line " + std::to_string(location.line())); }
@@ -39,6 +46,44 @@ std::vector<uint8_t> Png()
     result.resize(size);
     return result;
 }
+std::vector<uint8_t> SolidPng(unsigned width, unsigned height)
+{
+    // Stream synthetic fixtures: no giant source image or proprietary artwork.
+    std::vector<uint8_t> bytes;
+    auto *png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    auto *info = png_create_info_struct(png);
+    Check(png && info);
+    png_set_write_fn(png, &bytes, [](png_structp p, png_bytep data, png_size_t count) {
+        auto &out = *static_cast<std::vector<uint8_t> *>(png_get_io_ptr(p));
+        out.insert(out.end(), data, data + count);
+    }, nullptr);
+    png_set_IHDR(png, info, width, height, 8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+    png_write_info(png, info);
+    std::vector<uint8_t> row(size_t(width) * 4, 255);
+    for (unsigned y = 0; y < height; ++y) png_write_row(png, row.data());
+    png_write_end(png, info);
+    png_destroy_write_struct(&png, &info);
+    return bytes;
+}
+std::vector<std::string> memoryWarnings;
+void SDLCALL CaptureMemoryLog(void *, int, SDL_LogPriority, const char *message)
+{
+    if (std::strstr(message, "HD_PNG_WARNING") || std::strstr(message, "HD_MEMORY_WARNING"))
+        memoryWarnings.emplace_back(message);
+}
+class LargeProvider final : public reincarnated::AssetProvider {
+    std::vector<uint8_t> bytes = SolidPng(8192, 4098);
+public:
+    bool read(const std::string &id, reincarnated::AssetBytes &out) const override {
+        if (id == "hd/plrgfx/warrior/wln/wlnst.png") { out = bytes; return true; }
+        if (id == "hd/plrgfx/warrior/wln/wlnst.png.layout") {
+            const std::string text = "D1R_SHEET_V1 1 2 3";
+            out.assign(text.begin(), text.end()); return true;
+        }
+        return false;
+    }
+};
 devilution::OwnedClxSpriteListOrSheet Sprites()
 {
     using namespace devilution;
@@ -128,7 +173,43 @@ int main(int argc, char **argv)
         Check(parse("D1R_SHEET_V1 2 5 3"));
         Check(!DecodeSheetPng(png,*source,image,&canvas)); // anchor outside the real canvas
 
+        Check(MemoryTarget("8192", 4096) == size_t(8192) * MemoryMiB);
+        Check(MemoryTarget("bad", 4096) == size_t(4096) * MemoryMiB);
+        Check(MemoryTarget("0", 4096) == size_t(4096) * MemoryMiB);
+        Check(MemoryWarningFlags(74,100)==0 && MemoryWarningFlags(75,100)==1);
+        Check(MemoryWarningFlags(90,100)==3 && MemoryWarningFlags(100,100)==7);
+        {
+            FILE *log = std::tmpfile();
+            Check(log != nullptr);
+            SdlLogToFile(log, 0, SDL_LOG_PRIORITY_TRACE, "trace");
+            SdlLogToFile(log, 0, SDL_LOG_PRIORITY_INFO, "info");
+            SdlLogToFile(log, 0, SDL_LOG_PRIORITY_WARN, "warning");
+            SdlLogToFile(log, 0, SDL_LOG_PRIORITY_CRITICAL, "critical");
+            std::rewind(log);
+            char text[256] {};
+            const size_t count = std::fread(text, 1, sizeof(text)-1, log);
+            std::fclose(log);
+            Check(std::string(text,count)=="TRACE: trace\nINFO: info\nWARN: warning\nCRITICAL: critical\n");
+        }
+        SDL_LogOutputFunction oldLog;
+        void *oldLogData;
+        SDL_GetLogOutputFunction(&oldLog, &oldLogData);
+        SDL_SetLogOutputFunction(CaptureMemoryLog, nullptr);
+        const auto diagnosticPath = std::filesystem::temp_directory_path() /
+            ("reincarnated-sheet-test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".log");
+        Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_SHEET_LOG", diagnosticPath.string().c_str(), true));
+        Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_SHEET_WARN_MB", "128", true));
+        const SheetSource wideSource {"synthetic-wide",1,1,2};
+        const auto wide = SolidPng(65544, 1);
+        Check(parse("D1R_SHEET_V1 1 65540 1"));
+        Check(DecodeSheetPng(wide,wideSource,image,&canvas));
+        Check(image.width==65544 && image.anchorX==65540);
+        Check(!memoryWarnings.empty() && memoryWarnings.back().find("dimension_over_65536=1")!=std::string::npos);
+
         Check(SDL_Init(0));
+        // A target smaller than one sheet must evict others, never reject it.
+        Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_SHEET_CACHE_MB", "1", true));
+        Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_PROCESS_WARN_MB", "1", true));
         gnScreenWidth=8; gnScreenHeight=8;
         Palette.reset(SDL_CreatePalette(256));
         Check(bool(Palette));
@@ -218,7 +299,32 @@ int main(int argc, char **argv)
         BeginHdWorldFrame(1,0,0,8,8);
         Check(!HasHdSheet(sprite)); // malformed metadata takes the existing Classic fallback
         EndHdWorldFrame();
+        ResetHdAssets();
+        GetHdAssetStore().mount(std::make_unique<LargeProvider>());
+        memoryWarnings.clear();
+        BeginHdWorldFrame(1,0,0,8,8);
+        Check(HasHdSheet(sprite)); // >128 MiB retained; >1 MiB cache target
+        EndHdWorldFrame();
+        Check(std::any_of(memoryWarnings.begin(), memoryWarnings.end(), [](const std::string &line) {
+            return line.find("HD_PNG_WARNING")!=std::string::npos && line.find("flags=7")!=std::string::npos;
+        }));
+        Check(std::any_of(memoryWarnings.begin(), memoryWarnings.end(), [](const std::string &line) {
+            return line.find("kind=sheet_cache flags=7")!=std::string::npos;
+        }));
+#ifdef _WIN32
+        Check(std::any_of(memoryWarnings.begin(), memoryWarnings.end(), [](const std::string &line) {
+            return line.find("kind=process_private_commit flags=7")!=std::string::npos;
+        }));
+#endif
         ResetHdAssets(); PalSurface=nullptr; Palette.reset(); SDL_Quit();
+        SDL_SetLogOutputFunction(oldLog, oldLogData);
+        {
+            std::ifstream file(diagnosticPath);
+            const std::string diagnostics(std::istreambuf_iterator<char>(file), {});
+            Check(diagnostics.find("HD_PNG_WARNING")!=std::string::npos);
+            Check(diagnostics.find("kind=sheet_cache flags=7")!=std::string::npos);
+        }
+        std::filesystem::remove(diagnosticPath);
         std::puts("PASS: provenance, translations, legacy/expanded decode, 1x/2x anchors, viewport clipping, invalid metadata fallback, Classic buffer, lighting, blending and foreground occlusion");
         return 0;
     } catch (const std::exception &e) { std::fprintf(stderr,"%s\n",e.what()); return 1; }

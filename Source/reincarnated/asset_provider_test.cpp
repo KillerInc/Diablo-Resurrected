@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -95,6 +96,22 @@ int main()
     assert(!store.readWithSidecar("hd/../players/0.png", pairedImage, pairedLayout));
     assert(pairedImage.empty() && pairedLayout.empty());
     assert(!store.read("hd/../players/0.png", value) && value.empty());
+
+    // A sparse synthetic resource above the former 256 MiB byte cap must
+    // reach the PNG decoder. Other resource types retain their old policy.
+    const auto large = high / "hd/large.PNG";
+    {
+        std::ofstream file(large, std::ios::binary);
+        file.seekp(256ULL * 1024 * 1024);
+        file.put('\0');
+        if (!file) { std::fputs("Cannot create synthetic oversized PNG\n", stderr); return 1; }
+    }
+    LooseFileAssetProvider loose(high.string());
+    if (!loose.read("hd/large.PNG", value)) { std::fputs("Oversized PNG rejected by provider\n", stderr); return 1; }
+    if (value.size() != 256ULL * 1024 * 1024 + 1) { std::fputs("Oversized PNG truncated\n", stderr); return 1; }
+    value.clear(); value.shrink_to_fit();
+    fs::rename(large, high / "hd/large.dds");
+    if (loose.read("hd/large.dds", value)) { std::fputs("Non-PNG guard changed unexpectedly\n", stderr); return 1; }
 
     // Layout metadata is resolved by the same provider chain as image bytes.
     // An archive can supply the same asset ID later without touching renderer code.
