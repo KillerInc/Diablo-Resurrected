@@ -24,6 +24,7 @@ for j in plan['jobs']:
    for k,(part,bv,bt,bb,cached) in enumerate(body):
     material=part.data.materials[0].name
     if 'base01_GLV' in material and any(Path(e['path']).name==asset and e.get('allow_bow_hand_contact') for e in ref['equipment']):continue
+    if 'base01_GLV' in material and any(Path(e['path']).name==asset and e.get('town_role')=='held_staff' and e.get('allow_hand_grip_contact') for e in ref['equipment']):continue
     if 'Shield_' in asset and not plan.get('town_back_stow_revision') and 'P00_HED' not in material:continue
     if 'twoHandAxe' in asset and not plan.get('two_hand_back_stow_revision') and 'base01_GLV' in material:continue
     if any(box[1][a]<bb[0][a] or box[0][a]>bb[1][a] for a in range(3)):continue
