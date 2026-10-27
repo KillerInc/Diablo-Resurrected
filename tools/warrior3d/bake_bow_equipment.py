@@ -44,10 +44,12 @@ def bake(source,dest,model=None,rows=0,release_row=10,mode='shot'):
  else:
   bpy.ops.import_scene.gltf(filepath=str(source.resolve()));wood=next(o for o in bpy.data.objects if o.type=='MESH')
  assert all(abs(wood.data.vertices[0].co[k])<5 for k in range(3));removed=remove_old_string(wood);base=[v.co.copy() for v in wood.data.vertices];top=Vector((.108,.705,0));bottom=Vector((.108,-.677,0));rest=Vector((.108,.0216,0));verts,faces=string_geometry(top,rest,bottom);string=obj('Bow string',verts,faces,[material('Bow string hemp',(.32,.24,.13))]);objects=[wood,string]
- if model and mode=='carry':
+ if model and mode in ['carry','town']:
   wp=[];sp=[]
   for row in range(rows):
-   scene.frame_set(row);bpy.context.view_layer.update();w=wood.matrix_world.copy();draw=w.to_3x3().col[0];draw.z=0;draw.normalize();up=Vector((0,0,1));normal=draw.cross(up);posed=Matrix((draw,up,normal)).transposed().to_4x4();posed.translation=w.translation;local=w.inverted()@posed;wp.append([local@v for v in base]);sp.append(string_geometry(local@top,local@rest,local@bottom)[0])
+   scene.frame_set(row);bpy.context.view_layer.update();w=wood.matrix_world.copy();draw=w.to_3x3().col[0];draw.z=0;draw.normalize();up=Vector((0,0,1))
+   if mode=='town':draw,up=Vector((0,0,1)),Vector((0,1,0))
+   normal=draw.cross(up);posed=Matrix((draw,up,normal)).transposed().to_4x4();posed.translation=w.translation;local=w.inverted()@posed;wp.append([local@v for v in base]);sp.append(string_geometry(local@top,local@rest,local@bottom)[0])
   keys(wood,wp);keys(string,sp);scene.frame_start=0;scene.frame_end=rows-1
  elif model:
   av,af=cylinder(Vector((0,0,0)),Vector((.73,0,0)),.003,6);arrow=obj('Nocked arrow',av+[(.8,0,0),(.72,.018,0),(.72,-.018,0),(.08,0,0),(.2,0,.025),(.2,0,-.025)],af+[(len(av),len(av)+1,len(av)+2),(len(av)+3,len(av)+4,len(av)+5)],[material('Arrow wood',(.24,.12,.045)),material('Arrow tip',(.12,.13,.14),.6),material('Arrow feather',(.2,.16,.12))]);arrow.data.polygons[-2].material_index=1;arrow.data.polygons[-1].material_index=2;objects.append(arrow);raw_arrow=[v.co.copy() for v in arrow.data.vertices];wp=[];sp=[];ap=[];align=[0,.15,.3,.5,.65,.8,1,1,1,1,1,1,.75,.4,.15,0];tension=[0,0,0,0,.1,.2,.4,.6,.8,.95,1,.2,.05,0,0,0]
