@@ -41,6 +41,7 @@ def install(file,archive):
    receipt['string_arm_gaps']={r['sheet']:[r['minimum_string_arm_gap_metres'],r['maximum_string_arm_gap_metres']] for r in audits};updated['bow_string_clearance_revision']=receipt
   if plan.get('bow_elbow_revision'):
    receipt['elbow_hinge_checks']={r['sheet']:{k:r[k] for k in ['minimum_elbow_outward_metres','minimum_elbow_drop_metres','maximum_elbow_hinge_error_degrees']} for r in audits};updated['bow_elbow_revision']=receipt
+  if plan.get('bow_reference_pose_revision'):updated['bow_reference_pose_revision']=receipt
   body=json.dumps(updated,indent=2);manifest.write_text(body);(mirror/'install-manifest.json').write_text(body);(archive/'install-manifest.json').write_text(body)
   for name in ['idle-hold-audit.json','preflight-progress.json','pack-validation.json','plan.json']:shutil.copy2(work/name,archive/name)
   if plan.get('bow_string_clearance_revision'):shutil.copy2(work/'string-clearance.json',archive/'string-clearance.json')
