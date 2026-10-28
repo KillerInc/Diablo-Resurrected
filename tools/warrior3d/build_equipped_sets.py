@@ -16,7 +16,9 @@ def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest().upper()
 def fingerprint(job):
  ref=json.loads(Path(job['reference']).read_text());parts=[sha(job['model']),sha(job['reference'])]
  parts.extend(sha(TOOLS/name) for name in ['render_paladin_town_walk.py','render_paladin_shadows.py','assemble_paladin_canvas.py','paladin_equipment.py','paladin_fire_effect.py','paladin_fire_bubble.py','paladin_lightning_effect.py','paladin_magic_effect.py','paladin_magic_emitter.py'])
- parts.extend(sha(item['path']) for item in ref.get('equipment',[]));return hashlib.sha256('|'.join(parts).encode()).hexdigest()
+ parts.extend(sha(item['path']) for item in ref.get('equipment',[]))
+ if job.get('output_rows'):parts.append('output_rows='+str(job['output_rows']))
+ return hashlib.sha256('|'.join(parts).encode()).hexdigest()
 
 def command(args,log):
  with Path(log).open('w',encoding='utf8') as output:
@@ -35,7 +37,14 @@ def render_one(job,plan,blender):
  command([blender,'-b','--python',TOOLS/'render_paladin_shadows.py','--',root/'frames/Paladin-town-walk-render.blend',root/'frames/render.json',root/'shadows'],root/'shadow.log')
  assert len(list((root/'shadows').glob('shadow-*.png')))==ref['rows']*8,job['sheet']
  command([sys.executable,TOOLS/'assemble_paladin_canvas.py',root/'frames',root/'shadows',root/'frames/render.json',plan['calibration'],root/'output'],root/'assembly.log')
- validation=json.loads((root/'output/validation.json').read_text());assert validation['size']==plan['inventory'][job['code']][job['sheet']]['size'];assert sha(png)==validation['sheet_sha256'].upper()
+ validation=json.loads((root/'output/validation.json').read_text())
+ if job.get('output_rows') and job['output_rows']<ref['rows']:
+  rows=job['output_rows'];assert rows==plan['inventory'][job['code']][job['sheet']]['rows'] and rows>0
+  with Image.open(png) as image:height=image.height//ref['rows'];image.crop((0,0,image.width,height*rows)).save(png,compress_level=6)
+  validation.update(size=[validation['size'][0],height*rows],frame_count=rows,source_render_rows=ref['rows'],sheet_sha256=sha(png).lower())
+  for field in ['body_cells','shadow_cells']:validation[field]=[r for r in validation[field] if r['row']<rows]
+  (root/'output/validation.json').write_text(json.dumps(validation,indent=2))
+ assert validation['size']==plan['inventory'][job['code']][job['sheet']]['size'];assert sha(png)==validation['sheet_sha256'].upper()
  record={'sheet':job['sheet'],'fingerprint':key,'sha256':sha(png)};mark.write_text(json.dumps(record,indent=2));print('DONE',job['sheet'],flush=True);return record
 
 def render(plan,blender,workers=2,watch=False):

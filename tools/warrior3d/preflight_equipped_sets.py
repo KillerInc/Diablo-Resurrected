@@ -70,7 +70,7 @@ def check(model,reference):
    tree=BVHTree.FromPolygons(points,polygons);sword=swords[0];start=sword.matrix_world@Vector((0,-.04,0));end=sword.matrix_world@Vector((0,-1.03,0));ray=end-start;hit=tree.ray_cast(start,ray.normalized(),ray.length)
    if hit[0] is not None:collisions.append({'row':row,'point':list(hit[0])})
  minimum_body=min(b['margin'] for b in bounds if b['kind']=='body');minimum_shadow=min(b['margin'] for b in bounds if b['kind']=='shadow');safe=minimum_body>3 and minimum_shadow>3 and not collisions
- weights=json.loads(Path(model).with_suffix('.motion.json').read_text())['recipe'].get('idle_weights',[0]*ref['rows']);moving_shadow=min((b['margin'] for b in bounds if b['kind']=='shadow' and weights[b['row']]<1),default=minimum_shadow);safe=safe and moving_shadow>7
+ motion_file=Path(model).with_suffix('.motion.json');recipe=json.loads(motion_file.read_text()).get('recipe',{}) if motion_file.exists() else {};weights=recipe.get('idle_weights',[0]*ref['rows']);moving_shadow=min((b['margin'] for b in bounds if b['kind']=='shadow' and weights[b['row']]<1),default=minimum_shadow);safe=safe and moving_shadow>7
  result={'motion_root_bone':actor_name,'native_root_drive_offsets':drive,'root_world_positions':root_positions,'safe':safe,'minimum_body_margin':minimum_body,'minimum_shadow_margin_before_blur':minimum_shadow,'body_intersections':collisions,'worst_cells':sorted(bounds,key=lambda b:b['margin'])[:8],'pose_offsets':floors}
  if ref.get('capture_bounds'):result['cell_bounds']=bounds
  return result

@@ -33,13 +33,14 @@ for row in range(rows):
     frame_dx=dx+screen_offset[0];frame_dy=dy+screen_offset[1]
     cells=[]
     for direction in range(8):
+        direction_offset=info.get('direction_image_offsets',[[0,0]]*8)[direction];direction_dx=frame_dx+direction_offset[0];direction_dy=frame_dy+direction_offset[1]
         body=Image.open(body_root/f'body-{direction}-{source_row}.png').convert('RGBA');assert body.size==(raw_cell,raw_cell)
-        body=body.transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-frame_dx/scale,0,1/scale,-frame_dy/scale),resample=Image.Resampling.BICUBIC)
+        body=body.transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-direction_dx/scale,0,1/scale,-direction_dy/scale),resample=Image.Resampling.BICUBIC)
         rgba=np.array(body);rgb=rgba[:,:,:3].astype(np.float32);lum=rgb@np.array([.2126,.7152,.0722],dtype=np.float32)
         graded=(lum[:,:,None]+.86*(rgb-lum[:,:,None]))*.62
         if info.get('fire_effect'):
             masks=list((body_root/'fire-masks'/f'{direction}-{source_row}').rglob('*.png'));assert len(masks)==1,('Missing fire emission mask',direction,source_row)
-            mask=Image.open(masks[0]).convert('L').transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-frame_dx/scale,0,1/scale,-frame_dy/scale),resample=Image.Resampling.BICUBIC)
+            mask=Image.open(masks[0]).convert('L').transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-direction_dx/scale,0,1/scale,-direction_dy/scale),resample=Image.Resampling.BICUBIC)
             mix=np.clip(np.asarray(mask,dtype=np.float32)[:,:,None]/255*2,0,1)
             if info['fire_effect'].get('style') in ('lightning','magic'):fire_rgb=rgb*np.array([.85,.92,1.10],dtype=np.float32)
             else:
@@ -47,7 +48,7 @@ for row in range(rows):
             graded=graded*(1-mix)+fire_rgb*mix
         rgba[:,:,:3]=np.clip(graded,0,255).astype(np.uint8);body=Image.fromarray(rgba)
         shadow=Image.open(shadow_root/f'shadow-{direction}-{source_row}.png');assert shadow.size==(raw_cell+512,raw_cell+512)
-        alpha=shadow.getchannel('A').transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-frame_dx/scale+256,0,1/scale,-frame_dy/scale+256),resample=Image.Resampling.BICUBIC)
+        alpha=shadow.getchannel('A').transform((cell,cell_height),Image.Transform.AFFINE,(1/scale,0,-direction_dx/scale+256,0,1/scale,-direction_dy/scale+256),resample=Image.Resampling.BICUBIC)
         alpha=alpha.filter(ImageFilter.GaussianBlur(2)).point(lambda x:round(x*.7))
         for name,box in [('body_cells',body.getbbox()),('shadow_cells',alpha.getbbox())]:
             assert box and min(box[:2])>0 and box[2]<cell and box[3]<cell_height,('clipped',name,row,direction,box)
@@ -66,7 +67,7 @@ for row in range(rows):
     if row==info.get('preview_contact_row',8):canvas.save(out/(preview_prefix+'-contact.png'))
 dest=out/filename;sheet.save(dest,compress_level=6)
 (out/(filename+'.layout')).write_text(f'D1R_SHEET_V1 {density} {anchor[0]} {anchor[1]}\n',encoding='ascii')
-report['size']=[cell*8,cell_height*rows];report['sheet_sha256']=hashlib.sha256(dest.read_bytes()).hexdigest();report['pose_image_offsets']=info.get('pose_image_offsets',[])
+report['size']=[cell*8,cell_height*rows];report['sheet_sha256']=hashlib.sha256(dest.read_bytes()).hexdigest();report['pose_image_offsets']=info.get('pose_image_offsets',[]);report['direction_image_offsets']=info.get('direction_image_offsets',[])
 (out/'validation.json').write_text(json.dumps(report,indent=2))
 duration=200 if Path(filename).stem.endswith(('as','st')) else (100 if Path(filename).stem.endswith('dt') else 50)
 preview[0].save(out/(preview_prefix+'-preview.gif'),save_all=True,append_images=preview[1:],duration=duration,loop=0,optimize=False)
