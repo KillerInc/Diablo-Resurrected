@@ -37,7 +37,7 @@ def keys(o,positions):
   k=o.shape_key_add(name='Pose%02d'%row)
   for v,co in zip(k.data,coords):v.co=co
   for frame in range(len(positions)):k.value=1 if row==frame else 0;k.keyframe_insert('value',frame=frame)
-def bake(source,dest,model=None,rows=0,release_row=10,mode='shot'):
+def bake(source,dest,model=None,rows=0,release_row=10,mode='shot',hold_tilt_degrees=0,hold_cant_degrees=0,hold_yaw_degrees=0):
  source,dest=map(Path,[source,dest]);bpy.ops.wm.read_factory_settings(use_empty=True);scene=bpy.context.scene;scene.render.fps=30;rig=None
  if model:
   bpy.ops.import_scene.gltf(filepath=str(Path(model).resolve()));rig=next(o for o in bpy.data.objects if o.type=='ARMATURE');gear={'path':str(source.resolve()),'bone':'hand.L','orientation_socket':'weapon.L','grip':[0,0,0],'hand_point':[0,.05,0],'scale':1};wood=attach_equipment(rig,[gear])[0]
@@ -48,7 +48,8 @@ def bake(source,dest,model=None,rows=0,release_row=10,mode='shot'):
   wp=[];sp=[]
   for row in range(rows):
    scene.frame_set(row);bpy.context.view_layer.update();w=wood.matrix_world.copy();draw=w.to_3x3().col[0];draw.z=0;draw.normalize();up=Vector((0,0,1))
-   if mode=='town':draw,up=Vector((0,0,1)),Vector((0,1,0))
+   if mode=='town':
+    tilt=math.radians(hold_tilt_degrees);cant=math.radians(hold_cant_degrees);draw=Vector((math.sin(cant),math.sin(tilt)*math.cos(cant),math.cos(tilt)*math.cos(cant)));up=Vector((0,math.cos(tilt),-math.sin(tilt)));rotation=Matrix.Rotation(math.radians(hold_yaw_degrees),3,'Z');draw=rotation@draw;up=rotation@up
    normal=draw.cross(up);posed=Matrix((draw,up,normal)).transposed().to_4x4();posed.translation=w.translation;local=w.inverted()@posed;wp.append([local@v for v in base]);sp.append(string_geometry(local@top,local@rest,local@bottom)[0])
   keys(wood,wp);keys(string,sp);scene.frame_start=0;scene.frame_end=rows-1
  elif model:
@@ -64,4 +65,4 @@ def bake(source,dest,model=None,rows=0,release_row=10,mode='shot'):
  bpy.ops.object.select_all(action='DESELECT')
  for o in objects:o.select_set(True)
  scene.frame_set(0);dest.parent.mkdir(parents=True,exist_ok=True);bpy.ops.export_scene.gltf(filepath=str(dest.resolve()),export_format='GLB',use_selection=True,export_animations=bool(model),export_animation_mode='SCENE',export_anim_scene_split_object=False,export_frame_range=bool(model),export_force_sampling=True,export_extras=True)
- dest.with_suffix('.fit.json').write_text(json.dumps({'source':str(source.resolve()),'source_string_vertices_replaced':removed,'dynamic_rows':rows,'release_row':release_row if model else None,'original_limb_uv_and_materials_preserved':True,'authored_string_and_arrow':True},indent=2));return dest
+ dest.with_suffix('.fit.json').write_text(json.dumps({'source':str(source.resolve()),'source_string_vertices_replaced':removed,'dynamic_rows':rows,'hold_mode':mode,'hold_tilt_degrees':hold_tilt_degrees,'hold_cant_degrees':hold_cant_degrees,'hold_yaw_degrees':hold_yaw_degrees,'release_row':release_row if model else None,'original_limb_uv_and_materials_preserved':True,'authored_string_and_arrow':True},indent=2));return dest
