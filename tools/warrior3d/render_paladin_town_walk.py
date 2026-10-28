@@ -83,7 +83,7 @@ if redirect:
 bpy.ops.wm.save_as_mainfile(filepath=str(out/'Paladin-town-walk-render.blend'))
 ground=world_to_camera_view(scene,camera,Vector((0,0,0)))
 metadata={'sheet':ref.get('sheet','wlnwl.png'),'source_frames':times,'output_rows':rows,'render_directions':ref.get('render_directions',list(range(8))),'direction_order':ref['columns'],'camera_elevation':30,'camera_ortho_scale':camera.data.ortho_scale,'ground_origin_pixel':[ground.x*cell,(1-ground.y)*cell],'direction_registration':registrations,'horizontal_root_motion_removed':not ref.get('preserve_horizontal_root_motion',False),'pose_offsets':ref.get('pose_offsets',[]),'direction_pose_offsets':ref.get('direction_pose_offsets',[]),'redirect_fall':ref.get('redirect_fall'),'shadow_overscan':ref.get('shadow_overscan',0),'fire_effect':ref.get('fire_effect'),'sun_position':sun_position,'shadow_distance_gain':ref.get('shadow_distance_gain',1),'ground_shadow':'composited separately from original sheet'}
-for key in ['canvas_logical','canvas_anchor','preview_prefix','preview_anchor','preview_contact_row','preview_caption','pose_image_offsets','render_rows']:
+for key in ['canvas_logical','canvas_anchor','preview_prefix','preview_anchor','preview_contact_row','preview_caption','pose_image_offsets','render_rows','direction_image_offsets']:
  if key in ref:metadata[key]=ref[key]
 if equipment:metadata.update(equipment=ref['equipment'],equipment_mesh_count=len(equipment))
 if 'root_anchor_frame' in ref:metadata['root_anchor_frame']=ref['root_anchor_frame']

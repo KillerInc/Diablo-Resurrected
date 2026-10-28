@@ -3,7 +3,7 @@ Verify the final mount over every source pose. Strap contact is reported
 separately from the protected pouch, rim, bottom and arrow geometry.
 Private triangle-parts.json maps consolidated triangles to original components.
 """
-import bpy,sys,json
+import bpy,sys,json,hashlib
 from pathlib import Path
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
@@ -23,6 +23,6 @@ for j in p['jobs']:
     if hits:contacts.append({'row':row,'body':part.name,'hits':len(hits)})
   tests.append({'outward_metres':dy,'contacts':contacts})
   if not contacts:break
- reports.append({'sheet':j['sheet'],'tests':tests});(w/'final-clearance.json').write_text(json.dumps(reports,indent=2));print(j['sheet'],dy,len(contacts),flush=True)
+ reports.append({'sheet':j['sheet'],'model_sha256':hashlib.sha256(Path(j['model']).read_bytes()).hexdigest().upper(),'reference_sha256':hashlib.sha256(Path(j['reference']).read_bytes()).hexdigest().upper(),'quiver_sha256':hashlib.sha256(Path(r['equipment'][-1]['path']).read_bytes()).hexdigest().upper(),'tests':tests});(w/'final-clearance.json').write_text(json.dumps(reports,indent=2));print(j['sheet'],dy,len(contacts),flush=True)
 
 assert len(reports)==9 and all(not r["tests"][-1]["contacts"] for r in reports), "Pouch or arrow intersects body"
