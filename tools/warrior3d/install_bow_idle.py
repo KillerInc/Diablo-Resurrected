@@ -11,6 +11,7 @@ def install(file,archive):
  if plan.get('bow_grip_revision'):assert all(r['max_geometric_grip_centre_error']<.005 and r['minimum_string_inward_metres']>.04 and r['non_left_arm_channel_error']<1e-5 and r['original_art_buffers_preserved'] for r in audits)
  else:assert all(r['max_grip_error_metres']<1e-5 for r in audits)
  if plan.get('bow_string_clearance_revision'):assert all(r['minimum_string_arm_gap_metres']>=.0015 and r['maximum_string_arm_gap_metres']<=.012 for r in audits)
+ if plan.get('bow_elbow_revision'):assert all(r['minimum_elbow_outward_metres']>=.065 and r['minimum_elbow_drop_metres']>=.095 and r['maximum_elbow_hinge_error_degrees']<1 for r in audits)
  for j in plan['jobs']:
   ref=json.loads(Path(j['reference']).read_text());assert len(ref['equipment'])==2 and ref['equipment'][0]['town_role']=='held_bow' and ref['equipment'][1]['town_role']=='back_quiver'
   audit=next(r for r in audits if r['sheet']==j['sheet']);assert audit['bow_sha256']==sha(ref['equipment'][0]['path']) and audit['body_sha256']==sha(j['model'])
@@ -38,6 +39,8 @@ def install(file,archive):
   if plan.get('bow_grip_revision'):updated['bow_grip_revision']=receipt
   if plan.get('bow_string_clearance_revision'):
    receipt['string_arm_gaps']={r['sheet']:[r['minimum_string_arm_gap_metres'],r['maximum_string_arm_gap_metres']] for r in audits};updated['bow_string_clearance_revision']=receipt
+  if plan.get('bow_elbow_revision'):
+   receipt['elbow_hinge_checks']={r['sheet']:{k:r[k] for k in ['minimum_elbow_outward_metres','minimum_elbow_drop_metres','maximum_elbow_hinge_error_degrees']} for r in audits};updated['bow_elbow_revision']=receipt
   body=json.dumps(updated,indent=2);manifest.write_text(body);(mirror/'install-manifest.json').write_text(body);(archive/'install-manifest.json').write_text(body)
   for name in ['idle-hold-audit.json','preflight-progress.json','pack-validation.json','plan.json']:shutil.copy2(work/name,archive/name)
   if plan.get('bow_string_clearance_revision'):shutil.copy2(work/'string-clearance.json',archive/'string-clearance.json')
@@ -45,9 +48,9 @@ def install(file,archive):
   for p in work.glob('*recipe.json'):shutil.copy2(p,archive/p.name)
   for p in work.glob('*.fit.json'):shutil.copy2(p,archive/p.name)
   if (work/'closeups').is_dir():shutil.copytree(work/'closeups',archive/'Closeups')
-  (archive/'Equipment').mkdir();(archive/'References').mkdir()
+  (archive/'Equipment').mkdir();(archive/'References').mkdir();(archive/'Models').mkdir()
   for j in plan['jobs']:
-   ref=Path(j['reference']);shutil.copy2(ref,archive/'References'/(j['sheet']+'.json'));asset=Path(json.loads(ref.read_text())['equipment'][0]['path'])
+   shutil.copy2(j['model'],archive/'Models'/(j['sheet']+'-body.glb'));ref=Path(j['reference']);shutil.copy2(ref,archive/'References'/(j['sheet']+'.json'));asset=Path(json.loads(ref.read_text())['equipment'][0]['path'])
    shutil.copy2(asset,archive/'Equipment'/(j['sheet']+'-bow.glb'));fit=asset.with_suffix('.fit.json')
    if not fit.exists():fit=work/(j['sheet']+'-fit.json')
    shutil.copy2(fit,archive/'Equipment'/(j['sheet']+'-bow.fit.json'))

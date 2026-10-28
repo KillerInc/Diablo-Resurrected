@@ -66,7 +66,7 @@ def author(recipe,destination):
   return get
  def set_world_rotation(pose,index,rotation,get):
   q=(get(parents[index]).to_quaternion().inverted()@rotation).normalized();pose[index,'rotation']=np.array([q.x,q.y,q.z,q.w])
- def tuck_arm(pose,side,amount,target_override=None,pole_override=None):
+ def tuck_arm(pose,side,amount,target_override=None,pole_override=None,align_hinge=False):
   if amount<=0 and target_override is None:return
   u,e,h=[names[n+'.'+side] for n in ['upperArm','forearm','hand']];get=world(pose);a=get(u).translation.copy();b=get(e).translation.copy();c=get(h).translation.copy();hand_rotation=get(h).to_quaternion();center=get(names['pelvis']).translation;radial=Vector((c.x-center.x,0,c.z-center.z));target=c.copy();target.y-=amount
   if radial.length>1e-5:target-=radial.normalized()*amount*.5
@@ -74,7 +74,12 @@ def author(recipe,destination):
   upper=(b-a).length;lower=(c-b).length;direction=target-a;minimum=(upper*upper+lower*lower+2*upper*lower*math.cos(math.radians(130)))**.5;distance=max(minimum,min(direction.length,(upper+lower)*.99));direction.normalize();target=a+direction*distance;pole=(Vector(pole_override)-a) if pole_override is not None else b-a;pole-=direction*pole.dot(direction)
   if pole.length<1e-5:pole=Vector((1 if side=='L' else -1,0,0)).cross(direction)
   pole.normalize();along=(upper*upper-lower*lower+distance*distance)/(2*distance);elbow=a+direction*along+pole*max(0,upper*upper-along*along)**.5
-  set_world_rotation(pose,u,(b-a).rotation_difference(elbow-a)@get(u).to_quaternion(),get);get=world(pose);b=get(e).translation;c=get(h).translation;set_world_rotation(pose,e,(c-b).rotation_difference(target-b)@get(e).to_quaternion(),get);get=world(pose);set_world_rotation(pose,h,hand_rotation,get)
+  swing=(b-a).rotation_difference(elbow-a)
+  if align_hinge:
+   old_normal=(b-a).cross(c-b);new_normal=(elbow-a).cross(target-elbow)
+   if min(old_normal.length,new_normal.length)>1e-7:
+    old_normal=(swing@old_normal).normalized();new_normal.normalize();axis=(elbow-a).normalized();turn=math.atan2(axis.dot(old_normal.cross(new_normal)),old_normal.dot(new_normal));swing=Quaternion(axis,turn)@swing
+  set_world_rotation(pose,u,swing@get(u).to_quaternion(),get);get=world(pose);b=get(e).translation;c=get(h).translation;set_world_rotation(pose,e,(c-b).rotation_difference(target-b)@get(e).to_quaternion(),get);get=world(pose);set_world_rotation(pose,h,hand_rotation,get)
  if spec.get('align_horizontal_root'):keys.add((names['root'],'translation'))
  for item in spec.get('attachment_constraints',[]):
   for path in ['translation','rotation','scale']:keys.add((names[item['bone']],path))
@@ -130,7 +135,7 @@ def author(recipe,destination):
     target.y-=excess_height;tuck_arm(pose,side,0,target)
   # Fit an actual closed-hand opening to a rigid shaft without moving gear.
   for side,targets in spec.get('hand_grip_poses',{}).items():
-   target=targets[row];tuck_arm(pose,side,0,Vector(target['position']),target.get('elbow'))
+   target=targets[row];tuck_arm(pose,side,0,Vector(target['position']),target.get('elbow'),target.get('align_elbow_hinge',False))
    if target.get('forearm_twist_degrees'):
     get=world(pose);axis=(get(names['hand.'+side]).translation-get(names['forearm.'+side]).translation).normalized();set_world_rotation(pose,names['forearm.'+side],Quaternion(axis,math.radians(target['forearm_twist_degrees']))@get(names['forearm.'+side]).to_quaternion(),get)
    set_world_rotation(pose,names['hand.'+side],Quaternion(target['rotation_wxyz']),world(pose))
