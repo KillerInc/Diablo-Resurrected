@@ -81,6 +81,34 @@ fit those cells. Larger canvases remain an optional renderer capability, not a
 requirement to use the current art. Model scale and fixed ground registration
 are independent of transparent canvas padding.
 
+## Player-class preload (0.4.4-pre)
+
+Loading a save or new game preloads every installed named PNG for the selected
+local character's sprite class: all armor tiers, equipment sets, town/dungeon
+actions and directions. Original CL2/CLX data supplies each grid and width;
+unknown/malformed assets are logged and retain Classic fallback. Source PNGs
+and `layouts.csv` are not converted or rewritten. The current Warrior set is
+255 sheets and 4,794,935,808 bytes (4.47 GiB) of retained 2x RGBA.
+
+MPQ/provenance discovery stays serial. Up to four PNG decoders work during the
+loading screen, with synchronized metadata and cache insertion. The loading
+bar allocates its first half to game loading and second half to hero sprites.
+No gameplay, animation timing, palette/light/TRN rules or save format changes.
+
+The selected class is pinned against the renderer LRU for the game session.
+F10, display resets and level transitions retain those entries. Returning to
+the menu releases them; a different class replaces previous pinned entries.
+Other classes (including remote multiplayer players), monsters and other scene
+sprites still load on demand. They use remaining ordinary cache headroom, with
+a minimum 512 MiB evictable scene target if the pinned class exceeds the 4 GiB
+ordinary target. These are RAM buffers, not VRAM textures or OS-locked pages.
+Existing warning-only targets still apply; pinning does not impose a PNG cap.
+
+PNG edits for pinned player sheets require re-entering the game session;
+CSV edits still require restarting the process. Headless and SDL1/SDL2 runs do
+not preload. Archive providers must expose optional asset enumeration to
+participate; current loose HD folders do so with normal provider precedence.
+
 ## Color and memory
 
 Sheet colors pass through the sprite's accumulated palette translation, the draw's TRN or per-pixel lightmap, and the current display palette. Truecolor smoothing residuals around the nearest palette color are retained. This follows the vanilla color-control path; it is not an assertion of exact color equality for every interpolated pixel or every artist-authored palette. Alpha and the existing 50% sprite blend are composited in traversal order.

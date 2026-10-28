@@ -21,12 +21,14 @@ class AssetProvider {
 public:
     virtual ~AssetProvider() = default;
     virtual bool read(const std::string &assetId, AssetBytes &bytes) const = 0;
+    virtual std::vector<std::string> list(const std::string &prefix) const { return {}; }
 };
 
 class LooseFileAssetProvider final : public AssetProvider {
 public:
     explicit LooseFileAssetProvider(std::string root);
     bool read(const std::string &assetId, AssetBytes &bytes) const override;
+    std::vector<std::string> list(const std::string &prefix) const override;
 private:
     std::string root_;
 };
@@ -42,6 +44,7 @@ public:
     void mountLoose(std::string root);
 
     [[nodiscard]] bool read(const std::string &assetId, AssetBytes &bytes) const;
+    [[nodiscard]] std::vector<std::string> list(const std::string &prefix) const;
     // Resolve image + optional HD/layouts.csv row from the SAME provider.
     // This avoids mixing an overriding PNG with stale metadata from a base pack.
     [[nodiscard]] bool readWithLayout(const std::string &assetId,

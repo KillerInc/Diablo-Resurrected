@@ -1,11 +1,14 @@
 #include "asset_provider.hpp"
 
 #include <filesystem>
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <utility>
+#include <unordered_set>
 
 namespace reincarnated {
 
@@ -151,6 +154,44 @@ void AssetStore::mount(std::unique_ptr<AssetProvider> provider)
         providers_.push_back(std::move(provider));
 }
 
+std::vector<std::string> LooseFileAssetProvider::list(const std::string &prefix) const
+{
+    std::string directory = prefix;
+    if (!directory.empty() && directory.back() == '/') directory.pop_back();
+    if (!IsSafeAssetId(directory)) return {};
+    const auto base = std::filesystem::u8path(root_.empty() ? "." : root_);
+    std::error_code error;
+    std::filesystem::recursive_directory_iterator it(base / std::filesystem::u8path(directory),
+        std::filesystem::directory_options::skip_permission_denied, error), end;
+    std::vector<std::string> result;
+    while (!error && it != end) {
+        if (it->is_regular_file(error)) {
+            const auto id = it->path().lexically_relative(base).generic_string();
+            if (IsSafeAssetId(id)) result.push_back(id);
+        }
+        it.increment(error);
+    }
+    return result;
+}
+
+std::vector<std::string> AssetStore::list(const std::string &prefix) const
+{
+    std::string directory = prefix;
+    if (!directory.empty() && directory.back() == '/') directory.pop_back();
+    if (!IsSafeAssetId(directory)) return {};
+    directory += '/';
+    std::unordered_set<std::string> seen;
+    std::vector<std::string> result;
+    for (auto it = providers_.rbegin(); it != providers_.rend(); ++it) {
+        for (const auto &id : (*it)->list(directory)) {
+            if (!IsSafeAssetId(id) || id.compare(0, directory.size(), directory) != 0) continue;
+            if (seen.insert(LayoutKey(id)).second) result.push_back(id);
+        }
+    }
+    std::sort(result.begin(), result.end());
+    return result;
+}
+
 void AssetStore::mountFallback(std::unique_ptr<AssetProvider> provider)
 {
     if (provider != nullptr)
@@ -204,6 +245,8 @@ bool AssetStore::readWithLayout(const std::string &assetId,
 
 const AssetStore::LayoutRows &AssetStore::layoutRows(const AssetProvider &provider) const
 {
+    static std::mutex tableMutex;
+    const std::lock_guard<std::mutex> lock(tableMutex);
     auto result = layoutTables_.try_emplace(&provider);
     if (result.second) {
         AssetBytes table;

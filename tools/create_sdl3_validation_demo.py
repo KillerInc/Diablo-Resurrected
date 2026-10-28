@@ -43,6 +43,7 @@ def main():
     (args.out / 'diablo.ini').write_text(
         '[Graphics]\nFullscreen=0\nUpscale=1\nFit to Screen=0\n'
         'Width=768\nHeight=480\nHardware Cursor=0\n'
+        '[Game]\nPause Game When Window Loses Focus=0\n'
         '[Diablo]\nIntro=0\n', encoding='utf-8')
     if args.gameplay_hd:
         for source in fixture.iterdir():

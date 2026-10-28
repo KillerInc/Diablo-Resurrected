@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cstring>
 #include <sstream>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 #include <SDL3/SDL_surface.h>
@@ -41,8 +42,11 @@ bool inWorld, ready, suppressed;
 int scale = 1, offsetX;
 SDL_Rect clip;
 
-struct CachedSheet { SheetImage image; uint64_t used = 0; };
+struct CachedSheet { SheetImage image; uint64_t used = 0; bool pinned = false; };
 std::unordered_map<std::string, CachedSheet> sheets;
+std::mutex sheetMutex;
+std::string preloadedPlayerClass;
+size_t pinnedSheetBytes = 0;
 std::unordered_map<uint32_t, uint8_t> nearestColors;
 std::array<SDL_Color, 256> matchingPalette {};
 size_t sheetBytes = 0;
@@ -68,34 +72,58 @@ void WarnProcessMemory(const std::string &source)
     WarnMemory("process_private_commit", ProcessPrivateMemoryBytes(), target, processWarningFlags, source);
 }
 
-CachedSheet *LoadSheet(const SheetSource &source)
+CachedSheet *LoadSheet(const SheetSource &source, bool pin = false)
 {
+    std::unique_lock<std::mutex> lock(sheetMutex);
     const std::string key = source.path + ":" + std::to_string(source.columns) + ":" + std::to_string(source.rows) + ":" + std::to_string(source.width);
     auto found = sheets.find(key);
-    if (found != sheets.end()) { found->second.used = ++sheetClock; return &found->second; }
+    if (found != sheets.end()) {
+        if (pin && !found->second.pinned) { found->second.pinned = true; pinnedSheetBytes += found->second.image.rgba.size(); }
+        found->second.used = ++sheetClock; return &found->second;
+    }
+    // Independent PNG decoders run concurrently during the loading screen.
+    // MPQ/provenance discovery has already finished on the loading thread.
+    lock.unlock();
     CachedSheet entry;
+    entry.pinned = pin;
     AssetBytes bytes, sidecar;
+    bool decoded = false;
     if (GetHdAssetStore().readWithLayout(source.path, bytes, sidecar)) {
-        WarnProcessMemory(source.path);
+        { const std::lock_guard<std::mutex> memoryLock(sheetMutex); WarnProcessMemory(source.path); }
         SheetLayout layout;
         const bool validLayout = sidecar.empty() || ParseSheetLayout(sidecar, layout);
-        if (validLayout && DecodeSheetPng(bytes, source, entry.image, sidecar.empty() ? nullptr : &layout)) {
-            const size_t added = entry.image.rgba.size();
-            // Compare using subtraction so even extreme targets cannot wrap.
-            while (added > SheetBudget() || sheetBytes > SheetBudget() - added) {
-                auto victim = sheets.end();
-                for (auto it = sheets.begin(); it != sheets.end(); ++it)
-                    if (!it->second.image.rgba.empty() && (victim == sheets.end() || it->second.used < victim->second.used)) victim = it;
-                if (victim == sheets.end()) break;
-                sheetBytes -= victim->second.image.rgba.size();
-                sheets.erase(victim);
-            }
-            sheetBytes += entry.image.rgba.size();
-            WarnMemory("sheet_cache", sheetBytes, SheetBudget(), cacheWarningFlags, source.path);
-            WarnProcessMemory(source.path);
-            devilution::Log("Loaded HD sheet: {} ({}x{}, {} directions, {} frames, {}x retained density)", source.path,
-                entry.image.width, entry.image.height, source.columns, source.rows, entry.image.density);
-        } else devilution::Log("HD sheet layout/decode rejected; preserving Classic fallback: {}", source.path);
+        decoded = validLayout && DecodeSheetPng(bytes, source, entry.image, sidecar.empty() ? nullptr : &layout);
+        if (!decoded) devilution::Log("HD sheet layout/decode rejected; preserving Classic fallback: {}", source.path);
+    }
+    lock.lock();
+    // A concurrent request may have completed the same key first.
+    found = sheets.find(key);
+    if (found != sheets.end()) {
+        if (pin && !found->second.pinned) { found->second.pinned = true; pinnedSheetBytes += found->second.image.rgba.size(); }
+        found->second.used = ++sheetClock; return &found->second;
+    }
+    if (decoded) {
+        const size_t added = entry.image.rgba.size();
+        // Hero sheets are session-pinned. Leave at least 512 MiB for scene
+        // sprites when the requested hero set exceeds the ordinary LRU target.
+        const size_t pinnedAfter = pinnedSheetBytes + (pin ? added : 0);
+        const size_t available = SheetBudget() > pinnedAfter ? SheetBudget() - pinnedAfter : 0;
+        const size_t budget = pinnedAfter ? std::max(size_t(512 * MemoryMiB), available) : SheetBudget();
+        const size_t incoming = pin ? 0 : added;
+        while (incoming > budget || sheetBytes - pinnedSheetBytes > budget - incoming) {
+            auto victim = sheets.end();
+            for (auto it = sheets.begin(); it != sheets.end(); ++it)
+                if (!it->second.pinned && !it->second.image.rgba.empty() && (victim == sheets.end() || it->second.used < victim->second.used)) victim = it;
+            if (victim == sheets.end()) break;
+            sheetBytes -= victim->second.image.rgba.size();
+            sheets.erase(victim);
+        }
+        sheetBytes += added;
+        if (pin) pinnedSheetBytes += added;
+        WarnMemory("sheet_cache", sheetBytes, SheetBudget(), cacheWarningFlags, source.path);
+        WarnProcessMemory(source.path);
+        devilution::Log("Loaded HD sheet: {} ({}x{}, {} directions, {} frames, {}x retained density)", source.path,
+            entry.image.width, entry.image.height, source.columns, source.rows, entry.image.density);
     }
     entry.used = ++sheetClock;
     return &sheets.emplace(key, std::move(entry)).first->second;
@@ -422,11 +450,46 @@ SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
     return composed.get();
 }
 void PresentHdOverlay(SDL_Renderer *) {}
+bool BeginHdPlayerPreload(const std::string &classPath)
+{
+    const std::lock_guard<std::mutex> lock(sheetMutex);
+    if (preloadedPlayerClass == classPath) return false;
+    for (auto it = sheets.begin(); it != sheets.end();) {
+        if (it->second.pinned) { sheetBytes -= it->second.image.rgba.size(); it = sheets.erase(it); }
+        else ++it;
+    }
+    pinnedSheetBytes = 0;
+    preloadedPlayerClass = classPath;
+    return true;
+}
+bool PreloadHdPlayerSheet(const SheetSource &source) { return !LoadSheet(source, true)->image.rgba.empty(); }
+HdPlayerCacheStats GetHdPlayerCacheStats()
+{
+    const std::lock_guard<std::mutex> lock(sheetMutex);
+    size_t count = 0;
+    for (const auto &entry : sheets) if (entry.second.pinned && !entry.second.image.rgba.empty()) ++count;
+    return {count, pinnedSheetBytes};
+}
+void ReleaseHdPlayerSheets()
+{
+    {
+        const std::lock_guard<std::mutex> lock(sheetMutex);
+        preloadedPlayerClass.clear();
+        for (auto &entry : sheets) entry.second.pinned = false;
+        pinnedSheetBytes = 0;
+    }
+    ResetHdAssets();
+}
 void ResetHdAssets()
 {
+    const std::lock_guard<std::mutex> lock(sheetMutex);
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;
-    sheets.clear(); sheetBytes = 0; nearestColors.clear();
+    for (auto it = sheets.begin(); it != sheets.end();) {
+        if (!it->second.pinned) { sheetBytes -= it->second.image.rgba.size(); it = sheets.erase(it); }
+        else ++it;
+    }
+    nearestColors.clear();
     cacheWarningFlags = 0; processWarningFlags = 0;
 }
 }

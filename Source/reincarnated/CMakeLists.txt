@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(diablo_reincarnated_renderer_foundation LANGUAGES CXX)
+find_package(Threads REQUIRED)
 
 add_library(reincarnated_renderer_foundation STATIC renderer_switch.cpp sprite_layout.cpp asset_provider.cpp)
+target_link_libraries(reincarnated_renderer_foundation PUBLIC Threads::Threads)
 target_include_directories(reincarnated_renderer_foundation PUBLIC .)
 target_compile_features(reincarnated_renderer_foundation PUBLIC cxx_std_17)
 

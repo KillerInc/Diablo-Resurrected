@@ -25,6 +25,12 @@ bool QueueHdTile(int dungeonType, unsigned pieceId,
 void PresentHdOverlay(SDL_Renderer *renderer);
 void ResetHdAssets();
 #ifdef USE_SDL3
+struct SheetSource;
+struct HdPlayerCacheStats { size_t sheets; size_t bytes; };
+bool BeginHdPlayerPreload(const std::string &classPath);
+bool PreloadHdPlayerSheet(const SheetSource &source);
+HdPlayerCacheStats GetHdPlayerCacheStats();
+void ReleaseHdPlayerSheets();
 void EndHdWorldFrame();
 void SaveHdCursorBackground(int x, int y, int width, int height);
 void RestoreHdCursorBackground();

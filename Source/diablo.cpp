@@ -200,6 +200,9 @@ void StartGame(interface_mode uMsg)
 
 void FreeGame()
 {
+#ifdef USE_SDL3
+    reincarnated::ReleaseHdPlayerSheets();
+#endif
 	FreeMonsterHealthBar();
 	FreeXPBar();
 	FreeControlPan();

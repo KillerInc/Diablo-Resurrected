@@ -100,8 +100,10 @@ devilution::OwnedClxSpriteListOrSheet Sprites()
 class MemoryProvider final : public reincarnated::AssetProvider {
     std::vector<uint8_t> bytes = Png();
 public:
+    mutable unsigned imageReads = 0;
     bool read(const std::string &id, reincarnated::AssetBytes &out) const override {
         if (id != "hd/plrgfx/warrior/wln/wlnst.png") return false;
+        ++imageReads;
         out = bytes; return true;
     }
 };
@@ -221,7 +223,25 @@ int main(int argc, char **argv)
         PalSurface=pal.get(); Check(SDL_SetSurfacePalette(PalSurface,Palette.get()));
         SDL_FillSurfaceRect(PalSurface,nullptr,0);
         Surface out(PalSurface);
-        GetHdAssetStore().mount(std::make_unique<MemoryProvider>());
+        auto memoryProvider = std::make_unique<MemoryProvider>();
+        auto *memorySource = memoryProvider.get();
+        GetHdAssetStore().mount(std::move(memoryProvider));
+        Check(BeginHdPlayerPreload("warrior"));
+        Check(!BeginHdPlayerPreload("warrior"));
+        Check(PreloadHdPlayerSheet(*source));
+        const auto pinned = GetHdPlayerCacheStats();
+        Check(pinned.sheets == 1 && pinned.bytes != 0);
+        ResetHdAssets();
+        Check(GetHdPlayerCacheStats().bytes == pinned.bytes);
+        Check(PreloadHdPlayerSheet(*source) && memorySource->imageReads == 1);
+        Check(BeginHdPlayerPreload("rogue"));
+        Check(GetHdPlayerCacheStats().sheets == 0);
+        Check(PreloadHdPlayerSheet(*source));
+        ReleaseHdPlayerSheets();
+        Check(GetHdPlayerCacheStats().bytes == 0);
+        Check(BeginHdPlayerPreload("warrior"));
+        Check(PreloadHdPlayerSheet(*source) && memorySource->imageReads == 3);
+        ReleaseHdPlayerSheets();
         GetRendererSwitch().setMode(RenderMode::HighDefinition);
         gbRunGame=true;
         BeginHdWorldFrame(2,0,0,8,8);

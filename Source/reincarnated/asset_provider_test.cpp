@@ -1,6 +1,7 @@
 #include "asset_provider.hpp"
 
 #include <cassert>
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -8,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <thread>
 
 using namespace reincarnated;
 namespace fs = std::filesystem;
@@ -94,6 +96,10 @@ int main()
     store.mountLoose(low.string());
     store.mountLoose(high.string());
     assert(store.providerCount() == 3);
+    const auto listed = store.list("hd/players/");
+    assert(std::count(listed.begin(), listed.end(), id) == 1);
+    assert(store.list("hd/../players").empty());
+    assert(store.list("hd/monsters").empty());
     AssetBytes value;
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "high");
@@ -139,6 +145,22 @@ int main()
     }
     assert(table->tableReads == 1);
     assert(table->individualLayoutReads == 0);
+
+    AssetStore parallel;
+    auto parallelProvider = std::make_unique<TableProvider>();
+    auto *parallelSource = parallelProvider.get();
+    parallelSource->csv = "path,layout\nplayers/0.png,D1R_SHEET_V1 8 96 160\n";
+    parallel.mount(std::move(parallelProvider));
+    std::vector<std::thread> readers;
+    for (int i = 0; i < 8; ++i) readers.emplace_back([&] {
+        for (int n = 0; n < 100; ++n) {
+            AssetBytes image, layout;
+            assert(parallel.readWithLayout(id, image, layout));
+            assert(std::string(layout.begin(), layout.end()) == "D1R_SHEET_V1 8 96 160");
+        }
+    });
+    for (auto &reader : readers) reader.join();
+    assert(parallelSource->tableReads == 1 && parallelSource->individualLayoutReads == 0);
 
     AssetStore missingTable;
     auto missing = std::make_unique<TableProvider>();

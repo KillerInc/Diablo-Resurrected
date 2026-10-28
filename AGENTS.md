@@ -6,3 +6,5 @@
 - Preserve installed game data, sheets, preferences and saves. Back up an installed executable before replacing it with a tested build.
 
 - Since 0.4.3-pre, `HD/layouts.csv` is the only runtime layout source. It is cached until process exit; F10 does not reload it. Do not install individual `.layout` files into the game HD tree. Update the CSV atomically using `tools/hd_layouts.py` helpers and verify PNG hashes/anchors. Offline render outputs and private backups may retain sidecars. Legacy install scripts must be adapted before reuse.
+
+- Since 0.4.4-pre, initial SDL3 save/new-game loading preloads and session-pins all installed sheets for the selected sprite class. Preserve pins across F10/level/display resets and release them on game exit; keep MPQ discovery serial and PNG workers bounded. Validation must check resident count/bytes, no warm player redecodes, reference-save outcomes, and current PNG/CSV hashes.

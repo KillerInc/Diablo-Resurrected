@@ -8,6 +8,10 @@
 #include <cstdint>
 
 #ifdef USE_SDL3
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include "utils/sdl_thread.h"
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_timer.h>
 #else
@@ -58,6 +62,9 @@
 #include "utils/log.hpp"
 #include "utils/str_cat.hpp"
 #include "utils/utf8.hpp"
+#ifdef USE_SDL3
+#include "reincarnated/hd_renderer.hpp"
+#endif
 
 namespace devilution {
 
@@ -2169,6 +2176,90 @@ void LoadPlrGFX(Player &player, player_graphic graphic)
 		ClxApplyTrans(*animationData.sprites, classTRN->data());
 	}
 }
+
+#ifdef USE_SDL3
+void PreloadPlayerHdSprites(const Player &player, void (*progress)(size_t, size_t))
+{
+    if (HeadlessMode) return;
+    const HeroClass cls = GetPlayerSpriteClass(player._pClass);
+    const auto &data = GetPlayerSpriteDataForClass(cls);
+    if (!reincarnated::BeginHdPlayerPreload(data.classPath)) return;
+    const uint64_t started = SDL_GetTicks();
+    const std::string prefix = "hd/plrgfx/" + data.classPath + "/";
+    const auto files = reincarnated::GetHdAssetStore().list(prefix);
+    size_t skipped = 0;
+    std::vector<reincarnated::SheetSource> jobs;
+    for (size_t i = 0; i < files.size(); ++i) {
+        const auto &id = files[i];
+        const auto slash = id.find_last_of('/');
+        const std::string name = id.substr(slash + 1);
+        if (name.size() == 9 && name.substr(5) == ".png" && name[0] == data.classChar
+            && std::find(ArmourChar.begin(), ArmourChar.end(), name[1]) != ArmourChar.end()) {
+            const auto weapon = std::find(WepChar.begin(), WepChar.end(), name[2]);
+            std::optional<player_graphic> graphic;
+            const auto action = name.substr(3, 2);
+            if (action == "as" || action == "st") graphic = player_graphic::Stand;
+            else if (action == "aw" || action == "wl") graphic = player_graphic::Walk;
+            else if (action == "at") graphic = player_graphic::Attack;
+            else if (action == "ht") graphic = player_graphic::Hit;
+            else if (action == "bl") graphic = player_graphic::Block;
+            else if (action == "dt") graphic = player_graphic::Death;
+            else if (action == "fm") graphic = player_graphic::Fire;
+            else if (action == "lm") graphic = player_graphic::Lightning;
+            else if (action == "qm") graphic = player_graphic::Magic;
+            if (graphic && weapon != WepChar.end()) {
+                std::string original = id.substr(3, id.size() - 7);
+                std::replace(original.begin(), original.end(), '/', '\\');
+                const auto width = GetPlayerSpriteWidth(cls, *graphic, static_cast<PlayerWeaponGraphic>(weapon - WepChar.begin()));
+                auto sprites = LoadCl2ListOrSheetWithStatus(original.c_str(), PointerOrValue<uint16_t> { width });
+                if (sprites.has_value()) {
+                    const ClxSpriteListOrSheet view(*sprites);
+                    const auto list = view.isSheet() ? view.sheet()[0] : view.list();
+                    if (list.numSprites()) {
+                        const auto *source = reincarnated::GetSheetSource(list[0]);
+                        if (source) jobs.push_back(*source);
+                        else ++skipped;
+                    } else ++skipped;
+                } else {
+                    ++skipped;
+                    Log("HD player preload skipped unavailable original: {}", original);
+                }
+            }
+        }
+    }
+    struct Work {
+        const std::vector<reincarnated::SheetSource> &jobs;
+        void (*progress)(size_t, size_t);
+        std::atomic<size_t> next {0}, loaded {0};
+        std::mutex progressMutex;
+        size_t completed = 0;
+    } work {jobs, progress};
+    if (progress) progress(0, jobs.size());
+    const auto decode = [](void *ptr) -> int {
+        auto &work = *static_cast<Work *>(ptr);
+        while (true) {
+            const size_t index = work.next++;
+            if (index >= work.jobs.size()) break;
+            if (reincarnated::PreloadHdPlayerSheet(work.jobs[index])) ++work.loaded;
+            const std::lock_guard<std::mutex> lock(work.progressMutex);
+            ++work.completed;
+            if (work.progress) work.progress(work.completed, work.jobs.size());
+        }
+        return 0;
+    };
+    const size_t workers = std::min<size_t>({4, std::max(1u, std::thread::hardware_concurrency()), jobs.size()});
+    std::vector<SdlThread> threads;
+    threads.reserve(workers ? workers - 1 : 0);
+    for (size_t i = 1; i < workers; ++i) threads.emplace_back(decode, &work);
+    decode(&work);
+    for (auto &thread : threads) thread.join();
+    const size_t loaded = work.loaded;
+    skipped += jobs.size() - loaded;
+    const auto stats = reincarnated::GetHdPlayerCacheStats();
+    Log("HD_PLAYER_PRELOAD class={} loaded={} skipped={} resident={} bytes={} workers={} elapsed_ms={}",
+        data.classPath, loaded, skipped, stats.sheets, stats.bytes, workers, SDL_GetTicks() - started);
+}
+#endif
 
 void InitPlayerGFX(Player &player)
 {
