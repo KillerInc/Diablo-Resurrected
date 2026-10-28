@@ -10,6 +10,7 @@ def install(file,archive):
  audits=json.loads((work/'idle-hold-audit.json').read_text());assert {r['sheet'] for r in audits}==set(records) and all(not r['body_contacts'] for r in audits)
  if plan.get('bow_grip_revision'):assert all(r['max_geometric_grip_centre_error']<.005 and r['minimum_string_inward_metres']>.04 and r['non_left_arm_channel_error']<1e-5 and r['original_art_buffers_preserved'] for r in audits)
  else:assert all(r['max_grip_error_metres']<1e-5 for r in audits)
+ if plan.get('bow_string_clearance_revision'):assert all(r['minimum_string_arm_gap_metres']>=.0015 and r['maximum_string_arm_gap_metres']<=.012 for r in audits)
  for j in plan['jobs']:
   ref=json.loads(Path(j['reference']).read_text());assert len(ref['equipment'])==2 and ref['equipment'][0]['town_role']=='held_bow' and ref['equipment'][1]['town_role']=='back_quiver'
   audit=next(r for r in audits if r['sheet']==j['sheet']);assert audit['bow_sha256']==sha(ref['equipment'][0]['path']) and audit['body_sha256']==sha(j['model'])
@@ -35,8 +36,11 @@ def install(file,archive):
   assert len(updated['sheets'])==len(current['sheets']) and sha(exe)==exe_hash
   receipt={'changed_sheets':sorted(records),'other_custom_sheets_preserved':len(current['sheets'])-2,'custom_sheet_count':len(current['sheets']),'executable_sha256':exe_hash,'archive':str(archive),'hold_angles':plan['bow_hold_angles'],'version':current['version']};updated['bow_idle_revision']=receipt
   if plan.get('bow_grip_revision'):updated['bow_grip_revision']=receipt
+  if plan.get('bow_string_clearance_revision'):
+   receipt['string_arm_gaps']={r['sheet']:[r['minimum_string_arm_gap_metres'],r['maximum_string_arm_gap_metres']] for r in audits};updated['bow_string_clearance_revision']=receipt
   body=json.dumps(updated,indent=2);manifest.write_text(body);(mirror/'install-manifest.json').write_text(body);(archive/'install-manifest.json').write_text(body)
   for name in ['idle-hold-audit.json','preflight-progress.json','pack-validation.json','plan.json']:shutil.copy2(work/name,archive/name)
+  if plan.get('bow_string_clearance_revision'):shutil.copy2(work/'string-clearance.json',archive/'string-clearance.json')
   for p in work.glob('*.glb'):shutil.copy2(p,archive/p.name)
   for p in work.glob('*recipe.json'):shutil.copy2(p,archive/p.name)
   for p in work.glob('*.fit.json'):shutil.copy2(p,archive/p.name)
