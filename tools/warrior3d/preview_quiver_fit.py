@@ -12,10 +12,13 @@ for pos,power,size in [((3,-4,6),400,4),((-3,-1,3),140,3),((0,3,4),110,3)]:
 bpy.ops.object.camera_add(location=target+Vector((3,0,.55)));cam=bpy.context.object;cam.data.type='ORTHO';cam.data.ortho_scale=1.08;cam.rotation_euler=(target-cam.location).to_track_quat('-Z','Y').to_euler();scene.camera=cam
 original_basis=basis.copy()
 spec=next(e for e in r['equipment'] if e.get('town_role')=='back_quiver')
-if spec.get('previous_local_transform'):
+new_data=q.data;old_data=None
+if spec.get('previous_asset_path'):
+ prior=set(bpy.data.objects);bpy.ops.import_scene.gltf(filepath=spec['previous_asset_path']);old_obj=next(o for o in set(bpy.data.objects)-prior if o.type=='MESH');old_data=old_obj.data;old_obj.hide_render=True;original_basis=basis.copy()
+elif spec.get('previous_local_transform'):
  original_basis=Matrix.Translation((0,-rig.data.bones['chest'].length,0))@Matrix(spec['previous_local_transform'])
 elif p['quiver_fit'].get('contour'):
  prior=json.loads((Path(p['work'])/'translation-only-plan.json').read_text());before=json.loads((Path(p['work'])/'translation-only-references/wlbst.json').read_text());spec=next(e for e in before['equipment'] if e.get('town_role')=='back_quiver');M=Matrix(spec['local_transform']);original_basis=Matrix.Translation((0,-rig.data.bones['chest'].length,0))@M;original_basis.translation+=M.to_3x3()@Vector((0,prior['quiver_fit']['selected_inward_metres']/.8,0))
 else:original_basis.translation+=basis.to_3x3()@Vector((0,p['quiver_fit']['selected_inward_metres']/.8,0))
 for label,B in [('before',original_basis),('after',basis)]:
- q.matrix_basis=B.copy();bpy.context.view_layer.update();scene.render.filepath=str(out/(label+'.png'));bpy.ops.render.render(write_still=True)
+ q.data=old_data if label=='before' and old_data is not None else new_data;q.matrix_basis=B.copy();bpy.context.view_layer.update();scene.render.filepath=str(out/(label+'.png'));bpy.ops.render.render(write_still=True)
