@@ -1,7 +1,8 @@
 """Blender --python SCRIPT -- QUIVER_PLAN.json
 Verify the final mount over every source pose. Strap contact is reported
 separately from the pouch, rim, bottom and arrow geometry.
-Explicit minor-back-overlap plans may intersect the pouch; arrows stay protected.
+Explicit minor-back-overlap plans may intersect the pouch. Arrow overlap is
+reported and requires separate endpoint-fit authorization.
 Private triangle-parts.json maps consolidated triangles to original components.
 """
 import bpy,sys,json,hashlib
@@ -28,5 +29,6 @@ for j in p['jobs']:
  reports.append({'sheet':j['sheet'],'model_sha256':hashlib.sha256(Path(j['model']).read_bytes()).hexdigest().upper(),'reference_sha256':hashlib.sha256(Path(j['reference']).read_bytes()).hexdigest().upper(),'quiver_sha256':hashlib.sha256(Path(r['equipment'][-1]['path']).read_bytes()).hexdigest().upper(),'tests':tests});(w/'final-clearance.json').write_text(json.dumps(reports,indent=2));print(j['sheet'],dy,len(contacts),flush=True)
 
 allow=p.get('quiver_fit',{}).get('approved_minor_back_overlap',False)
-assert not allow or 0<p['quiver_fit']['additional_inward_metres']<=.02
-assert len(reports)==9 and all(not r['tests'][-1]['arrow_contacts'] and (allow or not r['tests'][-1]['contacts']) for r in reports), 'Unapproved pouch or arrow intersection'
+limit=.04 if p['quiver_fit'].get('endpoint_fit') else .02
+assert not allow or 0<p['quiver_fit']['additional_inward_metres']<=limit
+assert len(reports)==9 and all((not r['tests'][-1]['arrow_contacts'] or allow and p['quiver_fit'].get('approved_minor_arrow_overlap') and p['quiver_fit'].get('endpoint_fit')) and (allow or not r['tests'][-1]['contacts']) for r in reports), 'Unapproved pouch or arrow intersection'

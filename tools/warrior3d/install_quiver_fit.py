@@ -7,7 +7,7 @@ from build_equipped_sets import sha,fingerprint
 def install(file,archive):
  plan=json.loads(Path(file).read_text());assert plan['equipment_family']=='light-bow' and plan['quiver_fit_revision'];work=Path(plan['work']);report=json.loads((work/'pack-validation.json').read_text());records=report['sheets'];assert set(records)=={'wlb'+a for a in ['as','aw','at','ht','st','wl','fm','lm','qm']} and report['sheet_count']==9
  checks=json.loads((work/'preflight-progress.json').read_text());assert len(checks)==9 and all(r['safe'] for r in checks)
- final=json.loads((work/'final-clearance.json').read_text());assert {r['sheet'] for r in final}==set(records) and all((not r['tests'][-1]['contacts'] or plan['quiver_fit'].get('approved_minor_back_overlap') and 0<plan['quiver_fit']['additional_inward_metres']<=.02) and not r['tests'][-1].get('arrow_contacts',[]) and r['tests'][-1]['outward_metres']==0 for r in final)
+ final=json.loads((work/'final-clearance.json').read_text());assert {r['sheet'] for r in final}==set(records) and all((not r['tests'][-1]['contacts'] or plan['quiver_fit'].get('approved_minor_back_overlap') and 0<plan['quiver_fit']['additional_inward_metres']<=(.04 if plan['quiver_fit'].get('endpoint_fit') else .02)) and (not r['tests'][-1].get('arrow_contacts',[]) or plan['quiver_fit'].get('approved_minor_arrow_overlap') and plan['quiver_fit'].get('endpoint_fit')) and r['tests'][-1]['outward_metres']==0 for r in final)
  for j in plan['jobs']:
   ref=json.loads(Path(j['reference']).read_text());q=[e for e in ref['equipment'] if e.get('town_role')=='back_quiver'];assert len(q)==1 and q[0]['bone']=='chest' and q[0]['strap_side_inward'] and abs(q[0]['quiver_inward_revision_metres']-plan['quiver_fit']['selected_inward_metres'])<1e-9
   audit=next(a for a in final if a['sheet']==j['sheet']);assert audit['model_sha256']==sha(j['model']) and audit['reference_sha256']==sha(j['reference']) and audit['quiver_sha256']==sha(q[0]['path'])
@@ -44,6 +44,7 @@ def install(file,archive):
    for e in ref['equipment']:e['path']=str(archive/'Equipment'/Path(e['path']).name)
    (archive/'References'/(j['sheet']+'.json')).write_text(json.dumps(ref,indent=2))
   if plan['quiver_fit'].get('contour'):shutil.copy2(work/'quiver-contour-search.json',archive/'quiver-contour-search.json')
+  if (work/'endpoint-fit.json').exists():shutil.copy2(work/'endpoint-fit.json',archive/'endpoint-fit.json')
   for p in work.glob('*recipe.json'):shutil.copy2(p,archive/p.name)
   for p in work.glob('*.fit.json'):shutil.copy2(p,archive/p.name)
   shutil.copytree(work/'review',archive/'Review');(archive/'install-receipt.json').write_text(json.dumps(receipt,indent=2));(work/'install-receipt.json').write_text(json.dumps(receipt,indent=2))
