@@ -71,7 +71,7 @@ Asset *LoadAsset(const std::string &name)
     AssetBytes layoutBytes;
     // The PNG and optional layout must originate in the same provider (folder
     // or future archive) to avoid mixing an override with outdated metadata.
-    if (GetHdAssetStore().readWithSidecar(name, imageBytes, layoutBytes)) {
+    if (GetHdAssetStore().readWithLayout(name, imageBytes, layoutBytes)) {
         SDL_Surface *surface = nullptr;
 #ifdef USE_SDL3
         SDL_IOStream *stream = SDL_IOFromConstMem(imageBytes.data(), imageBytes.size());

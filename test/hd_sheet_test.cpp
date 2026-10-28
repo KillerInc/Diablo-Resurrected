@@ -77,8 +77,8 @@ class LargeProvider final : public reincarnated::AssetProvider {
 public:
     bool read(const std::string &id, reincarnated::AssetBytes &out) const override {
         if (id == "hd/plrgfx/warrior/wln/wlnst.png") { out = bytes; return true; }
-        if (id == "hd/plrgfx/warrior/wln/wlnst.png.layout") {
-            const std::string text = "D1R_SHEET_V1 1 2 3";
+        if (id == "hd/layouts.csv") {
+            const std::string text = "path,layout\nplrgfx/warrior/wln/wlnst.png,D1R_SHEET_V1 1 2 3\n";
             out.assign(text.begin(), text.end()); return true;
         }
         return false;
@@ -111,7 +111,7 @@ public:
     explicit CanvasProvider(std::string text) : layout(std::move(text)) {}
     bool read(const std::string &id, reincarnated::AssetBytes &out) const override {
         if (id == "hd/plrgfx/warrior/wln/wlnst.png") { out = Png(); return true; }
-        if (id == "hd/plrgfx/warrior/wln/wlnst.png.layout") { out.assign(layout.begin(),layout.end()); return true; }
+        if (id == "hd/layouts.csv") { const std::string csv="path,layout\nplrgfx/warrior/wln/wlnst.png,"+layout+"\n";out.assign(csv.begin(),csv.end()); return true; }
         return false;
     }
 };

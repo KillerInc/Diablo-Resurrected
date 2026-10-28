@@ -4,6 +4,8 @@ Install the closer quiver mount in nine bow sheets; preserve other art and execu
 import copy,json,shutil,sys
 from pathlib import Path
 from build_equipped_sets import sha,fingerprint
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from hd_layouts import read_table,write_table
 def install(file,archive):
  plan=json.loads(Path(file).read_text());assert plan['equipment_family']=='light-bow' and plan['quiver_fit_revision'];work=Path(plan['work']);report=json.loads((work/'pack-validation.json').read_text());records=report['sheets'];assert set(records)=={'wlb'+a for a in ['as','aw','at','ht','st','wl','fm','lm','qm']} and report['sheet_count']==9
  checks=json.loads((work/'preflight-progress.json').read_text());assert len(checks)==9 and all(r['safe'] for r in checks)
@@ -15,24 +17,29 @@ def install(file,archive):
   if plan.get('quiver_arrow_wall_revision'):assert wall['quiver_sha256']==sha(q[0]['path'])
   audit=next(a for a in final if a['sheet']==j['sheet']);assert audit['model_sha256']==sha(j['model']) and audit['reference_sha256']==sha(j['reference']) and audit['quiver_sha256']==sha(q[0]['path'])
   mark=json.loads((Path(j['root'])/'completed.json').read_text());assert mark['fingerprint']==fingerprint(j)
- manifest=Path(plan['previous'])/'paladin-vanilla-dimensions/install-manifest.json';before=manifest.read_bytes();current=json.loads(before);assert current==plan['starting_custom_manifest'];live=Path(plan['game'])/'HD/plrgfx/warrior';mirror=Path(plan['assets'])/'Vanilla NN8 Dimensions';exe=Path(plan['game'])/'Diablo Reincarnated.exe';exe_hash=sha(exe)
+ manifest=Path(plan['previous'])/'paladin-vanilla-dimensions/install-manifest.json';before=manifest.read_bytes();current=json.loads(before);assert current==plan['starting_custom_manifest'];live=Path(plan['game'])/'HD/plrgfx/warrior';mirror=Path(plan['assets'])/'Vanilla NN8 Dimensions';exe=Path(plan['game'])/'Diablo Reincarnated.exe';exe_hash=sha(exe);table=Path(plan['game'])/'HD/layouts.csv';table_before=table.read_bytes();layout_rows=read_table(table)
  for n,r in current['sheets'].items():
   assert sha(live/n[:3]/(n+'.png'))==r['sha256'].upper(),n
-  assert (live/n[:3]/(n+'.png.layout')).read_text().strip()==r['layout'],n
+  assert layout_rows['plrgfx/warrior/'+n[:3]+'/'+n+'.png']==r['layout'],n
  for n,r in records.items():assert sha(r['path'])==r['sha256'] and Path(r['path']+'.layout').read_text().strip()==r['layout']
- archive=Path(archive);assert not archive.exists();archive.mkdir(parents=True);(archive/'ASSET_ATTRIBUTION.txt').write_text('Bow Quiver And Arrow by Egor Surin (stark.egor), CC BY 4.0\nhttps://sketchfab.com/3d-models/bow-quiver-and-arrow-100a1bfeb3f947d6bafe22945d9c754e\nChanges: removed bow, seated six arrows, normalized units and fitted quiver to warrior back. Arrow-wall revisions also remove hidden heads and seat shafts inside the pouch.\n');(archive/'previous-install-manifest.json').write_bytes(before)
+ archive=Path(archive);assert not archive.exists();archive.mkdir(parents=True);(archive/'ASSET_ATTRIBUTION.txt').write_text('Bow Quiver And Arrow by Egor Surin (stark.egor), CC BY 4.0\nhttps://sketchfab.com/3d-models/bow-quiver-and-arrow-100a1bfeb3f947d6bafe22945d9c754e\nChanges: removed bow, seated six arrows, normalized units and fitted quiver to warrior back. Arrow-wall revisions also remove hidden heads and seat shafts inside the pouch.\n');(archive/'previous-install-manifest.json').write_bytes(before);(archive/'previous-layouts.csv').write_bytes(table_before)
  for n,r in records.items():
   for kind,p in [('Final',Path(r['path'])),('previous-game',live/n[:3]/(n+'.png')),('previous-mirror',mirror/(n+'.png'))]:
    dest=archive/kind/n[:3]/p.name;dest.parent.mkdir(parents=True,exist_ok=True)
-   for suffix in ['', '.layout']:shutil.copy2(p.with_name(p.name+suffix),dest.with_name(dest.name+suffix))
+   shutil.copy2(p,dest)
+   if kind=='previous-game':dest.with_name(dest.name+'.layout').write_text(layout_rows['plrgfx/warrior/'+n[:3]+'/'+n+'.png'])
+   else:shutil.copy2(p.with_name(p.name+'.layout'),dest.with_name(dest.name+'.layout'))
  updated=copy.deepcopy(current);changed=[]
  try:
   for n,r in records.items():
    source=archive/'Final'/n[:3]/(n+'.png');changed.append(n)
    for p in [live/n[:3]/source.name,mirror/source.name]:
-    for suffix in ['', '.layout']:shutil.copy2(source.with_name(source.name+suffix),p.with_name(p.name+suffix))
+    shutil.copy2(source,p)
+    if p.parent==mirror:shutil.copy2(source.with_name(source.name+'.layout'),p.with_name(p.name+'.layout'))
+   layout_rows['plrgfx/warrior/'+n[:3]+'/'+n+'.png']=r['layout']
    updated['sheets'][n].update(source=str(source),size=r['size'],layout=r['layout'],sha256=r['sha256'],status='closer chest-mounted six-arrow quiver; approved minor back overlap' if plan['quiver_fit'].get('approved_minor_back_overlap') else 'closer chest-mounted six-arrow quiver; approved pose, grips and effects retained')
-  for n,r in updated['sheets'].items():assert sha(live/n[:3]/(n+'.png'))==r['sha256'].upper() and (live/n[:3]/(n+'.png.layout')).read_text().strip()==r['layout'],n
+  write_table(table,layout_rows);layout_rows=read_table(table);updated['layout_table']={'path':str(table),'sha256':sha(table),'rows':len(layout_rows)}
+  for n,r in updated['sheets'].items():assert sha(live/n[:3]/(n+'.png'))==r['sha256'].upper() and layout_rows['plrgfx/warrior/'+n[:3]+'/'+n+'.png']==r['layout'],n
   assert len(updated['sheets'])==len(current['sheets']) and sha(exe)==exe_hash
   receipt={'version':current['version'],'changed_sheets':sorted(records),'other_custom_sheets_preserved':len(current['sheets'])-9,'custom_sheet_count':len(current['sheets']),'executable_sha256':exe_hash,'archive':str(archive),'bow_town_carry':'approved reference resting hold','quiver':'six arrows, chest attachment, strap side inward','quiver_source_attribution':'Bow Quiver And Arrow by Egor Surin (stark.egor), CC BY 4.0; modified quiver only'};receipt['quiver_fit']=plan['quiver_fit'];updated['bow_quiver_revision']=receipt;updated['quiver_close_fit_revision']=receipt;
   if plan.get('quiver_arrow_wall_revision'):updated['quiver_arrow_wall_revision']=receipt
@@ -64,7 +71,8 @@ def install(file,archive):
   for n in changed:
    for kind,p in [('previous-game',live/n[:3]/(n+'.png')),('previous-mirror',mirror/(n+'.png'))]:
     source=archive/kind/n[:3]/p.name
-    for suffix in ['', '.layout']:shutil.copy2(source.with_name(source.name+suffix),p.with_name(p.name+suffix))
-  manifest.write_bytes(before);(mirror/'install-manifest.json').write_bytes(before);raise
+    shutil.copy2(source,p)
+    if kind=='previous-mirror':shutil.copy2(source.with_name(source.name+'.layout'),p.with_name(p.name+'.layout'))
+  table.write_bytes(table_before);manifest.write_bytes(before);(mirror/'install-manifest.json').write_bytes(before);raise
  print('Installed nine completed bow sheets; 76 other sheets and executable preserved')
 if __name__=='__main__':install(*sys.argv[1:])

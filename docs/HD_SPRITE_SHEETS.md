@@ -10,11 +10,40 @@ Player town/dungeon animations, equipment, armor and class graphics therefore fo
 
 The sheet grid comes from the original file's direction lists and maximum frame count. Column = original direction list, row = original frame. Integer PNG scale is measured against the original sprite width. Cells may be rectangular. Frames draw at their original width with the cell bottom aligned to the classic baseline. Transparent top padding is retained instead of stretching the image to a variable-height frame.
 
-Loose numeric PNG/DDS overrides remain available as the existing fallback when there is no usable named sheet. If no replacement can draw, Classic rasterization still supplies that sprite. Named sheets retain the original direction/frame grid; version 0.4.1 adds an optional named-sheet canvas sidecar described below.
+Loose numeric PNG/DDS overrides remain available as the existing fallback when there is no usable named sheet. If no replacement can draw, Classic rasterization still supplies that sprite. Named sheets retain the original direction/frame grid; version 0.4.1 adds canvas metadata and version 0.4.3 consolidates it in the CSV described below.
+
+## Consolidated layout table (0.4.3-pre)
+
+The only runtime layout source is `HD/layouts.csv`. Paths are relative to `HD`,
+use forward slashes, and are matched without ASCII case sensitivity:
+
+```csv
+path,layout
+plrgfx/warrior/wln/wlnst.png,D1R_SHEET_V1 8 48 96
+```
+
+The `layout` field contains the same version, density and anchors as the former
+individual files. It also accepts the existing four-number layout for numeric
+image overrides. Normal CSV quoting, UTF-8/BOM and CRLF/LF are supported.
+Duplicate paths, unsafe paths or malformed CSV invalidate the table. Missing
+or invalid metadata uses the existing default alignment/Classic fallback;
+individual `.layout` files are never consulted.
+
+Each asset provider loads its table on first use and keeps every row in memory
+until the process exits. F10 and image-cache eviction do not remove or reload
+it. Restart the game after editing the CSV. An image only uses metadata from its
+own provider, so an overriding image cannot inherit a lower pack's anchors.
+
+`python tools/hd_layouts.py INPUT_HD OUTPUT_CSV` collects offline render sidecars
+into the table without modifying artwork. Runtime installation uses just the
+CSV; private render outputs and backups may retain per-image metadata. New
+sprite installs must update this table, using `read_table`/`write_table` in that
+module. The current warrior installer does so atomically and backs up the old
+CSV for rollback.
 
 ## Expanded HD canvases and fixed anchors (0.4.1-pre)
 
-An original-named PNG may have a UTF-8/ASCII sidecar at `NAME.png.layout`:
+An original-named PNG uses the following value in its CSV `layout` field:
 
 ```text
 D1R_SHEET_V1 8 96 160
@@ -34,7 +63,7 @@ and bottom baseline. Original movement offsets, animation frames, damage/range,
 world traversal, palette/light handling and the indexed buffer are unchanged.
 The full larger rectangle participates in world rendering and the existing
 foreground/UI/viewport clipping. Sheets without metadata keep their prior width
-and bottom alignment. PNG and sidecar resolve from the same asset provider;
+and bottom alignment. PNG and CSV row resolve from the same asset provider;
 malformed metadata or out-of-range anchors preserve the Classic fallback.
 
 Density is explicitly 1, 2, 4, 8 or 16, independent of canvas dimensions. Source

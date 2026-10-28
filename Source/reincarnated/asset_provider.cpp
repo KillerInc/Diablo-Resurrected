@@ -1,8 +1,10 @@
 #include "asset_provider.hpp"
 
 #include <filesystem>
+#include <cstdio>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <utility>
 
 namespace reincarnated {
@@ -11,6 +13,74 @@ namespace {
 // Keep the existing bound on non-PNG resources. PNG sizes are diagnosed by
 // the sheet loader instead of being rejected by an arbitrary byte budget.
 constexpr std::uintmax_t MaxLooseAssetBytes = 256ULL * 1024ULL * 1024ULL;
+
+std::string LayoutKey(std::string key)
+{
+    for (char &c : key) {
+        if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+    }
+    return key;
+}
+
+// Two CSV fields per physical line. Quoted paths, escaped quotes, UTF-8 BOM,
+// CRLF and LF are supported; layout values never need embedded newlines.
+bool CsvFields(const std::string &line, std::vector<std::string> &fields)
+{
+    size_t pos = 0;
+    while (true) {
+        std::string field;
+        if (pos < line.size() && line[pos] == '"') {
+            ++pos;
+            bool closed = false;
+            while (pos < line.size()) {
+                const char c = line[pos++];
+                if (c != '"') { field += c; continue; }
+                if (pos < line.size() && line[pos] == '"') {
+                    field += '"'; ++pos;
+                } else { closed = true; break; }
+            }
+            if (!closed || (pos < line.size() && line[pos] != ',')) return false;
+        } else {
+            while (pos < line.size() && line[pos] != ',') {
+                if (line[pos] == '"') return false;
+                field += line[pos++];
+            }
+        }
+        fields.push_back(std::move(field));
+        if (pos == line.size()) return fields.size() == 2;
+        if (fields.size() >= 2) return false;
+        ++pos;
+    }
+}
+
+bool ParseLayoutTable(const AssetBytes &bytes,
+    std::unordered_map<std::string, AssetBytes> &rows)
+{
+    std::string text(bytes.begin(), bytes.end());
+    if (text.compare(0, 3, "\xEF\xBB\xBF") == 0) text.erase(0, 3);
+    std::istringstream input(text);
+    std::string line;
+    bool header = false;
+    while (std::getline(input, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+        std::vector<std::string> fields;
+        if (!CsvFields(line, fields)) return false;
+        if (!header) {
+            if (fields[0] != "path" || fields[1] != "layout") return false;
+            header = true;
+            continue;
+        }
+        if (!IsSafeAssetId(fields[0]) || fields[1].empty() || fields[1].size() > 256)
+            return false;
+        for (unsigned char c : fields[1]) {
+            if (c < 32 && c != '\t') return false;
+        }
+        if (!rows.emplace(LayoutKey(fields[0]),
+                AssetBytes(fields[1].begin(), fields[1].end())).second) return false;
+    }
+    return header;
+}
 }
 
 bool IsSafeAssetId(const std::string &id) noexcept
@@ -105,12 +175,12 @@ bool AssetStore::read(const std::string &assetId, AssetBytes &bytes) const
     return false;
 }
 
-bool AssetStore::readWithSidecar(const std::string &assetId,
+bool AssetStore::readWithLayout(const std::string &assetId,
     AssetBytes &bytes, AssetBytes &sidecar) const
 {
     bytes.clear();
     sidecar.clear();
-    if (!IsSafeAssetId(assetId) || !IsSafeAssetId(assetId + ".layout"))
+    if (!IsSafeAssetId(assetId))
         return false;
 
     for (auto it = providers_.rbegin(); it != providers_.rend(); ++it) {
@@ -118,11 +188,35 @@ bool AssetStore::readWithSidecar(const std::string &assetId,
             bytes.clear();
             continue;
         }
-        if (!(*it)->read(assetId + ".layout", sidecar))
-            sidecar.clear();
+        const std::string key = LayoutKey(assetId);
+        if (key.compare(0, 3, "hd/") == 0) {
+            const auto &rows = layoutRows(**it);
+            const auto row = rows.find(key.substr(3));
+            if (row != rows.end()) {
+                sidecar = row->second;
+                return true;
+            }
+        }
         return true;
     }
     return false;
+}
+
+const AssetStore::LayoutRows &AssetStore::layoutRows(const AssetProvider &provider) const
+{
+    auto result = layoutTables_.try_emplace(&provider);
+    if (result.second) {
+        AssetBytes table;
+        if (provider.read("hd/layouts.csv", table)) {
+            if (!ParseLayoutTable(table, result.first->second)) {
+                result.first->second.clear();
+                std::fputs("HD_LAYOUT_CSV: invalid hd/layouts.csv; using default alignment until restart\n", stderr);
+            } else {
+                std::fprintf(stderr, "HD_LAYOUT_CSV: loaded rows=%zu cache=process-lifetime\n", result.first->second.size());
+            }
+        }
+    }
+    return result.first->second;
 }
 
 } // namespace reincarnated

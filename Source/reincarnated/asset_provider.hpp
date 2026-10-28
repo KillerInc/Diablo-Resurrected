@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace reincarnated {
@@ -41,13 +42,18 @@ public:
     void mountLoose(std::string root);
 
     [[nodiscard]] bool read(const std::string &assetId, AssetBytes &bytes) const;
-    // Resolve image + optional metadata from the SAME mounted provider.
+    // Resolve image + optional HD/layouts.csv row from the SAME provider.
     // This avoids mixing an overriding PNG with stale metadata from a base pack.
-    [[nodiscard]] bool readWithSidecar(const std::string &assetId,
+    [[nodiscard]] bool readWithLayout(const std::string &assetId,
         AssetBytes &bytes, AssetBytes &sidecar) const;
     [[nodiscard]] size_t providerCount() const noexcept { return providers_.size(); }
 private:
+    using LayoutRows = std::unordered_map<std::string, AssetBytes>;
+    const LayoutRows &layoutRows(const AssetProvider &provider) const;
     std::vector<std::unique_ptr<AssetProvider>> providers_;
+    // Loaded on first use, including a missing/invalid table. The global HD
+    // store lives until process exit; F10/image-cache resets do not evict this.
+    mutable std::unordered_map<const AssetProvider *, LayoutRows> layoutTables_;
 };
 
 } // namespace reincarnated

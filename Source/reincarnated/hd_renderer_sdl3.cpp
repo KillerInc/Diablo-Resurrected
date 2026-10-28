@@ -75,7 +75,7 @@ CachedSheet *LoadSheet(const SheetSource &source)
     if (found != sheets.end()) { found->second.used = ++sheetClock; return &found->second; }
     CachedSheet entry;
     AssetBytes bytes, sidecar;
-    if (GetHdAssetStore().readWithSidecar(source.path, bytes, sidecar)) {
+    if (GetHdAssetStore().readWithLayout(source.path, bytes, sidecar)) {
         WarnProcessMemory(source.path);
         SheetLayout layout;
         const bool validLayout = sidecar.empty() || ParseSheetLayout(sidecar, layout);
@@ -182,7 +182,7 @@ Asset *Load(const std::string &path)
     if (found != assets.end()) return found->second.surface ? &found->second : nullptr;
     Asset image;
     AssetBytes bytes, sidecar;
-    if (GetHdAssetStore().readWithSidecar(path, bytes, sidecar)) {
+    if (GetHdAssetStore().readWithLayout(path, bytes, sidecar)) {
         if (path.size() >= 4 && path.substr(path.size() - 4) == ".dds") {
             DdsImage decoded;
             if (DecodeDds(bytes, decoded)) {
