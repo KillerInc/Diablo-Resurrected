@@ -2,6 +2,7 @@
 import argparse,io,json,math,struct
 from pathlib import Path
 from PIL import Image,ImageChops,ImageStat
+from gpu_index import read_index
 from hd_layouts import read_table
 from install_layout_table import sha
 
@@ -18,17 +19,18 @@ def validate(pack,hd,custom,proof_names):
     for name in proof_names:proof.update(json.loads((pack/name).read_text()))
     assert len(proof)==255,len(proof)
     assert read_table(pack/'HD/layouts.csv')==read_table(hd/'layouts.csv')
-    files={};total=0;pages_count=0;qualities={}
+    index=pack/'HD/sprites.gpus';records=read_index(index)
+    assert set(records)==set(proof)
+    files={'sprites.gpus':sha(index)};total=0;pages_count=0;qualities={}
     Image.MAX_IMAGE_PIXELS=None
     for rel,record in sorted(proof.items()):
         assert rel.startswith('plrgfx/warrior/') and '..' not in rel
         assert sha(hd/rel)==record['source_sha256'],rel
-        manifest=(pack/'HD'/rel).with_suffix('.gpus');lines=manifest.read_text().splitlines()
+        manifest=(pack/'HD'/rel).with_suffix('.gpus');lines=records[rel]
         magic,density,columns,rows,lw,lh,count=lines[0].split();density,columns,rows,lw,lh,count=map(int,(density,columns,rows,lw,lh,count))
         assert magic=='D1R_GPU_SHEET_V1' and density==4 and (columns,rows)==(record['columns'],record['rows'])
         assert len(lines)==1+count+columns*rows
         assert len(record['frames'])==columns*rows
-        files[manifest.relative_to(pack/'HD').as_posix()]=sha(manifest)
         decoded=None
         for page_index,line in enumerate(lines[1:1+count]):
             name,w,h=line.split();w,h=int(w),int(h);assert Path(name).name==name and w%4==h%4==0 and 0<w<=2048 and 0<h<=2048

@@ -74,4 +74,8 @@ if __name__=='__main__':
     for name in ['hd','custom','log','output','encoder_path']:p.add_argument(name,type=Path)
     p.add_argument('--only',nargs='+')
     p.add_argument('--proof-name',default='gpu-pack-proof.json')
+    p.add_argument('--finalize-index',action='store_true',help='After all workers finish, publish the one runtime index')
     a=p.parse_args();pack(a.hd,a.custom,a.log,a.output,a.encoder_path,a.only,a.proof_name)
+    if a.finalize_index:
+        from gpu_index import consolidate
+        consolidate(a.output/'HD')

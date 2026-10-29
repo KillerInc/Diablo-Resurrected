@@ -22,7 +22,7 @@ int main(){
  auto folder=root/"hd/plrgfx/warrior/test";std::filesystem::create_directories(folder);
  const unsigned char block[]={32,60,158,199,163,80,0,2,174,170,170,170,86,85,85,85,32,60,158,199,163,80,0,2,174,170,170,170,86,85,85,85,32,60,158,199,163,80,0,2,174,170,170,170,86,85,85,85,32,60,158,199,163,80,0,2,174,170,170,170,86,85,85,85};
  {std::ofstream f(folder/"test.p0.bc7",std::ios::binary);uint32_t dimensions[2]={8,8};f.write(reinterpret_cast<char*>(dimensions),8);f.write(reinterpret_cast<const char*>(block),sizeof(block));}
- {std::ofstream f(folder/"test.gpus");f<<"D1R_GPU_SHEET_V1 4 1 1 2 2 1\ntest.p0.bc7 8 8\n0 0 0 8 8 0 0\n";}
+ {std::ofstream f(root/"hd/sprites.gpus");f<<"D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET plrgfx/warrior/test/test.png 1 1 * * * *\ntest.p0.bc7 8 8\n0 0 0 8 8 0 0\n";}
  {std::ofstream f(root/"hd/layouts.csv");f<<"path,layout\nplrgfx/warrior/test/test.png,D1R_SHEET_V1 4 1 2\n";}
  auto *window=SDL_CreateWindow("Synthetic GPU validation",256,256,SDL_WINDOW_HIDDEN);Check(window,"window");
  devilution::gnScreenWidth=128;devilution::gnScreenHeight=128;

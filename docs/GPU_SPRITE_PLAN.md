@@ -1,4 +1,4 @@
-# GPU player sprite renderer (0.4.6-pre)
+# GPU player sprite renderer (0.4.7-pre)
 
 The existing SDL3/Direct3D 12 engine now draws compiled Warrior sprite pages on
 the GPU. This is an incremental renderer migration inside the modified executable,
@@ -75,3 +75,54 @@ owned HLSL into the checked-in DXBC headers using the Windows SDK.
 executable, backs up previous state, preserves all source PNGs/CSV and rolls back
 on failure. Replay proof must include actual GPU draws, complete class residency,
 no warm page uploads, reference-save equality, UI/F10/F11, and native GPU tests.
+
+## Consolidated metadata (0.4.7-pre)
+
+`HD/sprites.gpus` replaces all per-sheet runtime `.gpus` files. The provider
+reads it once, including missing/invalid results, and keeps its lookup table
+until process exit. F10, equipment changes and image-cache resets do not reload
+it. Sparse overlay indexes fall through by sheet ID; the selected index record,
+BC7 pages and CSV anchors always use the same provider. Individual `.gpus`
+files are not queried by the renderer. CPU PNG fallback remains available.
+
+The UTF-8 text format (LF or CRLF) is:
+
+```
+D1R_GPU_INDEX_V1
+DEFAULTS 4 8 96 96
+SHEET plrgfx/warrior/wln/wlnst.png 20 3 * * * *
+```
+
+The four defaults are density, direction count, logical cell width and height.
+A sheet supplies its PNG-relative path, frame count, page count, then those same
+four fields; `*` inherits the corresponding default. Explicit values preserve
+padded cells and other exceptions. The next page-count lines are filename,
+width, height; then direction-count times frame-count lines contain page, x, y,
+width, height, crop-x, crop-y, unchanged from the V1 per-sheet metadata. Page
+names resolve relative to the sheet's directory. Anchors exist only in
+`layouts.csv`. Duplicate IDs, unsafe paths and malformed/truncated records are
+rejected. No image payload is stored in the index.
+
+After all encoding workers complete, run `python tools/gpu_index.py PACK/HD`
+(or use the packer's `--finalize-index` on a serial run). Private authoring packs
+may retain per-sheet intermediates for resuming encodes; validated runtime
+file lists contain only the root index and BC7 pages. Validation expands every
+index record and compares it with the original metadata, frame proofs and page
+hashes without re-encoding. The installer skips identical pages, backs up and
+removes loose per-sheet metadata, and restores it if installation fails.
+
+This reduces runtime metadata file opens and centralizes repeated settings.
+It does not reduce texture allocation or fix unrelated world-rendering hitches.
+
+### 0.4.7 validation
+
+The consolidated index expands exactly to all 255 original sheet records. All
+760 BC7 pages (2,525,855,744 texture bytes), 255 source PNG hashes and the
+85-row anchor table match. All six foundation checks and six installer tests
+pass, including metadata retirement and rollback. The real GPU synthetic test
+passes lighting, transparency, ordering, cursor restoration and native output.
+Two 4,853-frame reference gameplay replays produce the same saved outcome; a
+normal-speed UI replay covers F10/F11 and both renderer modes. Every replay
+loads the 255-record index once, retains all class sheets, and uploads no warm
+player pages. Initial class preload measured 4.736 seconds in the first replay;
+this is a metadata-management change, not a claim of a frame-rate improvement.

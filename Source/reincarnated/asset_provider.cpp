@@ -84,6 +84,67 @@ bool ParseLayoutTable(const AssetBytes &bytes,
     }
     return header;
 }
+
+// Defaults apply only where a sheet field is '*'. Rows and page counts are
+// always explicit. Existing sheet validation still checks all GPU geometry.
+bool ParseGpuTable(const AssetBytes &bytes,
+    std::unordered_map<std::string, AssetBytes> &rows)
+{
+    std::string text(bytes.begin(), bytes.end());
+    text.erase(std::remove(text.begin(), text.end(), '\r'), text.end());
+    std::istringstream input(text);
+    std::string line, magic, extra;
+    if (!std::getline(input, line) || line != "D1R_GPU_INDEX_V1") return false;
+    if (!std::getline(input, line)) return false;
+    std::istringstream defaults(line);
+    unsigned values[4] {};
+    if (!(defaults >> magic >> values[0] >> values[1] >> values[2] >> values[3])
+        || magic != "DEFAULTS" || (defaults >> extra)) return false;
+    for (unsigned value : values) if (!value || value > 16384) return false;
+    while (std::getline(input, line)) {
+        if (line.empty()) continue;
+        std::istringstream header(line);
+        std::string path, fields[4];
+        unsigned count = 0, frames = 0, resolved[4] {};
+        if (!(header >> magic >> path >> frames >> count >> fields[0] >> fields[1] >> fields[2] >> fields[3])
+            || magic != "SHEET" || (header >> extra) || !IsSafeAssetId(path)
+            || path.rfind("plrgfx/", 0) != 0 || path.size() < 4
+            || path.substr(path.size()-4) != ".png" || !frames || frames > 16384 || !count) return false;
+        for (unsigned i = 0; i < 4; ++i) {
+            if (fields[i] == "*") resolved[i] = values[i];
+            else {
+                if (fields[i].find_first_not_of("0123456789") != std::string::npos) return false;
+                std::istringstream number(fields[i]);
+                if (!(number >> resolved[i]) || !resolved[i] || resolved[i] > 16384) return false;
+            }
+        }
+        const uint64_t frameCount = uint64_t(resolved[1]) * frames;
+        if (count > frameCount || frameCount > bytes.size()) return false;
+        std::ostringstream record;
+        record << "D1R_GPU_SHEET_V1 " << resolved[0] << ' ' << resolved[1] << ' '
+            << frames << ' ' << resolved[2] << ' ' << resolved[3] << ' ' << count << '\n';
+        for (uint64_t i = 0; i < count + frameCount; ++i) {
+            if (!std::getline(input, line) || line.empty()) return false;
+            std::istringstream body(line);
+            if (i < count) {
+                std::string name;
+                if (!(body >> name) || !IsSafeAssetId(name) || name.find('/') != std::string::npos) return false;
+            }
+            for (unsigned field = 0; field < (i < count ? 2U : 7U); ++field) {
+                std::string token;
+                unsigned number;
+                if (!(body >> token) || token.find_first_not_of("0123456789") != std::string::npos) return false;
+                std::istringstream value(token);
+                if (!(value >> number)) return false;
+            }
+            if (body >> extra) return false;
+            record << line << '\n';
+        }
+        const auto text = record.str();
+        if (!rows.emplace(LayoutKey("hd/" + path), AssetBytes(text.begin(), text.end())).second) return false;
+    }
+    return !rows.empty();
+}
 }
 
 bool IsSafeAssetId(const std::string &id) noexcept
@@ -232,7 +293,6 @@ bool AssetStore::readWithLayout(const std::string &assetId,
         }
         if (provider) *provider = it->get();
         std::string key = LayoutKey(assetId);
-        if (key.size() > 5 && key.substr(key.size()-5) == ".gpus") key = key.substr(0,key.size()-5) + ".png";
         if (key.compare(0, 3, "hd/") == 0) {
             const auto &rows = layoutRows(**it);
             const auto row = rows.find(key.substr(3));
@@ -263,6 +323,46 @@ const AssetStore::LayoutRows &AssetStore::layoutRows(const AssetProvider &provid
         }
     }
     return result.first->second;
+}
+
+const AssetStore::LayoutRows &AssetStore::gpuRows(const AssetProvider &provider) const
+{
+    static std::mutex tableMutex;
+    const std::lock_guard<std::mutex> lock(tableMutex);
+    auto result = gpuTables_.try_emplace(&provider);
+    if (result.second) {
+        AssetBytes table;
+        if (provider.read("hd/sprites.gpus", table)) {
+            if (!ParseGpuTable(table, result.first->second)) {
+                result.first->second.clear();
+                std::fputs("HD_GPU_INDEX: invalid hd/sprites.gpus; using fallback until restart\n", stderr);
+            } else {
+                std::fprintf(stderr, "HD_GPU_INDEX: loaded sheets=%zu cache=process-lifetime\n", result.first->second.size());
+            }
+        }
+    }
+    return result.first->second;
+}
+
+bool AssetStore::readGpuWithLayout(const std::string &pngId,
+    AssetBytes &bytes, AssetBytes &layout, const AssetProvider **provider) const
+{
+    bytes.clear(); layout.clear();
+    if (provider) *provider = nullptr;
+    if (!IsSafeAssetId(pngId) || pngId.rfind("hd/plrgfx/", 0) != 0) return false;
+    const auto key = LayoutKey(pngId);
+    for (auto it = providers_.rbegin(); it != providers_.rend(); ++it) {
+        const auto &rows = gpuRows(**it);
+        const auto row = rows.find(key);
+        if (row == rows.end()) continue;
+        bytes = row->second;
+        if (provider) *provider = it->get();
+        const auto &anchors = layoutRows(**it);
+        const auto anchor = anchors.find(key.substr(3));
+        if (anchor != anchors.end()) layout = anchor->second;
+        return true;
+    }
+    return false;
 }
 
 } // namespace reincarnated

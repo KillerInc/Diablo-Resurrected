@@ -104,7 +104,7 @@ std::shared_ptr<GpuSheet> LoadGpuPlayerSheet(const SheetSource &source){
     const std::string manifest=source.path.substr(0,source.path.size()-4)+".gpus";
     auto &store=GetHdAssetStore();
     const AssetProvider *provider=nullptr;
-    if(!store.readWithLayout(manifest,bytes,layout,&provider)){sheets.emplace(source.path,nullptr);return {};}
+    if(!store.readGpuWithLayout(source.path,bytes,layout,&provider)){sheets.emplace(source.path,nullptr);return {};}
     auto sheet=std::make_shared<GpuSheet>();sheet->owner=device;
     std::istringstream input(std::string(bytes.begin(),bytes.end()));std::string magic;unsigned pages=0;
     input>>magic>>sheet->density>>sheet->columns>>sheet->rows>>sheet->width>>sheet->height>>pages;

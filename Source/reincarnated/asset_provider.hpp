@@ -50,6 +50,10 @@ public:
     [[nodiscard]] bool readWithLayout(const std::string &assetId,
         AssetBytes &bytes, AssetBytes &sidecar, const AssetProvider **provider = nullptr) const;
     [[nodiscard]] size_t providerCount() const noexcept { return providers_.size(); }
+    // Resolve a PNG's compiled record from the process-lifetime root GPU index.
+    // Records, pages and anchors always belong to the same provider.
+    [[nodiscard]] bool readGpuWithLayout(const std::string &pngId,
+        AssetBytes &bytes, AssetBytes &layout, const AssetProvider **provider = nullptr) const;
 private:
     using LayoutRows = std::unordered_map<std::string, AssetBytes>;
     const LayoutRows &layoutRows(const AssetProvider &provider) const;
@@ -57,6 +61,8 @@ private:
     // Loaded on first use, including a missing/invalid table. The global HD
     // store lives until process exit; F10/image-cache resets do not evict this.
     mutable std::unordered_map<const AssetProvider *, LayoutRows> layoutTables_;
+    const LayoutRows &gpuRows(const AssetProvider &provider) const;
+    mutable std::unordered_map<const AssetProvider *, LayoutRows> gpuTables_;
 };
 
 } // namespace reincarnated

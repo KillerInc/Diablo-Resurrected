@@ -21,12 +21,21 @@ def install(pack,binary,game,manifest,mirror,backup,validation):
             assert name.endswith(('.gpus','.bc7'))
             target=(hd/name).resolve();assert target.is_relative_to(hd)
             source=pack/'HD'/name;assert sha(source)==digest
+            if target.exists() and sha(target)==digest:continue
             if target.exists():
                 saved=backup/'gpu-before'/name;saved.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(target,saved);existed[name]=saved
             target.parent.mkdir(parents=True,exist_ok=True)
             temporary=target.with_name(target.name+'.gpu-new');assert not temporary.exists()
             temporaries.append(temporary);shutil.copy2(source,temporary);os.replace(temporary,target);written.append((name,target))
             assert sha(target)==digest
+        # Retire only loose per-sheet metadata after the consolidated index is verified.
+        if 'sprites.gpus' in assets['files']:
+            for target in sorted((hd/'plrgfx').rglob('*.gpus')):
+                target=target.resolve();assert target.is_relative_to(hd)
+                name=target.relative_to(hd).as_posix()
+                saved=backup/'gpu-before'/name;saved.parent.mkdir(parents=True,exist_ok=True)
+                shutil.copy2(target,saved);existed[name]=saved
+                written.append((name,target));target.unlink()
         install_build(binary,game,manifest,mirror,backup/'renderer',validation)
         assert sha(hd/'layouts.csv')==assets['layout_sha256']
         for name,digest in assets['source_png_hashes'].items():assert sha(hd/name)==digest

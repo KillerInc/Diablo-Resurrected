@@ -13,3 +13,5 @@
 
 - Since 0.4.6-pre, the installed Warrior class has 255 compiled native-4x BC7 GPU sheets. Preserve original PNGs and HD/layouts.csv; GPU frame records carry crop/page coordinates while logical anchors still come from the single cached CSV. Keep pages bound to their metadata provider and resident across F10/levels; release class pages on game exit. Preserve Classic/CPU and virtual-gamepad compatibility. Do not retain full CPU player RGBA when compiled resources are available. Validate actual GPU draws, synthetic native-resolution/lighting/occlusion readback, warm-upload counts, two reference saves, UI and source hashes before installing.
 - Run test audio with D1R_TEST_AUDIO_GAIN=0.5 (tools/run_gpu_replay.ps1 does this). Never reduce the user's normal saved volume settings for test convenience.
+
+- Since 0.4.7-pre, `HD/sprites.gpus` is the sole runtime compiled-sheet index, cached per provider until process exit. Keep shared defaults in the index with explicit per-sheet exceptions; do not restore individual runtime `.gpus` reads. Finalize the index after parallel encoders finish. Preserve BC7 page hashes and back up retired metadata during installation.

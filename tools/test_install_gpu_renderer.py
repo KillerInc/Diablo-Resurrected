@@ -45,5 +45,26 @@ class GpuInstallTest(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertEqual((image.read_bytes(),table.read_bytes()),before)
 
+    def test_consolidation_retires_metadata_and_failure_restores_it(self):
+        for fail in (False,True):
+            with self.subTest(fail=fail), tempfile.TemporaryDirectory() as temp:
+                pack,fixture=self.fixture(Path(temp));binary,game,manifest,mirror,backup,validation,image,table=fixture
+                central=pack/'HD/sprites.gpus';central.write_bytes(b'synthetic central index')
+                digest=sha(central)
+                assets=json.loads((pack/'validated-gpu-pack.json').read_text());assets['files']={'sprites.gpus':digest}
+                (pack/'validated-gpu-pack.json').write_text(json.dumps(assets))
+                proof=json.loads(validation.read_text());proof['gpu_sprites']['pack_file_hashes']=assets['files'];validation.write_text(json.dumps(proof))
+                old=game/'HD/plrgfx/warrior/wln/wlnst.gpus';old.write_bytes(b'old sheet metadata')
+                if fail:
+                    with patch('install_gpu_renderer.install_build',side_effect=OSError('Synthetic failure')):
+                        with self.assertRaises(OSError):install(pack,binary,game,manifest,mirror,backup,validation)
+                    self.assertEqual(old.read_bytes(),b'old sheet metadata')
+                    self.assertFalse((game/'HD/sprites.gpus').exists())
+                else:
+                    install(pack,binary,game,manifest,mirror,backup,validation)
+                    self.assertFalse(old.exists())
+                    self.assertEqual((backup/'gpu-before/plrgfx/warrior/wln/wlnst.gpus').read_bytes(),b'old sheet metadata')
+
+
 
 if __name__=='__main__':unittest.main()

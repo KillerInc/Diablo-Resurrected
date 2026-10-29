@@ -10,6 +10,9 @@ def validate(root,pack,synthetic_log):
         text=(root/(name+'.log')).read_text(errors='replace')
         assert 'GPU_SPRITES_READY' in text and 'GPU_SPRITE_DRAW' in text and 'Test audio master gain: 0.5' in text
         assert text.count('GPU_SHEET_RESIDENT source=hd/plrgfx/warrior/')==assets['sheets']==255
+        diagnostics=(root/(name+'-stderr.log')).read_text(errors='replace')
+        assert diagnostics.count('HD_GPU_INDEX: loaded sheets=255 cache=process-lifetime')==1
+        assert 'HD_GPU_INDEX: invalid' not in diagnostics
         assert not re.search(r'Loaded HD sheet: hd/plrgfx/',text)
         end=re.search(r'HD_PLAYER_PRELOAD[^\n]+',text).end()
         assert 'GPU_SHEET_RESIDENT' not in text[end:]
@@ -21,6 +24,7 @@ def validate(root,pack,synthetic_log):
         assert proof['preload']['bytes']==proof['repeat_preload']['bytes']==proof['ui_preload']['bytes']==0
     proof['gpu_sprites']={'sheets':assets['sheets'],'pages':assets['pages'],'texture_bytes':assets['texture_bytes'],'palette_lookup_bytes':67108864,'cpu_player_rgba_bytes':0,'density':4,'warm_page_uploads':0,'synthetic_native_viewport':True,'test_audio_gain':0.5,'pack_file_hashes':assets['files']}
     proof['checks']['gpu_sprites']=True
+    proof['checks']['gpu_index_process_cache']=True
     (root/'validation.json').write_text(json.dumps(proof,indent=2))
     print('PASS: all Warrior sheets GPU-resident, zero CPU player RGBA, zero warm page uploads, real GPU draws, half-volume test audio and reference-save proof')
     return proof

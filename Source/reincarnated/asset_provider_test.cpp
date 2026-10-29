@@ -30,11 +30,15 @@ private:
 };
 class TableProvider final : public AssetProvider {
 public:
-    std::string csv;
+    std::string csv, gpu;
+    mutable unsigned gpuReads = 0;
     mutable unsigned tableReads = 0;
     mutable unsigned individualLayoutReads = 0;
     bool read(const std::string &id, AssetBytes &bytes) const override
     {
+        if (id == "hd/sprites.gpus") {
+            ++gpuReads; bytes.assign(gpu.begin(), gpu.end()); return !gpu.empty();
+        }
         if (id == "hd/layouts.csv") {
             ++tableReads;
             bytes.assign(csv.begin(), csv.end());
@@ -206,21 +210,44 @@ int main()
     }
 
     {
+        const std::string sheet = "SHEET plrgfx/warrior/test.png 1 1 * * * *\npage.bc7 8 8\n0 0 0 8 8 0 0\n";
+        const std::string index = "D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\n" + sheet;
+        const std::string gpuId = "hd/plrgfx/warrior/test.png";
         AssetStore gpuStore;
-        auto table = std::make_unique<TableProvider>();
-        table->csv = "path,layout\nplayers/0.png,D1R_SHEET_V1 8 48 96\n";
-        // Separate loose synthetic provider includes manifest/pages and one CSV.
-        Write(high / "hd/gpu.gpus", "synthetic gpu manifest");
-        Write(high / "hd/layouts.csv", "path,layout\ngpu.png,D1R_SHEET_V1 8 48 96\n");
-        auto owner=std::make_unique<LooseFileAssetProvider>(high.string());
-        const AssetProvider *expectedOwner=owner.get();gpuStore.mount(std::move(owner));
-        const AssetProvider *actualOwner=nullptr;
-        assert(gpuStore.readWithLayout("hd/gpu.gpus",pairedImage,pairedLayout,&actualOwner));
-        assert(actualOwner==expectedOwner);
-        assert(std::string(pairedLayout.begin(),pairedLayout.end())=="D1R_SHEET_V1 8 48 96");
-        actualOwner=expectedOwner;
-        assert(!gpuStore.readWithLayout("hd/missing.gpus",pairedImage,pairedLayout,&actualOwner));
-        assert(actualOwner==nullptr);
+        auto base = std::make_unique<TableProvider>(); auto *owner = base.get();
+        base->gpu = index; base->csv = "path,layout\nplrgfx/warrior/test.png,D1R_SHEET_V1 8 1 2\n";
+        gpuStore.mount(std::move(base));
+        auto overlay = std::make_unique<TableProvider>(); auto *top = overlay.get();
+        overlay->gpu = "D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET plrgfx/warrior/other.png 1 1 * * 3 4\nother.bc7 8 8\n0 0 0 8 8 0 0\n";
+        gpuStore.mount(std::move(overlay));
+        std::vector<std::thread> workers;
+        for (int i=0; i<8; ++i) workers.emplace_back([&] {
+            for (int j=0; j<50; ++j) {
+                AssetBytes metadata, anchors; const AssetProvider *actual=nullptr;
+                assert(gpuStore.readGpuWithLayout(gpuId,metadata,anchors,&actual));
+                assert(actual==owner && !anchors.empty());
+                assert(std::string(metadata.begin(),metadata.end()).find("D1R_GPU_SHEET_V1 4 1 1 2 2 1") == 0);
+            }
+        });
+        for(auto &worker:workers)worker.join();
+        assert(owner->gpuReads==1 && top->gpuReads==1 && owner->tableReads==1);
+        owner->gpu.clear(); // Cache remains immutable across later file changes.
+        assert(gpuStore.readGpuWithLayout(gpuId,pairedImage,pairedLayout));
+        assert(gpuStore.readGpuWithLayout("hd/plrgfx/warrior/other.png",pairedImage,pairedLayout));
+        assert(pairedLayout.empty()); // Never take an anchor from another provider.
+        assert(std::string(pairedImage.begin(),pairedImage.end()).find("4 1 1 3 4 1")!=std::string::npos);
+        for (const auto &bad : {index+sheet, index.substr(0,index.size()-10),
+                 std::string("D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET ../bad.png 1 1 * * * *\n"),
+                 std::string("D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET plrgfx/warrior/test.png 1 1 -4 * * *\n")}) {
+            AssetStore invalid;auto source=std::make_unique<TableProvider>();source->gpu=bad;
+            invalid.mount(std::move(source));
+            assert(!invalid.readGpuWithLayout(gpuId,pairedImage,pairedLayout));
+        }
+        AssetStore missing;auto source=std::make_unique<TableProvider>();auto *empty=source.get();
+        missing.mount(std::move(source));
+        assert(!missing.readGpuWithLayout(gpuId,pairedImage,pairedLayout));
+        empty->gpu=index;
+        assert(!missing.readGpuWithLayout(gpuId,pairedImage,pairedLayout) && empty->gpuReads==1);
     }
 
     // A sparse synthetic resource above the former 256 MiB byte cap must
