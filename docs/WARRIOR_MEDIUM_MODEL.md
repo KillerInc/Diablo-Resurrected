@@ -24,3 +24,16 @@ reviewed in the static pose from front, rear and oblique angles. Animated
 clearance is still pending; no medium sheets have been installed in the game.
 Models, textures, private reports and renders remain outside Git. No executable
 change or build-version bump is required for this model-only working pass.
+
+## Blue and gray material pass
+
+`tint_medium_warrior.py` takes the same private prepared scene/component audit
+and a new output directory. It gives the central chest mail and lower outfit a
+muted blue cast inspired by vanilla, while keeping the waist medallion and
+shoulder plates in their existing gray metal. The helmet's neutral metal is
+darkened to match the armor, protecting warm gold accents. The texture pass
+preserves warm leather/rust detail and alpha. Geometry, UVs and skin weights
+are hashed before/after and must match. The prior strap fit and disabled cape
+and skirt are retained. Original models/textures are preserved; only a new
+private GLB/Blender copy and review renders are written. Review the exported
+material assignment and front/oblique views before use in animation sheets.
