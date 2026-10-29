@@ -1,6 +1,8 @@
 #ifdef USE_SDL3
 #include "hd_renderer.hpp"
 #include "raster_bridge.hpp"
+#include "gpu_sprites.hpp"
+#include "controls/control_mode.hpp"
 #include <algorithm>
 #include <cmath>
 #include <charconv>
@@ -186,6 +188,7 @@ void Pixel(int x, int y, SDL_Color color, bool blend)
             const int px = x + dx, py = y + dy;
             if (px < 0 || py < 0 || px >= target->w || py >= target->h) continue;
             if (inWorld && (px < clip.x || px >= clip.x + clip.w || py >= clip.h)) continue;
+            MaskGpuSpritePixel(px,py,color.r,color.g,color.b,blend ? 128 : 255);
             auto *dst = static_cast<uint8_t *>(target->pixels) + py * target->pitch + px * 4;
             if (blend) {
                 // Classic's transparent masks use 50% source blending. Blend
@@ -232,6 +235,8 @@ Asset *Load(const std::string &path)
             if (stream) image.surface.reset(IMG_Load_IO(stream, true));
         }
         if (image.surface) {
+            if(image.surface->format!=SDL_PIXELFORMAT_RGBA32)image.surface.reset(SDL_ConvertSurface(image.surface.get(),SDL_PIXELFORMAT_RGBA32));
+            if(!image.surface)devilution::ErrSdl();
             SDL_SetSurfaceBlendMode(image.surface.get(), SDL_BLENDMODE_BLEND);
             if (!sidecar.empty()) {
                 std::istringstream layout(std::string(sidecar.begin(), sidecar.end()));
@@ -261,6 +266,15 @@ bool Draw(const std::string &path, int left, int bottom, int nominalW, int nomin
         int(std::lround((bottom - py + 1) * scale)), int(std::lround(w * scale)), int(std::lround(h * scale)) };
     // SDL clips the scaled destination without moving its source pivot.
     if (!SDL_BlitSurfaceScaled(image->surface.get(), nullptr, world.get(), &dst, SDL_SCALEMODE_NEAREST)) devilution::ErrSdl();
+    if(HasQueuedGpuSprites() && dst.w>0 && dst.h>0) {
+        const int x0=std::max({dst.x,clip.x,0}),y0=std::max(dst.y,0);
+        const int x1=std::min({dst.x+dst.w,clip.x+clip.w,world->w}),y1=std::min({dst.y+dst.h,clip.h,world->h});
+        for(int py=y0;py<y1;++py)for(int px=x0;px<x1;++px) {
+            const int sx=int64_t(px-dst.x)*image->surface->w/dst.w,sy=int64_t(py-dst.y)*image->surface->h/dst.h;
+            const auto *rgba=static_cast<const uint8_t*>(image->surface->pixels)+sy*image->surface->pitch+sx*4;
+            if(rgba[3])MaskGpuSpritePixel(px,py,rgba[0],rgba[1],rgba[2],rgba[3]);
+        }
+    }
     return true;
 }
 bool DrawVariants(const std::string &base, int direction, int frame, int left, int bottom, int w, int h)
@@ -309,6 +323,7 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_
 }
 void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clipHeight)
 {
+    BeginGpuSpriteFrame();
     HdCaptureActive = GetRendererSwitch().usesHdRenderer();
     ready = false; suppressed = false; cursorSaved = false;
     if (!HdCaptureActive) return;
@@ -337,6 +352,7 @@ void EndHdWorldFrame()
 // cannot remain above an HD sprite or erase menu pixels beneath the cursor.
 void SaveHdCursorBackground(int x, int y, int width, int height)
 {
+    SaveGpuSpriteCursor();
     cursorSaved = false;
     if (!HdCaptureActive || !ready || !ui) return;
     const SDL_Rect requested { x, y, width, height };
@@ -351,6 +367,7 @@ void SaveHdCursorBackground(int x, int y, int width, int height)
 void RestoreHdCursorBackground()
 {
     if (!cursorSaved || !ui) return;
+    RestoreGpuSpriteCursor();
     for (int row = 0; row < cursorRect.h; ++row)
         std::memcpy(static_cast<uint8_t *>(ui->pixels) + (cursorRect.y + row) * ui->pitch + cursorRect.x * 4,
             cursorBehind.data() + size_t(row) * cursorRect.w * 4, cursorRect.w * 4);
@@ -365,7 +382,7 @@ bool HasHdSheet(devilution::ClxSprite sprite)
 {
     if (!HdCaptureActive || !inWorld) return false;
     const auto *source = GetSheetSource(sprite);
-    return source && !LoadSheet(*source)->image.rgba.empty();
+    return source && (LoadGpuPlayerSheet(*source) || !LoadSheet(*source)->image.rgba.empty());
 }
 
 bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite,
@@ -376,6 +393,42 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
     if (!HdCaptureActive || !inWorld || suppressed || out.surface != devilution::PalSurface) return false;
     const auto *source = GetSheetSource(sprite);
     if (!source) return false;
+    if(SDL_getenv("D1R_TRACE_PLAYER_SHEETS") && source->path.rfind("hd/plrgfx/",0)==0) {
+        static std::unordered_map<std::string,bool> traced;
+        if(traced.emplace(source->path,true).second)devilution::Log("HD_PLAYER_DRAW source={}",source->path);
+    }
+    if (auto gpu = devilution::ControlMode != devilution::ControlTypes::VirtualGamepad ? LoadGpuPlayerSheet(*source) : std::shared_ptr<GpuSheet>{}) {
+        const auto *header=sprite.pixelData()-SheetHeaderSize;
+        const unsigned group=devilution::LoadLE16(header+14), frame=devilution::LoadLE16(header+16);
+        if(group>=gpu->columns || frame>=gpu->rows)return false;
+        const auto &packed=gpu->frames[group*gpu->rows+frame];
+        if(!packed.w || !packed.h)return true;
+        const double fullLeft=(double(x)+source->width/2-gpu->anchorX+out.region.x)*scale+offsetX;
+        const double fullTop=(double(y)+1-gpu->anchorY+out.region.y)*scale;
+        GpuSpriteDraw draw;draw.sheet=gpu;draw.frame=packed;
+        draw.x=fullLeft+double(packed.cropX)*scale/gpu->density;draw.y=fullTop+double(packed.cropY)*scale/gpu->density;
+        draw.w=double(packed.w)*scale/gpu->density;draw.h=double(packed.h)*scale/gpu->density;draw.alpha=blend?0.5f:1.0f;
+        draw.maskX=std::max({int(std::floor(draw.x)),clip.x,out.region.x*scale+offsetX,0});
+        draw.maskY=std::max({int(std::floor(draw.y)),out.region.y*scale,0});
+        const int right=std::min({int(std::ceil(draw.x+draw.w)),clip.x+clip.w,(out.region.x+out.w())*scale+offsetX,world->w});
+        const int bottom=std::min({int(std::ceil(draw.y+draw.h)),clip.h,(out.region.y+out.h())*scale,world->h});
+        draw.maskW=right-draw.maskX;draw.maskH=bottom-draw.maskY;
+        if(draw.maskW<=0 || draw.maskH<=0)return true;
+        draw.coverage.assign(size_t(draw.maskW)*draw.maskH*4,0);draw.lighting.assign(size_t(draw.maskW)*draw.maskH,0);
+        for(int py=0;py<draw.maskH;++py)for(int px=0;px<draw.maskW;++px){
+            const size_t i=size_t(py)*draw.maskW+px;draw.coverage[i*4+3]=255;
+            if(lightmap){const int lx=(draw.maskX+px-offsetX)/scale-out.region.x,ly=(draw.maskY+py)/scale-out.region.y;
+                draw.lighting[i]=std::min<unsigned>(15,*lightmap->getLightingAt(out.at(lx,ly)));}
+        }
+        draw.palette.resize(256*17*4);
+        for(unsigned index=0;index<256;++index){
+            const auto &base=matchingPalette[index];auto *dst=draw.palette.data()+index*4;dst[0]=base.r;dst[1]=base.g;dst[2]=base.b;dst[3]=255;
+            uint8_t mapped=header[18+index];if(translation)mapped=translation[mapped];
+            for(unsigned level=0;level<16;++level){const auto color=devilution::Palette->colors[lightmap?lightmap->adjustColor(mapped,level):mapped];
+                auto *row=draw.palette.data()+((level+1)*256+index)*4;row[0]=color.r;row[1]=color.g;row[2]=color.b;row[3]=255;}
+        }
+        QueueGpuSprite(std::move(draw));return true;
+    }
     auto &image = LoadSheet(*source)->image;
     if (image.rgba.empty()) return false;
     const auto *header = sprite.pixelData() - SheetHeaderSize;
@@ -421,6 +474,11 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
             const int intensity = std::min(256, (int(lit.r) + lit.g + lit.b) * 256 / std::max(1, int(base.r) + base.g + base.b));
             for (int c = 0; c < 3; ++c) {
                 const int color = std::clamp(litChannels[c] + (int(src[c]) - originalChannels[c]) * intensity / 256, 0, 255);
+                if(c==0) {
+                    uint8_t rgb[3];
+                    for(int channel=0;channel<3;++channel)rgb[channel]=std::clamp(litChannels[channel]+(int(src[channel])-originalChannels[channel])*intensity/256,0,255);
+                    MaskGpuSpritePixel(px,py,rgb[0],rgb[1],rgb[2],alpha);
+                }
                 dst[px * 4 + c] = (color * alpha + dst[px * 4 + c] * (255 - alpha) + 127) / 255;
             }
             dst[px * 4 + 3] = 255;
@@ -435,6 +493,7 @@ bool QueueHdTile(int type, unsigned piece, int left, int bottom, int w, int h, i
 }
 SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
 {
+    SetGpuSpriteFrameReady(devilution::gbRunGame && HdCaptureActive && ready && GetRendererSwitch().usesHdRenderer());
     if (!devilution::gbRunGame || !HdCaptureActive || !ready || !GetRendererSwitch().usesHdRenderer()) return classic;
     // Preserve persistent HUD/panel pixels, then replace the entire world
     // viewport with the independently assembled canvas. No flattened Classic
@@ -467,9 +526,10 @@ bool BeginHdPlayerPreload(const std::string &classPath)
     }
     pinnedSheetBytes = 0;
     preloadedPlayerClass = classPath;
+    ReleaseGpuPlayerSheets();
     return true;
 }
-bool PreloadHdPlayerSheet(const SheetSource &source) { return !LoadSheet(source, true)->image.rgba.empty(); }
+bool PreloadHdPlayerSheet(const SheetSource &source) { return bool(LoadGpuPlayerSheet(source)) || !LoadSheet(source, true)->image.rgba.empty(); }
 HdCacheMetrics GetHdCacheMetrics()
 {
     const std::lock_guard<std::mutex> lock(sheetMutex);
@@ -477,6 +537,7 @@ HdCacheMetrics GetHdCacheMetrics()
     result.bytes = sheetBytes;
     for (const auto &entry : sheets) if (!entry.second.image.rgba.empty()) ++result.sheets;
     for (const auto &entry : sheets) if (entry.second.pinned && !entry.second.image.rgba.empty()) ++result.pinned;
+    const auto gpu=GetGpuSpriteStats();result.sheets+=gpu.sheets;result.pinned+=gpu.sheets;
     return result;
 }
 HdPlayerCacheStats GetHdPlayerCacheStats()
@@ -484,10 +545,12 @@ HdPlayerCacheStats GetHdPlayerCacheStats()
     const std::lock_guard<std::mutex> lock(sheetMutex);
     size_t count = 0;
     for (const auto &entry : sheets) if (entry.second.pinned && !entry.second.image.rgba.empty()) ++count;
-    return {count, pinnedSheetBytes};
+    return {count+GetGpuSpriteStats().sheets, pinnedSheetBytes};
 }
 void ReleaseHdPlayerSheets()
 {
+    BeginGpuSpriteFrame();
+    ReleaseGpuPlayerSheets();
     {
         const std::lock_guard<std::mutex> lock(sheetMutex);
         preloadedPlayerClass.clear();
@@ -498,6 +561,7 @@ void ReleaseHdPlayerSheets()
 }
 void ResetHdAssets()
 {
+    BeginGpuSpriteFrame();
     const std::lock_guard<std::mutex> lock(sheetMutex);
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;

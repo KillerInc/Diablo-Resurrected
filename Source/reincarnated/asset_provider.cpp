@@ -217,10 +217,11 @@ bool AssetStore::read(const std::string &assetId, AssetBytes &bytes) const
 }
 
 bool AssetStore::readWithLayout(const std::string &assetId,
-    AssetBytes &bytes, AssetBytes &sidecar) const
+    AssetBytes &bytes, AssetBytes &sidecar, const AssetProvider **provider) const
 {
     bytes.clear();
     sidecar.clear();
+    if (provider) *provider = nullptr;
     if (!IsSafeAssetId(assetId))
         return false;
 
@@ -229,7 +230,9 @@ bool AssetStore::readWithLayout(const std::string &assetId,
             bytes.clear();
             continue;
         }
-        const std::string key = LayoutKey(assetId);
+        if (provider) *provider = it->get();
+        std::string key = LayoutKey(assetId);
+        if (key.size() > 5 && key.substr(key.size()-5) == ".gpus") key = key.substr(0,key.size()-5) + ".png";
         if (key.compare(0, 3, "hd/") == 0) {
             const auto &rows = layoutRows(**it);
             const auto row = rows.find(key.substr(3));

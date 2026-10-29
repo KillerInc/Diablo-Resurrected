@@ -48,7 +48,7 @@ public:
     // Resolve image + optional HD/layouts.csv row from the SAME provider.
     // This avoids mixing an overriding PNG with stale metadata from a base pack.
     [[nodiscard]] bool readWithLayout(const std::string &assetId,
-        AssetBytes &bytes, AssetBytes &sidecar) const;
+        AssetBytes &bytes, AssetBytes &sidecar, const AssetProvider **provider = nullptr) const;
     [[nodiscard]] size_t providerCount() const noexcept { return providers_.size(); }
 private:
     using LayoutRows = std::unordered_map<std::string, AssetBytes>;

@@ -166,3 +166,11 @@ Unverified breadth includes a complete playthrough, every class/action/monster s
 Since 0.4.5-pre, press F11 for frame-time, CPU-stage, RAM and sprite-cache metrics.
 A once-per-second CSV is recorded alongside the game configuration. See
 [performance monitoring](PERFORMANCE.md) for metric definitions and log location.
+
+## Native GPU Warrior pack (0.4.6-pre)
+
+Compiled .gpus/.bc7 resources take precedence for the Warrior on Direct3D 12.
+They retain 4x texels in VRAM and render at physical viewport resolution; they do
+not pass through the legacy 2x CPU PNG decoder. Original PNGs/CSV stay available
+for compatibility. Re-encode compiled resources when changing source artwork.
+See [GPU architecture](GPU_SPRITE_PLAN.md) for provider, anchor and cache rules.

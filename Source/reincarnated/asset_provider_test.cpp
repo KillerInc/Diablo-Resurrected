@@ -205,6 +205,24 @@ int main()
         assert(pairedLayout.empty());
     }
 
+    {
+        AssetStore gpuStore;
+        auto table = std::make_unique<TableProvider>();
+        table->csv = "path,layout\nplayers/0.png,D1R_SHEET_V1 8 48 96\n";
+        // Separate loose synthetic provider includes manifest/pages and one CSV.
+        Write(high / "hd/gpu.gpus", "synthetic gpu manifest");
+        Write(high / "hd/layouts.csv", "path,layout\ngpu.png,D1R_SHEET_V1 8 48 96\n");
+        auto owner=std::make_unique<LooseFileAssetProvider>(high.string());
+        const AssetProvider *expectedOwner=owner.get();gpuStore.mount(std::move(owner));
+        const AssetProvider *actualOwner=nullptr;
+        assert(gpuStore.readWithLayout("hd/gpu.gpus",pairedImage,pairedLayout,&actualOwner));
+        assert(actualOwner==expectedOwner);
+        assert(std::string(pairedLayout.begin(),pairedLayout.end())=="D1R_SHEET_V1 8 48 96");
+        actualOwner=expectedOwner;
+        assert(!gpuStore.readWithLayout("hd/missing.gpus",pairedImage,pairedLayout,&actualOwner));
+        assert(actualOwner==nullptr);
+    }
+
     // A sparse synthetic resource above the former 256 MiB byte cap must
     // reach the PNG decoder. Other resource types retain their old policy.
     const auto large = high / "hd/large.PNG";

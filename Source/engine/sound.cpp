@@ -277,6 +277,12 @@ void snd_init()
 		MIX_Quit();
 		return;
 	}
+    // Test-run override only; never rewrites the user's volume preferences.
+    const char *testGain=SDL_getenv("D1R_TEST_AUDIO_GAIN");
+    if(testGain && SDL_strcmp(testGain,"0.5")==0) {
+        MIX_SetMixerGain(CurrentMixer,0.5f);
+        Log("Test audio master gain: 0.5");
+    }
 #else
 	if (!Aulib::init(*GetOptions().Audio.sampleRate, AUDIO_S16, *GetOptions().Audio.channels, *GetOptions().Audio.bufferSize, *GetOptions().Audio.device)) {
 		LogError(LogCategory::Audio, "Failed to initialize audio (Aulib::init): {}", SDL_GetError());

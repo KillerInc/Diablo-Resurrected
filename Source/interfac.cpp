@@ -1,4 +1,5 @@
 #include "reincarnated/performance_monitor.hpp"
+#include "reincarnated/gpu_sprites.hpp"
 /**
  * @file interfac.cpp
  *
@@ -687,6 +688,7 @@ void ShowProgress(interface_mode uMsg)
 #endif
 	IsProgress = true;
 #ifdef USE_SDL3
+    reincarnated::BeginGpuSpriteFrame();
     reincarnated::GetPerformanceMonitor().loading = true;
     reincarnated::GetPerformanceMonitor().resetWindow();
 #endif
@@ -740,6 +742,7 @@ void ShowProgress(interface_mode uMsg)
 	loadThread.join();
 #endif
 #ifdef USE_SDL3
+    reincarnated::WarmGpuSpritePalette(logical_palette.data());
     reincarnated::GetPerformanceMonitor().loading = false;
     reincarnated::GetPerformanceMonitor().resetWindow();
 #endif

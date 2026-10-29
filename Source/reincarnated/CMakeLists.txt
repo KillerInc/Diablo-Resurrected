@@ -33,3 +33,8 @@ if(BUILD_TESTING)
     add_executable(reincarnated_performance_samples_test performance_samples_test.cpp)
     add_test(NAME performance_percentiles_and_hitches COMMAND reincarnated_performance_samples_test)
 endif()
+
+if(BUILD_TESTING)
+    add_executable(reincarnated_gpu_coverage_test gpu_coverage_test.cpp)
+    add_test(NAME gpu_foreground_and_transparency_coverage COMMAND reincarnated_gpu_coverage_test)
+endif()

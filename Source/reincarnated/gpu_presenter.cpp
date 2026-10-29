@@ -1,4 +1,5 @@
 #include "gpu_presenter.hpp"
+#include "gpu_sprites.hpp"
 #ifdef USE_SDL3
 #include <algorithm>
 #include <cmath>
@@ -20,6 +21,8 @@ namespace {
 SDL_GPUDevice *device;
 SDL_Window *window;
 SDL_GPUTexture *frame;
+SDL_GPUTexture *scene;
+int sceneWidth=0,sceneHeight=0;
 SDL_GPUTransferBuffer *upload;
 int frameWidth, frameHeight;
 SDL_GPUPresentMode presentMode = SDL_GPU_PRESENTMODE_VSYNC;
@@ -34,6 +37,8 @@ View Viewport(int width, int height)
 }
 void ReleaseFrame()
 {
+    if (scene) SDL_ReleaseGPUTexture(device,scene);
+    scene=nullptr;sceneWidth=sceneHeight=0;
     if (frame) SDL_ReleaseGPUTexture(device, frame);
     if (upload) SDL_ReleaseGPUTransferBuffer(device, upload);
     frame = nullptr; upload = nullptr;
@@ -49,6 +54,7 @@ void InitializeGpuPresenter(SDL_Window *target)
     if (!device) devilution::ErrSdl();
     if (!SDL_ClaimWindowForGPUDevice(device, target)) devilution::ErrSdl();
     window = target;
+    InitializeGpuSprites(device);
     devilution::Log("SDL_GPU shared presenter: {}", SDL_GetGPUDeviceDriver(device));
 }
 void DestroyGpuPresenter()
@@ -56,6 +62,7 @@ void DestroyGpuPresenter()
     if (!device) return;
     SDL_WaitForGPUIdle(device);
     ReleaseFrame();
+    DestroyGpuSprites();
     SDL_ReleaseWindowFromGPUDevice(device, window);
     SDL_DestroyGPUDevice(device);
     device = nullptr; window = nullptr;
@@ -119,21 +126,31 @@ void PresentGpuFrame(SDL_Surface *surface)
         dst.texture = frame; dst.w = frameWidth; dst.h = frameHeight; dst.d = 1;
         SDL_UploadToGPUTexture(copy, &src, &dst, true);
         SDL_EndGPUCopyPass(copy);
-        if (capture) {
-            SDL_GPUTransferBufferCreateInfo readInfo {};
-            readInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
-            readInfo.size = frameWidth * frameHeight * 4;
-            readback = SDL_CreateGPUTransferBuffer(device, &readInfo);
-            if (!readback) devilution::ErrSdl();
-            copy = SDL_BeginGPUCopyPass(cmd);
-            SDL_GPUTextureTransferInfo readDst {};
-            readDst.transfer_buffer = readback;
-            SDL_DownloadFromGPUTexture(copy, &dst, &readDst);
-            SDL_EndGPUCopyPass(copy);
-        }
         const View v = Viewport(w, h);
+        SDL_GPUTexture *display=frame;
+        int displayW=frameWidth,displayH=frameHeight;
+        if(GpuSpriteFrameReady()) {
+            if(!scene || sceneWidth!=v.w || sceneHeight!=v.h) {
+                if(scene)SDL_ReleaseGPUTexture(device,scene);
+                SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D;info.format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+                info.usage=SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;info.width=v.w;info.height=v.h;info.layer_count_or_depth=1;info.num_levels=1;
+                scene=SDL_CreateGPUTexture(device,&info);sceneWidth=v.w;sceneHeight=v.h;
+                if(!scene)devilution::ErrSdl();
+            }
+            SDL_GPUBlitInfo base{};base.source.texture=frame;base.source.w=frameWidth;base.source.h=frameHeight;
+            base.destination.texture=scene;base.destination.w=sceneWidth;base.destination.h=sceneHeight;
+            base.load_op=SDL_GPU_LOADOP_DONT_CARE;base.filter=SDL_GPU_FILTER_NEAREST;SDL_BlitGPUTexture(cmd,&base);
+            RenderGpuSprites(cmd,scene,frameWidth,frameHeight,sceneWidth,sceneHeight);
+            display=scene;displayW=sceneWidth;displayH=sceneHeight;
+        }
+        if(capture) {
+            SDL_GPUTransferBufferCreateInfo readInfo{};readInfo.usage=SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;readInfo.size=displayW*displayH*4;
+            readback=SDL_CreateGPUTransferBuffer(device,&readInfo);if(!readback)devilution::ErrSdl();
+            auto *readCopy=SDL_BeginGPUCopyPass(cmd);SDL_GPUTextureRegion from{};from.texture=display;from.w=displayW;from.h=displayH;from.d=1;
+            SDL_GPUTextureTransferInfo to{};to.transfer_buffer=readback;SDL_DownloadFromGPUTexture(readCopy,&from,&to);SDL_EndGPUCopyPass(readCopy);
+        }
         SDL_GPUBlitInfo blit {};
-        blit.source.texture = frame; blit.source.w = frameWidth; blit.source.h = frameHeight;
+        blit.source.texture = display; blit.source.w = displayW; blit.source.h = displayH;
         blit.destination.texture = swapchain;
         blit.destination.x = v.x; blit.destination.y = v.y; blit.destination.w = v.w; blit.destination.h = v.h;
         blit.load_op = SDL_GPU_LOADOP_CLEAR;
@@ -147,7 +164,9 @@ void PresentGpuFrame(SDL_Surface *surface)
         if (!fence || !SDL_WaitForGPUFences(device, true, &fence, 1)) devilution::ErrSdl();
         void *pixels = SDL_MapGPUTransferBuffer(device, readback, false);
         if (!pixels) devilution::ErrSdl();
-        auto *dump = SDL_CreateSurfaceFrom(frameWidth, frameHeight, SDL_PIXELFORMAT_RGBA32, pixels, frameWidth * 4);
+        const bool high=GpuSpriteFrameReady();
+        const int dw=high?sceneWidth:frameWidth,dh=high?sceneHeight:frameHeight;
+        auto *dump = SDL_CreateSurfaceFrom(dw, dh, SDL_PIXELFORMAT_RGBA32, pixels, dw * 4);
         if (!dump) devilution::ErrSdl();
         const std::string name = std::string(captureDirectory) + "/gpu-" + std::to_string(captureFrame)
             + (GetRendererSwitch().usesHdRenderer() ? "-HD" : "-Classic")

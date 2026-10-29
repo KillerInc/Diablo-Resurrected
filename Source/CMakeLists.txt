@@ -83,6 +83,7 @@ set(libdevilutionx_SRCS
   reincarnated/hd_renderer.cpp
   reincarnated/hd_renderer_sdl3.cpp
   reincarnated/gpu_presenter.cpp
+  reincarnated/gpu_sprites.cpp
   engine/palette.cpp
   engine/sound_position.cpp
   engine/trn.cpp
@@ -1176,6 +1177,8 @@ if(USE_SDL1)
 elseif(USE_SDL3)
   find_package(PNG REQUIRED)
   target_link_libraries(libdevilutionx PUBLIC SDL3_image::SDL3_image PNG::PNG)
+  add_executable(reincarnated_gpu_sprite_test EXCLUDE_FROM_ALL ../test/gpu_sprite_test.cpp)
+  target_link_dependencies(reincarnated_gpu_sprite_test PRIVATE libdevilutionx)
   add_executable(reincarnated_sheet_test EXCLUDE_FROM_ALL ../test/hd_sheet_test.cpp)
   target_link_dependencies(reincarnated_sheet_test PRIVATE libdevilutionx)
   if(MSVC)

@@ -40,3 +40,15 @@ anchor, animation, gameplay or cache residency policy is changed by the monitor.
 Validation uses synthetic percentile/hitch tests, real compositor/CSV checks including
 loading/inactivity exclusion, F11/F10 replays, unchanged reference saves and selected
 class residency checks. User saves/preferences and installed artwork are preserved.
+
+## GPU sprite metrics since 0.4.6-pre
+
+F11 also displays GPU-resident sheet count, allocated BC7 page payload and cumulative
+draw calls. CSV adds gpu_sheets, gpu_texture_bytes, gpu_page_uploads and gpu_draw_calls.
+Page bytes exclude the shared 64 MiB RGB lookup, render targets/control buffers and
+driver overhead; they are not a measurement of total resident VRAM. CPU sheet bytes
+exclude these GPU pages. A zero class-preload byte count now means no CPU RGBA player
+atlas, not an unloaded class; the resident sheet count and GPU counters prove loading.
+Cache hit/miss/decode counters describe the CPU PNG cache. GPU uploads/draws are
+cumulative process counters. Different app sessions may append a new CSV header.
+Test scripts also sample physical working set separately from private commit.
