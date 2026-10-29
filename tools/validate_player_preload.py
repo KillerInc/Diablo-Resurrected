@@ -32,7 +32,7 @@ def validate(root, hd, player_class, provider_log, integration_log):
     ui = check_case(root, 'ui', player_class, count, False)
     ui_text = (root / 'ui.log').read_text(errors='replace'); assert 'Renderer mode: HD' in ui_text and 'Renderer mode: Classic' in ui_text
     assert a['bytes'] == b['bytes'] == ui['bytes']
-    assert '100% tests passed, 0 tests failed out of 4' in Path(provider_log).read_text(errors='replace')
+    assert re.search(r'100% tests passed, 0 tests failed out of [45]', Path(provider_log).read_text(errors='replace'))
     assert 'PASS: provenance' in Path(integration_log).read_text(errors='replace')
     proof = {'version': (Path(__file__).resolve().parents[1] / 'REINCARNATED_VERSION').read_text().strip(),
              'executable_sha256': sha(root / 'package/Diablo Reincarnated.exe'), 'class_png_count': count,

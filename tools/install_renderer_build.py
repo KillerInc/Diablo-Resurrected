@@ -17,6 +17,7 @@ def install(binary, game, manifest, mirror_manifest, backup, validation):
     assert re.fullmatch(r'\d+\.\d+\.\d+(?:-[a-z0-9]+)?', version)
     assert version == (Path(__file__).resolve().parents[1] / 'REINCARNATED_VERSION').read_text().strip()
     assert proof['executable_sha256'] == sha(binary)
+    assert proof['checks'].get('performance_monitor'), 'Performance-monitor replay proof is required'
     assert proof['checks']['provider_tests'] and proof['checks']['integration'] and proof['checks']['gameplay_reference_same']
     assert proof['checks']['warm_player_reloads'] == 0 and proof['checks']['ui_exit'] == 0
     assert proof['checks']['gameplay_reference_repeat_same'] and proof['checks']['other_class_preloads'] == 0
@@ -44,12 +45,13 @@ def install(binary, game, manifest, mirror_manifest, backup, validation):
         receipt = {'version': version, 'executable_sha256': sha(target), 'previous_executable_sha256': old_hash,
                    'layout_sha256_preserved': csv_hash, 'custom_png_hashes_preserved': images, 'backup': str(backup),
                    'player_preload': proof['preload'], 'validation': proof['checks'],
+                   'performance_monitor': proof.get('performance_monitor', {}),
                    'policy': 'all installed selected-class PNG sheets; session-pinned across equipment, F10 and levels'}
         updated = copy.deepcopy(current); updated['version'] = version; updated['renderer_build_revision'] = receipt
         data = json.dumps(updated, indent=2).encode('utf-8'); manifest.write_bytes(data); mirror_manifest.write_bytes(data)
         shutil.copy2(validation, backup / 'validation.json')
         (backup / 'install-receipt.json').write_text(json.dumps(receipt, indent=2))
-        print('Installed', version, 'with session-resident player-class sheets; all art and CSV preserved')
+        print('Installed', version, 'with performance monitoring and session-resident player sheets; all art and CSV preserved')
     except BaseException:
         if replaced: shutil.copy2(old_binary, target)
         temporary.unlink(missing_ok=True); manifest.write_bytes(before); mirror_manifest.write_bytes(mirror_before)

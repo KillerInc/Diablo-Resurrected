@@ -51,6 +51,7 @@ std::unordered_map<uint32_t, uint8_t> nearestColors;
 std::array<SDL_Color, 256> matchingPalette {};
 size_t sheetBytes = 0;
 uint64_t sheetClock = 0;
+HdCacheMetrics cacheMetrics;
 unsigned cacheWarningFlags = 0, processWarningFlags = 0;
 size_t SheetBudget()
 {
@@ -78,11 +79,14 @@ CachedSheet *LoadSheet(const SheetSource &source, bool pin = false)
     const std::string key = source.path + ":" + std::to_string(source.columns) + ":" + std::to_string(source.rows) + ":" + std::to_string(source.width);
     auto found = sheets.find(key);
     if (found != sheets.end()) {
+        ++cacheMetrics.hits;
         if (pin && !found->second.pinned) { found->second.pinned = true; pinnedSheetBytes += found->second.image.rgba.size(); }
         found->second.used = ++sheetClock; return &found->second;
     }
     // Independent PNG decoders run concurrently during the loading screen.
     // MPQ/provenance discovery has already finished on the loading thread.
+    ++cacheMetrics.misses;
+    const uint64_t decodeStart = SDL_GetTicksNS();
     lock.unlock();
     CachedSheet entry;
     entry.pinned = pin;
@@ -96,6 +100,8 @@ CachedSheet *LoadSheet(const SheetSource &source, bool pin = false)
         if (!decoded) devilution::Log("HD sheet layout/decode rejected; preserving Classic fallback: {}", source.path);
     }
     lock.lock();
+    cacheMetrics.decodeNs += SDL_GetTicksNS() - decodeStart;
+    if (decoded) ++cacheMetrics.decodes; else ++cacheMetrics.failures;
     // A concurrent request may have completed the same key first.
     found = sheets.find(key);
     if (found != sheets.end()) {
@@ -117,6 +123,7 @@ CachedSheet *LoadSheet(const SheetSource &source, bool pin = false)
             if (victim == sheets.end()) break;
             sheetBytes -= victim->second.image.rgba.size();
             sheets.erase(victim);
+            ++cacheMetrics.evictions;
         }
         sheetBytes += added;
         if (pin) pinnedSheetBytes += added;
@@ -463,6 +470,15 @@ bool BeginHdPlayerPreload(const std::string &classPath)
     return true;
 }
 bool PreloadHdPlayerSheet(const SheetSource &source) { return !LoadSheet(source, true)->image.rgba.empty(); }
+HdCacheMetrics GetHdCacheMetrics()
+{
+    const std::lock_guard<std::mutex> lock(sheetMutex);
+    auto result = cacheMetrics;
+    result.bytes = sheetBytes;
+    for (const auto &entry : sheets) if (!entry.second.image.rgba.empty()) ++result.sheets;
+    for (const auto &entry : sheets) if (entry.second.pinned && !entry.second.image.rgba.empty()) ++result.pinned;
+    return result;
+}
 HdPlayerCacheStats GetHdPlayerCacheStats()
 {
     const std::lock_guard<std::mutex> lock(sheetMutex);

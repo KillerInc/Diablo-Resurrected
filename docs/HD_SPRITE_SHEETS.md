@@ -160,3 +160,9 @@ Git; see `tools/warrior3d/PALADIN.md` for the source workflow and sheet inventor
 The initial sheet-enabled executable SHA-256 was `BB89F8EFD5A61E69F838A78A1CA3E8705F0A83F7B4B59CAC9EABE2EF1861BB2E`. The explicitly versioned **0.4.0-pre** build is `F43F53A3F57090EA4C8B52E5B205C298FEFC01C44BD2C9F38932D3FF13659E8B`; it repeated the full gameplay check with the same reference-save outcome in 57.88 seconds (83.8 fps). Windows file/product versions match the display version. See [0.4.0-pre](releases/0.4.0-pre.md).
 
 Unverified breadth includes a complete playthrough, every class/action/monster skin and spell, multiplayer, physical input, fullscreen/DPI changes and exact color parity for every palette transformation. Missing terrain, object or towner sheets retain vanilla graphics. The installed set has no new floor/wall sheet directory; this change does not invent terrain assets.
+
+## Performance monitoring
+
+Since 0.4.5-pre, press F11 for frame-time, CPU-stage, RAM and sprite-cache metrics.
+A once-per-second CSV is recorded alongside the game configuration. See
+[performance monitoring](PERFORMANCE.md) for metric definitions and log location.

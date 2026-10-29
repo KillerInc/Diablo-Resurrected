@@ -21,6 +21,7 @@
 #include "reincarnated/raster_bridge.hpp"
 #include "reincarnated/sheet_png.hpp"
 #include "reincarnated/sheet_memory.hpp"
+#include "reincarnated/performance_monitor.hpp"
 #include "utils/display.h"
 #include "utils/endian_write.hpp"
 namespace devilution {
@@ -336,6 +337,34 @@ int main(int argc, char **argv)
             return line.find("kind=process_private_commit flags=7")!=std::string::npos;
         }));
 #endif
+        const auto perfPath = diagnosticPath.string() + ".csv";
+        Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_PERF_LOG", perfPath.c_str(), true));
+        {
+            PerformanceMonitor monitor;
+            monitor.record(1000000000, 1, 2, true);
+            for (int i=1; i<=60; ++i) {
+                monitor.drawMs = 3;
+                monitor.record(1000000000ULL + i * 20000000ULL, 1, 2, true);
+            }
+            Check(monitor.opened && monitor.file);
+            Check(monitor.lines[0].find("50.0 FPS") != std::string::npos);
+            Check(monitor.lines[1].find("draw 3.00 compose 1.00 present 2.00") != std::string::npos);
+            monitor.loading = true;
+            monitor.record(9000000000, 0, 0, true);
+            Check(monitor.previous == 0 && monitor.samples.frames == 0);
+            monitor.loading = false;
+            monitor.record(10000000000ULL, 0, 0, true);
+            Check(monitor.samples.frames == 0); // Loading gap is excluded.
+            monitor.record(11000000000ULL, 0, 0, false);
+            Check(monitor.previous == 0);
+        }
+        {
+            std::ifstream file(perfPath);
+            const std::string text(std::istreambuf_iterator<char>(file), {});
+            Check(text.find("draw_cpu_ms,compose_cpu_ms,present_cpu_ms") != std::string::npos);
+            Check(text.find(",50,20.0000,20.0000,20.0000,0,0,3.0000,1.0000,2.0000,") != std::string::npos);
+        }
+        std::filesystem::remove(perfPath);
         ResetHdAssets(); PalSurface=nullptr; Palette.reset(); SDL_Quit();
         SDL_SetLogOutputFunction(oldLog, oldLogData);
         {

@@ -17,7 +17,7 @@ class RendererInstallTest(unittest.TestCase):
         record={'version':'0.4.3-pre','sheets':{'wlnst':{'sha256':sha(image),'layout':'D1R_SHEET_V1 8 48 96'}}}
         manifest=root/'manifest.json';mirror=root/'mirror.json';manifest.write_text(json.dumps(record));mirror.write_bytes(manifest.read_bytes())
         version=(Path(__file__).resolve().parents[1]/'REINCARNATED_VERSION').read_text().strip()
-        proof={'version':version,'executable_sha256':sha(binary),'class_png_count':1,'preload':{'loaded':1,'resident':1,'skipped':0},'checks':{'provider_tests':True,'integration':True,'gameplay_reference_same':True,'gameplay_reference_repeat_same':True,'other_class_preloads':0,'warm_player_reloads':0,'ui_exit':0}}
+        proof={'version':version,'executable_sha256':sha(binary),'class_png_count':1,'preload':{'loaded':1,'resident':1,'skipped':0},'checks':{'performance_monitor':True,'provider_tests':True,'integration':True,'gameplay_reference_same':True,'gameplay_reference_repeat_same':True,'other_class_preloads':0,'warm_player_reloads':0,'ui_exit':0}}
         validation=root/'validation.json';validation.write_text(json.dumps(proof))
         return binary,game,manifest,mirror,root/'backup',validation,image,table
 

@@ -28,3 +28,8 @@ if(BUILD_TESTING)
     target_link_libraries(reincarnated_asset_provider_test PRIVATE reincarnated_renderer_foundation)
     add_test(NAME hd_loose_files_and_archive_provider_fallback COMMAND reincarnated_asset_provider_test)
 endif()
+
+if(BUILD_TESTING)
+    add_executable(reincarnated_performance_samples_test performance_samples_test.cpp)
+    add_test(NAME performance_percentiles_and_hitches COMMAND reincarnated_performance_samples_test)
+endif()

@@ -1,3 +1,4 @@
+#include "reincarnated/performance_monitor.hpp"
 /**
  * @file dx.cpp
  *
@@ -25,6 +26,7 @@
 #include "controls/plrctrls.h"
 #include "engine/render/primitive_render.hpp"
 #include "headless_mode.hpp"
+#include "game_mode.hpp"
 #include "init.hpp"
 #include "options.h"
 #include "reincarnated/hd_renderer.hpp"
@@ -303,6 +305,9 @@ void RenderPresent()
 	SDL_Surface *surface = GetOutputSurface();
 
 	if (!gbActive) {
+#ifdef USE_SDL3
+        reincarnated::GetPerformanceMonitor().resetWindow();
+#endif
 #ifdef __EMSCRIPTEN__
 		// Just yield to browser when inactive instead of blocking
 		emscripten_sleep(1);
@@ -313,9 +318,12 @@ void RenderPresent()
 	}
 
 #ifdef USE_SDL3
+    const uint64_t perfStart = SDL_GetTicksNS();
     SDL_Surface *presentation = reincarnated::ComposeHdFrame(surface);
+    const uint64_t perfComposed = SDL_GetTicksNS();
     if (ControlMode == ControlTypes::VirtualGamepad) RenderVirtualGamepad(presentation);
     reincarnated::PresentGpuFrame(presentation);
+    reincarnated::GetPerformanceMonitor().record(perfStart, double(perfComposed - perfStart)/1e6, double(SDL_GetTicksNS() - perfComposed)/1e6, gbRunGame);
     if (*GetOptions().Graphics.frameRateControl != FrameRateControl::VerticalSync) LimitFrameRate();
 #elif !defined(USE_SDL1)
 	if (renderer != nullptr) {

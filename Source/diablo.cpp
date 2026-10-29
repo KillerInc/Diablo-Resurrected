@@ -1,3 +1,4 @@
+#include "reincarnated/performance_monitor.hpp"
 /**
  * @file diablo.cpp
  *
@@ -783,6 +784,17 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 
 	switch (event.type) {
 	case SDL_EVENT_KEY_DOWN:
+#ifdef USE_SDL3
+        if (SDLC_EventKey(event) == SDLK_F11) {
+            if (!event.key.repeat) {
+                auto &monitor = reincarnated::GetPerformanceMonitor();
+                monitor.visible = !monitor.visible;
+                Log("Performance overlay: {}", monitor.visible ? "on" : "off");
+                RedrawEverything();
+            }
+            return;
+        }
+#endif
 		// F10 is an application-level renderer hotkey, never a held action.
 		if (SDLC_EventKey(event) == SDLK_F10) {
 #ifndef USE_SDL1
@@ -804,6 +816,9 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
                     renderer != nullptr
 #endif
                 ) {
+#ifdef USE_SDL3
+                    reincarnated::GetPerformanceMonitor().resetWindow();
+#endif
 					reincarnated::GetRendererSwitch().onF10KeyDown(false);
 					Log("Renderer mode: {}", reincarnated::GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic");
 					reincarnated::ResetHdAssets();

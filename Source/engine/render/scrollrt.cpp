@@ -1,3 +1,4 @@
+#include "reincarnated/performance_monitor.hpp"
 /**
  * @file scrollrt.cpp
  *
@@ -1938,7 +1939,13 @@ void DrawAndBlit()
 	nthread_UpdateProgressToNextGameTick();
 
 	this_sdl_thread::yield();
+#ifdef USE_SDL3
+    const uint64_t perfDrawStart = SDL_GetTicksNS();
+#endif
 	DrawView(out, ViewPosition);
+#ifdef USE_SDL3
+    reincarnated::GetPerformanceMonitor().drawMs = double(SDL_GetTicksNS() - perfDrawStart)/1e6;
+#endif
 	if (drawCtrlPan) {
 		DrawMainPanel(out);
 	}
@@ -1975,6 +1982,16 @@ void DrawAndBlit()
 	DrawCursor(out);
 
 	DrawFPS(out);
+#ifdef USE_SDL3
+    const auto &perf = reincarnated::GetPerformanceMonitor();
+    if (perf.visible) {
+        int y = 24;
+        for (const auto &line : perf.lines) {
+            DrawString(out, line, Point { 8, y }, { .flags = UiFlags::ColorWhite });
+            y += 14;
+        }
+    }
+#endif
 
 	lua::GameDrawComplete();
 

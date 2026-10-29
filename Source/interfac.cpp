@@ -1,3 +1,4 @@
+#include "reincarnated/performance_monitor.hpp"
 /**
  * @file interfac.cpp
  *
@@ -685,6 +686,10 @@ void ShowProgress(interface_mode uMsg)
     heroPreloadProgress = 0;
 #endif
 	IsProgress = true;
+#ifdef USE_SDL3
+    reincarnated::GetPerformanceMonitor().loading = true;
+    reincarnated::GetPerformanceMonitor().resetWindow();
+#endif
 	gbSomebodyWonGameKludge = false;
 
 	ProgressEventHandlerState.loadStartedAt = SDL_GetTicks();
@@ -733,6 +738,10 @@ void ShowProgress(interface_mode uMsg)
 	});
 	while (HandleProgressBarUpdate()) { }
 	loadThread.join();
+#endif
+#ifdef USE_SDL3
+    reincarnated::GetPerformanceMonitor().loading = false;
+    reincarnated::GetPerformanceMonitor().resetWindow();
 #endif
 }
 
