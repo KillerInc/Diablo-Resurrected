@@ -1,0 +1,53 @@
+{
+  "revision": "medium-shield-v1",
+  "status": "approved_rendering",
+  "armor": "medium",
+  "source_file": "shield_Medium.glb",
+  "source_sha256": "a66b80d1f6baf79fa5ae8b11a16f97bfb4df9a7fd348dcf5fae9bb63e9cbc2d9",
+  "bone": "forearm.L",
+  "local_transform": [
+    [
+      -1.4582626306491875e-07,
+      -0.31696394085884094,
+      0.6797308921813965,
+      0.0737871453166008
+    ],
+    [
+      0.6277104020118713,
+      0.37200525403022766,
+      0.17346885800361633,
+      0.24302014708518982
+    ],
+    [
+      -0.41046226024627686,
+      0.5688993334770203,
+      0.2652820944786072,
+      -0.08501975238323212
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "approved_fit": {
+    "height_change_m": 0.3,
+    "outward_tilt_degrees": 25,
+    "normal_offset_m": -0.025,
+    "scale": 0.75
+  },
+  "scope": {
+    "weapon_codes": [
+      "d",
+      "h",
+      "u"
+    ],
+    "sheet_count": 30,
+    "other_armor_unchanged": true,
+    "character_motion_unchanged": true,
+    "installed_lightning_retained": true
+  },
+  "artwork_in_git": false,
+  "pose_clearance": "fit_medium_shield_clearance.py; shield-only adjustments checked across every source frame"
+}

@@ -19,6 +19,9 @@ def smooth(a,b,x):
 class FireEffect:
     def __init__(self,scene,rig,output,settings):
         self.scene,self.rig=scene,rig
+        self.anchor_mode=settings.get('anchor_mode','root')
+        assert self.anchor_mode in ('root','cast_start')
+        self.cast_start_matrix=Matrix.Translation(Vector((rig.location.x,rig.location.y,0)))
         self.output=Path(output)/'fire-masks'
         self.seeds=np.random.default_rng(settings.get('seed',2718)).random((192,4))
         material=bpy.data.materials.new('Procedural casting fire');material.use_nodes=True
@@ -52,10 +55,10 @@ class FireEffect:
         self.bubble=None
         if settings.get('style')=='bubble':
             from paladin_fire_bubble import FireBubble
-            self.bubble=FireBubble(scene)
+            self.bubble=FireBubble(scene,settings)
 
     def update(self,direction,row,rows):
-        self.matrix=Matrix.Translation(Vector((self.rig.location.x,self.rig.location.y,0)))
+        self.matrix=self.cast_start_matrix.copy() if self.anchor_mode=='cast_start' else Matrix.Translation(Vector((self.rig.location.x,self.rig.location.y,0)))
         phase=row/(rows-1);envelope=smooth(.025,.20,phase)*(1-smooth(.72,.99,phase));self.noise.inputs['W'].default_value=phase*9
         self.light.data.energy=30*envelope*(.9+.1*math.sin(phase*47));self.light.location=self.matrix@Vector((0,-.25,1))
         vertices=[];faces=[];uv=[];strengths=[]

@@ -4,14 +4,19 @@ from pathlib import Path
 from install_layout_table import sha
 from hd_layouts import read_table
 
-def install(pack,art,baseline,game,master,mirror,archive,backup,validation):
+def install(pack,art,baseline,game,master,mirror,archive,backup,validation,revision='equipped-casts-v1'):
  pack,art,baseline,game,master,mirror,archive,backup,validation=map(Path,(pack,art,baseline,game,master,mirror,archive,backup,validation))
  assets=json.loads((pack/'validated-gpu-pack.json').read_text());before=json.loads((baseline/'validated-gpu-pack.json').read_text());art=json.loads(art.read_text());proof=json.loads(validation.read_text());hd=(game/'HD').resolve();exe_hash=sha(game/'Diablo Reincarnated.exe')
- required=['gpu_sprites','gameplay_reference_same','gameplay_reference_repeat_same','gpu_index_process_cache','casting_bounds','casting_head_clearance','casting_visual_review','casting_live_draw']
+ assert revision in ('equipped-casts-v1','fire-bubble-v2','spell-effects-v2','medium-shield-v1')
+ required=['gpu_sprites','gameplay_reference_same','gameplay_reference_repeat_same','gpu_index_process_cache']
+ required+=['casting_bounds','casting_head_clearance','casting_visual_review','casting_live_draw'] if revision=='equipped-casts-v1' else ['fire_bounds','fire_anchor_fixed','fire_mesh_stable','fire_visual_review','fire_live_draw','character_motion_unchanged']
+ if revision=='medium-shield-v1':required=required[:4]+['shield_bounds','shield_visual_review','shield_live_draw','character_motion_unchanged']
+ if revision=='spell-effects-v2':required+=['lightning_growth','lightning_paths_fixed','lightning_geometry_held','lightning_visual_review']
  assert all(proof['checks'].get(k) for k in required)
  assert proof['executable_sha256']==exe_hash and proof['gpu_sprites']['pack_file_hashes']==assets['files']
- expected={f'w{a}{w}{s}' for a in 'lm' for w in 'abdhmstu' for s in ('fm','lm','qm')}
- assert set(art['sheets'])==expected and len(expected)==48
+ expected={f'w{a}{w}{s}' for a in 'lm' for w in 'abdhmstu' for s in ('fm','lm','qm')} if revision=='equipped-casts-v1' else {f'w{a}{w}{s}' for a in 'lm' for w in 'abdhmnstu' for s in (('fm','lm') if revision=='spell-effects-v2' else ('fm',))}
+ if revision=='medium-shield-v1':expected={f'wm{w}{action}' for w in 'dhu' for action in ('as','at','aw','bl','fm','ht','lm','qm','st','wl')}
+ assert set(art['sheets'])==expected
  assert json.loads(master.read_text())==json.loads(mirror.read_text())
  for name,digest in before['source_png_hashes'].items():assert sha(hd/name)==digest,('Installed PNG changed',name)
  for name,digest in before['files'].items():assert sha(hd/name)==digest,('Installed GPU file changed',name)
@@ -31,11 +36,13 @@ def install(pack,art,baseline,game,master,mirror,archive,backup,validation):
  try:
   updated=copy.deepcopy(json.loads(old_master));table=read_table(pack/'HD/layouts.csv')
   for name,record in sorted(art['sheets'].items()):
-   assert re.fullmatch(r'w[lm][abdhmstu](fm|lm|qm)',name)
+   assert name in expected
    rel=f'plrgfx/warrior/{name[:3]}/{name}.png';source=Path(record['source']);assert sha(source)==record['sha256']==assets['source_png_hashes'][rel] and table[rel]==record['layout']
    saved=archive/'Final'/name[:3]/(name+'.png');saved.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source,saved)
    replace(saved,hd/rel,'game/'+rel);replace(saved,mirror.parent/(name+'.png'),'mirror/'+name+'.png')
-   updated['sheets'][name]={'source':str(saved.resolve()),'size':record['size'],'sha256':record['sha256'],'layout':record['layout'],'status':'approved equipped Fanaticism cast; original effects; complete native motion'}
+   status='approved equipped Fanaticism cast; original effects; complete native motion' if revision=='equipped-casts-v1' else ('approved larger fire voids; fixed cast-start anchor; unchanged character motion' if name.endswith('fm') else 'approved staggered growing lightning; held fixed paths; unchanged character motion')
+   if revision=='medium-shield-v1':status='approved medium kite shield; original character motion and installed spell effects retained'
+   updated['sheets'][name]={'source':str(saved.resolve()),'size':record['size'],'sha256':record['sha256'],'layout':record['layout'],'status':status}
   for name in assets['files']:
    assert name=='sprites.gpus' or name.endswith('.bc7')
    target=(hd/name).resolve();assert target.is_relative_to(hd)
@@ -49,8 +56,9 @@ def install(pack,art,baseline,game,master,mirror,archive,backup,validation):
   assert all(sha(hd/n)==h for n,h in assets['files'].items())
   assert all(sha(hd/n)==h for n,h in assets['source_png_hashes'].items())
   assert not list(hd.rglob('*.layout')) and len(list(hd.rglob('*.gpus')))==1
-  receipt={'revision':'equipped-casts-v1','sheets':48,'unarmed_unchanged':True,'noncasting_unchanged':True,'heavy_unchanged':True,'executable_unchanged':exe_hash,'gpu_pages':assets['pages'],'gpu_texture_bytes':assets['texture_bytes'],'archive':str(archive.resolve()),'backup':str(backup.resolve()),'checks':proof['checks']}
-  updated['equipped_casting_revision']=receipt;updated['layout_table']={'path':str(hd/'layouts.csv'),'sha256':assets['layout_sha256'],'rows':len(table)}
+  receipt={'revision':revision,'sheets':len(expected),'unarmed_unchanged':revision=='equipped-casts-v1','unarmed_motion_unchanged':True,'noncasting_unchanged':revision!='medium-shield-v1','heavy_unchanged':True,'executable_unchanged':exe_hash,'gpu_pages':assets['pages'],'gpu_texture_bytes':assets['texture_bytes'],'archive':str(archive.resolve()),'backup':str(backup.resolve()),'checks':proof['checks']}
+  key={'equipped-casts-v1':'equipped_casting_revision','fire-bubble-v2':'fire_bubble_revision','spell-effects-v2':'spell_effects_revision','medium-shield-v1':'medium_shield_revision'}[revision]
+  updated[key]=receipt;updated['layout_table']={'path':str(hd/'layouts.csv'),'sha256':assets['layout_sha256'],'rows':len(table)}
   data=json.dumps(updated,indent=2).encode();master.write_bytes(data);mirror.write_bytes(data);(archive/'install-manifest.json').write_bytes(data);(archive/'install-receipt.json').write_text(json.dumps(receipt,indent=2));(backup/'install-receipt.json').write_text(json.dumps(receipt,indent=2));shutil.copy2(validation,backup/'validation.json')
  except BaseException:
   for target in reversed(written):
@@ -59,9 +67,10 @@ def install(pack,art,baseline,game,master,mirror,archive,backup,validation):
   master.write_bytes(old_master);mirror.write_bytes(old_mirror);raise
  finally:
   for temp in temps:temp.unlink(missing_ok=True)
- print('Installed 48 equipped casts; unarmed, all other actions, heavy assets, saves and executable preserved')
+ print('Installed',len(expected),revision,'sheets; character motions, other actions, heavy assets, saves and executable preserved')
 
 if __name__=='__main__':
  p=argparse.ArgumentParser(description=__doc__)
  for key in ('pack','art','baseline','game','master','mirror','archive','backup','validation'):p.add_argument(key)
- a=p.parse_args();install(a.pack,a.art,a.baseline,a.game,a.master,a.mirror,a.archive,a.backup,a.validation)
+ p.add_argument('--revision',choices=['equipped-casts-v1','fire-bubble-v2','spell-effects-v2','medium-shield-v1'],default='equipped-casts-v1')
+ a=p.parse_args();install(a.pack,a.art,a.baseline,a.game,a.master,a.mirror,a.archive,a.backup,a.validation,a.revision)

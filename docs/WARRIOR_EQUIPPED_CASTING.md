@@ -88,3 +88,18 @@ armor rebuilds. No proprietary artwork or raw motion is published in Git.
 The replay using the installed executable also matches the reference outcome.
 Installed PNG/GPU hashes, all 207 preserved sheets, saves/settings, the unchanged
 executable and the single runtime index/table pass the final integrity check.
+
+## Fire revision installed 2026-10-30
+
+`fire-bubble-v2` replaces all 18 light/medium FM sheets, including unarmed.
+It enlarges the voids in the bubble and fixes the shell at the cast-start location.
+Character motions, equipment and all 2,880 directional shadow images are unchanged.
+The full class remains 255 sheets and 867 BC7 pages, using 2,924,388,352 texture bytes.
+Two reference replays, UI/F10/F11, actual cast GPU draws and the installed-executable
+smoke replay passed. The executable remains 0.4.7-pre and user state is unchanged.
+The private archive is `Warrior Fire Bubble Approved 2026-10-30`.
+
+Lightning plasma experiments were reviewed and rejected. Keep the currently
+installed legacy lightning; `lightning_settings.json` selects that existing mode.
+No plasma experiment was installed. Graphics replays mute music, effects and cues
+in their isolated test INI; normal saved settings and Windows volume stay unchanged.
