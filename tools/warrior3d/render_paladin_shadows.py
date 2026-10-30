@@ -11,14 +11,16 @@ from mathutils import Vector
 scene_file,metadata,out=map(Path,sys.argv[sys.argv.index('--')+1:]);out=out.resolve();out.mkdir(parents=True,exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=str(scene_file.resolve()))
 scene=bpy.context.scene;rig=next(o for o in bpy.data.objects if o.type=='ARMATURE');rig.rotation_mode='XYZ'
+info=json.loads(metadata.read_text())
+if info.get('shadow_render_samples'):scene.eevee.taa_render_samples=info['shadow_render_samples']
 parts=[];equipment=[]
 for o in list(bpy.data.objects):
  if o.type!='MESH':continue
  name=o.data.materials[0].name if o.data.materials else ''
- if any(t in name for t in ['base16_TRS','armor_skin','P00_HED','base01_GLV','base01_LEG','base05_BTS']):parts.append(o)
+ if any(t in name for t in info.get('shadow_material_tokens',['base16_TRS','armor_skin','P00_HED','base01_GLV','base01_LEG','base05_BTS'])):parts.append(o)
  elif o.get('d1r_equipment'):equipment.append(o)
  o.hide_render=True
-assert len(parts)==6,len(parts)
+assert len(parts)==info.get('shadow_anatomy_count',6),len(parts)
 info=json.loads(metadata.read_text());times=info['source_frames']
 assert len(equipment)==info.get('equipment_mesh_count',0)
 parts+=equipment

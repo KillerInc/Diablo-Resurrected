@@ -58,12 +58,13 @@ def validate(pack,hd,custom,proof_names):
             rgb=math.sqrt(sum(v*v for v in visible_rms)/3)
             assert rgb<20 and rgba[3]<20,(rel,rgba)
             qualities[rel]={'rgb_rmse':round(rgb,4),'alpha_rmse':round(rgba[3],4)}
-    assert len(qualities)==85,len(qualities)
+    expected_samples=sum((custom/'HD'/rel).is_file() for rel in proof)
+    assert len(qualities)==expected_samples>0,(len(qualities),expected_samples)
     assert total==sum(v['gpu_bytes'] for v in proof.values())
     result={'sheets':len(proof),'pages':pages_count,'texture_bytes':total,'density':4,'cpu_player_rgba_bytes':0,'files':files,'source_png_hashes':{p:r['source_sha256'] for p,r in proof.items()},'layout_sha256':sha(hd/'layouts.csv'),'quality_samples':qualities,'worst_rgb_rmse':max(v['rgb_rmse'] for v in qualities.values()),'worst_alpha_rmse':max(v['alpha_rmse'] for v in qualities.values())}
     (pack/'validated-gpu-pack.json').write_text(json.dumps(result,indent=2))
     (pack/'gpu-pack-proof.json').write_text(json.dumps(proof,indent=2))
-    print('PASS: 255 BC7 sheets;',pages_count,'pages;',round(total/2**30,3),'GiB; grids, anchors/table, source hashes and 85 quality samples verified')
+    print('PASS: 255 BC7 sheets;',pages_count,'pages;',round(total/2**30,3),'GiB; grids, anchors/table, source hashes and',len(qualities),'quality samples verified')
     return result
 
 

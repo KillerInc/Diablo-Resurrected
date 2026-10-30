@@ -2,7 +2,7 @@
   "schema": 1,
   "character": "warrior",
   "armor": "medium",
-  "status": "approved_base",
+  "status": "approved_installed",
   "approved_on": "2026-10-29",
   "model_file": "D1 Warrior Medium - blue gray.glb",
   "sha256": "E540EF6707A8CD7B9843F4ECDA5FDF422A3A93EF38CE478BCCFEAD4EF45AB52B",
@@ -14,6 +14,28 @@
     "dark_gray_helmet": true,
     "gold_accents_preserved": true
   },
-  "animation_clearance": "pending",
-  "replacement_sheets_installed": false
+  "animation_clearance": "passed",
+  "replacement_sheets_installed": true,
+  "graphics_revision": "medium-v1",
+  "installed_on": "2026-10-30",
+  "medium_sheet_count": 85,
+  "animation_validation": {
+    "motion_donors": 41,
+    "rest_matrix_max_error": 0,
+    "equipped_pose_sequences_head_clear": 66,
+    "directional_frames": 9408,
+    "town_axe_chest_local_offset_metres": [
+      0.04,
+      0,
+      0
+    ]
+  },
+  "runtime": {
+    "engine_version": "0.4.7-pre",
+    "executable_unchanged": true,
+    "gpu_density": 4,
+    "class_sheet_count": 255,
+    "class_gpu_pages": 804,
+    "class_gpu_texture_bytes": 2671796224
+  }
 }
