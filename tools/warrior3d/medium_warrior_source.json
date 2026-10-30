@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "character": "warrior",
+  "armor": "medium",
+  "status": "approved_base",
+  "approved_on": "2026-10-29",
+  "model_file": "D1 Warrior Medium - blue gray.glb",
+  "sha256": "E540EF6707A8CD7B9843F4ECDA5FDF422A3A93EF38CE478BCCFEAD4EF45AB52B",
+  "appearance": {
+    "cape_enabled": false,
+    "skirt_enabled": false,
+    "fitted_straps": true,
+    "blue_mail_and_lower_outfit": true,
+    "dark_gray_helmet": true,
+    "gold_accents_preserved": true
+  },
+  "animation_clearance": "pending",
+  "replacement_sheets_installed": false
+}

@@ -1,4 +1,4 @@
-# Medium Warrior model working pass
+# Approved Medium Warrior model
 
 The user-authored medium Warrior export intentionally excludes its cape and skirt.
 Keep the cape_sim and skirt_sim objects hidden; their untextured materials are
@@ -37,3 +37,13 @@ are hashed before/after and must match. The prior strap fit and disabled cape
 and skirt are retained. Original models/textures are preserved; only a new
 private GLB/Blender copy and review renders are written. Review the exported
 material assignment and front/oblique views before use in animation sheets.
+
+## Approved base selection — 2026-10-29
+
+The user approved `D1 Warrior Medium - blue gray.glb` as the Medium Warrior
+base. `tools/warrior3d/medium_warrior_source.json` records its identity and
+appearance choices; use this approved revision for medium animation/sheet
+work, retaining the fitted straps, blue mail/outfit, darker helmet and gold
+accents. Keep cape/skirt disabled. The original GLB and earlier variants are
+preserved. Approval selects the model; animated clearance and medium sheet
+replacement remain pending, and the installed game is unchanged.
