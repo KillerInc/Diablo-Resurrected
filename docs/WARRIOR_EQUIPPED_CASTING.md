@@ -62,5 +62,29 @@ without changing the user's saved volume settings.
 
 ## Verification status
 
-Production rebuild and installation checks are in progress. Do not interpret
-preview approval or completed preparation as a completed installation.
+Installed graphics revision `equipped-casts-v1` on 2026-10-30. All 48 sheets
+cover 7,688 directional body/shadow frames. All 48 equipped sequences pass
+head/helmet clearance. Runtime grids retain 20 rows, except the medium
+sword/shield lightning sheet's original 21 rows. All 207 unaffected source PNGs
+are byte-identical to the prior pack, including every unarmed and heavy sheet.
+
+The full class validates across 255 sheets and 867 BC7 pages totaling 2.726 GiB.
+All pages decode; 170 compression samples pass, with worst visible RGB RMSE
+2.4358 and alpha RMSE 2.2727 on the 0-255 scale. All current render hashes match
+the final compiled manifest. Two 4,853-frame reference-save replays produce the
+same outcomes. F10/F11/UI, actual equipped-cast GPU draws, process-cached
+metadata, zero retained CPU player RGBA and zero warm page uploads pass.
+The normal GPU pack and isolated visual-alias pack use their own verified page
+counts; aliases and visual-only row resampling are never installed.
+
+The transactional installer backs up replaced PNGs/pages and retires obsolete
+casting pages only. Synthetic success and rollback-after-retirement tests pass.
+The private archive preserves four complete animated character models, two
+exact compact motion donors, seven equipment assets, all references/calibration,
+48 source sheets/review GIFs, actual in-game captures and the full GPU pack.
+The current 85-entry light motion catalog points to archived inputs for future
+armor rebuilds. No proprietary artwork or raw motion is published in Git.
+
+The replay using the installed executable also matches the reference outcome.
+Installed PNG/GPU hashes, all 207 preserved sheets, saves/settings, the unchanged
+executable and the single runtime index/table pass the final integrity check.

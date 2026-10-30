@@ -118,3 +118,14 @@ The graphics installer backs up prior medium PNGs/pages and tables, and a
 private assets archive preserves the approved base, exact motion donors,
 references, equipment, review GIFs and the complete runtime GPU pack. No
 proprietary artwork, models, raw motion or captures are included in Git.
+
+## Equipped casting revision — 2026-10-30
+
+`equipped-casts-v1` replaces the 24 equipped medium FM/LM/QM sheets and the
+corresponding 24 light sheets with approved native Aura Fanaticism motion.
+Weapons/shields remain held; unarmed casts and all other actions are preserved.
+The body model, cape/skirt visibility, colors, short walk and town equipment
+remain unchanged. The `medium-v1` figures above describe that earlier installed
+revision; the current class has 867 pages totaling 2.726 GiB. See
+[the equipped casting record](WARRIOR_EQUIPPED_CASTING.md) for the current
+render, grip-clearance, runtime and installation proofs.
