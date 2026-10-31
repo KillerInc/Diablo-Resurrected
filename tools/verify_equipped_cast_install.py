@@ -12,6 +12,8 @@ def verify(root,pack,baseline,game,state):
  pattern=r'plrgfx/warrior/w[lm][abdhmnstu]/w[lm][abdhmnstu](fm|lm)\.png' if spells else (r'plrgfx/warrior/w[lm][abdhmnstu]/w[lm][abdhmnstu]fm\.png' if fire else r'plrgfx/warrior/w[lm][abdhmstu]/w[lm][abdhmstu](fm|lm|qm)\.png')
  if proof['checks'].get('shield_bounds',False):
   expected=30;pattern=r'plrgfx/warrior/wm[dhu]/wm[dhu](as|at|aw|bl|fm|ht|lm|qm|st|wl)\.png'
+ if proof['checks'].get('heavy_bounds',False):
+  expected=85;pattern=r'plrgfx/warrior/wh[a-z]/wh[a-z](as|at|aw|bl|dt|fm|ht|lm|qm|st|wl)\.png'
  changed={n for n,h in old['source_png_hashes'].items() if assets['source_png_hashes'][n]!=h};assert len(changed)==expected and all(re.fullmatch(pattern,n) for n in changed)
  assert sha(hd/'layouts.csv')==assets['layout_sha256'] and not list(hd.rglob('*.layout')) and len(list(hd.rglob('*.gpus')))==1
  assert all(sha(Path(n))==h for n,h in json.loads(state.read_text()).items())

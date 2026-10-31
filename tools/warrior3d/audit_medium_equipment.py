@@ -8,7 +8,7 @@ file=Path(sys.argv[sys.argv.index('--')+1]).resolve();plan=json.loads(file.read_
 for job in plan['jobs']:
  ref=json.loads(Path(job['reference']).read_text())
  if not ref.get('equipment'):continue
- bpy.ops.wm.read_factory_settings(use_empty=True);bpy.context.scene.render.fps=30;bpy.ops.import_scene.gltf(filepath=job['model']);rig=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE');gear=attach_equipment(rig,ref['equipment']);head=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.data.materials and any(t in o.data.materials[0].name for t in ('P00_HED','Helmet dark gray metal'))];assert len(head)==(1 if job['sheet'].startswith('wl') else 2)
+ bpy.ops.wm.read_factory_settings(use_empty=True);bpy.context.scene.render.fps=30;bpy.ops.import_scene.gltf(filepath=job['model']);rig=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE');gear=attach_equipment(rig,ref['equipment']);head=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.data.materials and any(t in o.data.materials[0].name for t in ('P00_HED','Helmet dark gray metal','HLM'))];assert len(head)==(1 if job['sheet'].startswith('wl') else 2)
  contacts=[]
  for row,frame in enumerate(ref['source_frames']):
   bpy.context.scene.frame_set(int(frame));bpy.context.view_layer.update();deps=bpy.context.evaluated_depsgraph_get();trees=[]

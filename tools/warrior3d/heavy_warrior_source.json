@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "armor": "heavy",
-  "status": "preview_not_installed",
+  "status": "awaiting_black_selection",
   "source_file": "D1 Warrior Heavy.glb",
   "source_sha256": "f590eddf72033434d8ab3ce726e820271b8e5fc5067249add7196aefb009cced",
   "has_embedded_textures": true,
@@ -9,7 +9,7 @@
   "idle_motion_compatible": true,
   "animated_bones_matched": 193,
   "max_rest_matrix_difference": 1.0129064321517944e-05,
-  "mesh_skin_and_nodes_unchanged": true,
+  "mesh_skin_and_nodes_unchanged": false,
   "preview_hidden_material_tokens": [
     "cape_sim",
     "skirt_sim",
@@ -23,7 +23,7 @@
     "red_armor": "dark gray",
     "gold_trim_preserved": false,
     "source_file_unchanged": true,
-    "status": "preview_not_installed",
+    "status": "awaiting_black_selection",
     "gold_trim": "dark silver",
     "gold_to_silver": true,
     "normal_maps_unchanged": true,
@@ -32,5 +32,29 @@
     "trim_color": "brighter cool silver with metallic reflections",
     "helm_to_silver": true,
     "helm_finish": "same metallic silver as trim"
-  }
+  },
+  "approved_on": "2026-10-31",
+  "approved_model_sha256": "AA31CDA058D3A2C5E979DC45DDD74187F718ABEF62B01728391320D6DEE6925B",
+  "shadow_material_tokens": [
+    "P00_BOD",
+    "P00_HED",
+    "HLM",
+    "sets57_TRS_mat",
+    "sets57_GLV",
+    "sets57_LEG_mat",
+    "sets57_BTS"
+  ],
+  "shadow_anatomy_count": 7,
+  "front_cloth_removed": true,
+  "front_cloth_removed_vertices": 633,
+  "front_cloth_removed_components": 9,
+  "remaining_geometry_uv_weights_unchanged": true,
+  "mesh_change": "detached front cloth removed; waist armor and leg plates retained",
+  "black_variant_selected": null,
+  "black_options": [
+    "undersuit",
+    "plates",
+    "both"
+  ],
+  "heavy_sheets_installed": false
 }

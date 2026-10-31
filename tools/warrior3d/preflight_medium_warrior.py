@@ -19,13 +19,13 @@ for j in plan['jobs']:
   bpy.context.view_layer.update();deps=bpy.context.evaluated_depsgraph_get();chunks=[];geometry={}
   for o in parts+gear:
    ev=o.evaluated_get(deps);me=ev.to_mesh();a=np.empty(len(me.vertices)*3,dtype=np.float32);me.vertices.foreach_get('co',a);matrix=np.asarray(ev.matrix_world);v=a.reshape(-1,3)@matrix[:3,:3].T+matrix[:3,3];chunks.append(v)
-   if o in gear or 'Helmet' in o.data.materials[0].name:geometry[o.name]=(v,[tuple(p.vertices) for p in me.polygons])
+   if o in gear or ('Helmet' in o.data.materials[0].name or 'HLM' in o.data.materials[0].name):geometry[o.name]=(v,[tuple(p.vertices) for p in me.polygons])
    ev.to_mesh_clear()
   points=np.concatenate(chunks);assert np.isfinite(points).all() and np.abs(points).max()<8,(j['sheet'],row,'invalid deformation');allpoints.append(points)
   # Head clearance is critical; hand/forearm and stowed-back contacts are
   # intentionally not treated as failures for gripped weapons and shields.
   if j['sheet'].endswith('at'):
-   helmet=next(o for o in parts if 'Helmet' in o.data.materials[0].name);v,f=geometry[helmet.name];head=BVHTree.FromPolygons([Vector(p) for p in v],f)
+   helmet=next(o for o in parts if ('Helmet' in o.data.materials[0].name or 'HLM' in o.data.materials[0].name));v,f=geometry[helmet.name];head=BVHTree.FromPolygons([Vector(p) for p in v],f)
    for o in gear:
     v,f=geometry[o.name];tree=BVHTree.FromPolygons([Vector(p) for p in v],f);hits=tree.overlap(head)
     if hits:contacts.append({'row':row,'equipment':o.get('d1r_asset',o.name),'helmet_triangles':len(hits)})
