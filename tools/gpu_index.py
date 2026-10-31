@@ -18,7 +18,7 @@ def read_index(path):
         if not line:continue
         tag,rel,rows,pages,*fields=line.split()
         assert tag=='SHEET' and len(fields)==4 and rel not in records
-        assert rel.startswith(('plrgfx/','monsters/','missiles/','objects/','towners/')) and '..' not in rel and '\\' not in rel and rel.endswith('.png')
+        assert rel.startswith(('plrgfx/','monsters/','missiles/','objects/','towners/','levels/','ctrlpan/','data/','items/','ui_art/','gendata/')) and '..' not in rel and '\\' not in rel and rel.endswith('.png')
         density,columns,width,height=[default if field=='*' else int(field) for field,default in zip(fields,defaults)]
         rows,pages=int(rows),int(pages)
         assert min(density,columns,width,height,rows,pages)>0

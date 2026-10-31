@@ -251,7 +251,7 @@ int main()
     }
 
     // Compiled monster/missile records and class discovery need no PNG files.
-    for (const std::string &directory : {"monsters/zombie/", "missiles/", "objects/", "towners/"}) {
+    for (const std::string &directory : {"monsters/zombie/", "missiles/", "objects/", "towners/", "levels/", "ctrlpan/", "data/", "items/", "ui_art/", "gendata/"}) {
         AssetStore compiled;
         auto provider = std::make_unique<TableProvider>();
         auto *owner = provider.get();

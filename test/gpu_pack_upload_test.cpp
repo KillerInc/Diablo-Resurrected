@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     InitializeGpuPresenter(window);
     GetHdAssetStore().mountLoose(argv[1]);
     size_t sheets = 0, pages = 0, bytes = 0;
-    for (const char *prefix : {"hd/plrgfx/", "hd/monsters/", "hd/missiles/", "hd/objects/", "hd/towners/"}) {
+    for (const char *prefix : {"hd/plrgfx/", "hd/monsters/", "hd/missiles/", "hd/objects/", "hd/towners/", "hd/levels/", "hd/ctrlpan/", "hd/data/", "hd/items/", "hd/ui_art/", "hd/gendata/"}) {
         for (const auto &path : GetHdAssetStore().listGpu(prefix)) {
             AssetBytes metadata, layout;
             if (!GetHdAssetStore().readGpuWithLayout(path, metadata, layout)) return 2;

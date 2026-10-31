@@ -108,7 +108,8 @@ bool ParseGpuTable(const AssetBytes &bytes,
         unsigned count = 0, frames = 0, resolved[4] {};
         if (!(header >> magic >> path >> frames >> count >> fields[0] >> fields[1] >> fields[2] >> fields[3])
             || magic != "SHEET" || (header >> extra) || !IsSafeAssetId(path)
-            || !(path.starts_with("plrgfx/") || path.starts_with("monsters/") || path.starts_with("missiles/") || path.starts_with("objects/") || path.starts_with("towners/")) || path.size() < 4
+            || !(path.starts_with("plrgfx/") || path.starts_with("monsters/") || path.starts_with("missiles/") || path.starts_with("objects/") || path.starts_with("towners/")
+                || path.starts_with("levels/") || path.starts_with("ctrlpan/") || path.starts_with("data/") || path.starts_with("items/") || path.starts_with("ui_art/") || path.starts_with("gendata/")) || path.size() < 4
             || path.substr(path.size()-4) != ".png" || !frames || frames > 16384 || !count) return false;
         for (unsigned i = 0; i < 4; ++i) {
             if (fields[i] == "*") resolved[i] = values[i];

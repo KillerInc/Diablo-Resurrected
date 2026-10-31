@@ -6,7 +6,30 @@ from hd_layouts import read_table
 from install_layout_table import sha
 
 
-def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.json", inventory=None):
+def constant_blocks(image,bc,settings,cache):
+    """Native-4x nearest-neighbour art has solid 4x4 BC7 blocks.
+
+    Encode each distinct colour once with the same BC7 encoder/profile, then
+    reuse that block. Fall back if any block contains more than one colour.
+    """
+    import numpy as np
+    pixels=np.asarray(image);samples=pixels[::4,::4]
+    if any(not np.array_equal(pixels[y::4,x::4],samples) for y in range(4) for x in range(4)):
+        return None
+    colors,indices=np.unique(samples.reshape(-1,4).view('<u4').ravel(),return_inverse=True)
+    missing=[int(color) for color in colors if int(color) not in cache]
+    if missing:
+        rgba=np.asarray(missing,dtype='<u4').view('u1').reshape(-1,4)
+        strip=np.broadcast_to(np.repeat(rgba,4,axis=0)[None,:,:],(4,len(missing)*4,4)).copy()
+        encoded=bc.compress_blocks_bc7(bc.RGBASurface(strip.tobytes(),len(missing)*4,4),settings)
+        assert len(encoded)==16*len(missing)
+        cache.update((color,encoded[i*16:(i+1)*16]) for i,color in enumerate(missing))
+    blocks=np.frombuffer(b''.join(cache[int(color)] for color in colors),dtype='u1').reshape(-1,16)
+    return blocks[indices].tobytes()
+
+
+def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.json", inventory=None, page_size=2048, solid_blocks=False):
+    assert page_size in (2048,4096), 'Supported offline page sizes: 2048, 4096'
     sys.path.insert(0,str(encoder_path));import ispc_texcomp as bc
     settings=bc.BC7EncSettings.from_profile('alpha_fast')
     Image.MAX_IMAGE_PIXELS=None
@@ -17,6 +40,7 @@ def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.
     proof_file=output/proof_name
     assert Path(proof_name).name==proof_name
     proofs=json.loads(proof_file.read_text()) if proof_file.exists() else {}
+    block_cache={}
     for number,(rel,(cols,rows)) in enumerate(sorted(grids.items()),1):
         if (inventory is None and not rel.startswith('plrgfx/warrior/')) or (only and Path(rel).stem not in only):continue
         source=hd/rel; authored=custom/'HD'/rel
@@ -29,18 +53,20 @@ def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.
         meta=dst.with_suffix('.gpus')
         if meta.exists():
             assert rel in proofs, 'Existing sheet has no proof: '+rel
+            assert proofs[rel]['source_sha256']==sha(source) and proofs[rel]['prepared_sha256']==sha(path), 'Input changed: use a new output pack for '+rel
             continue
-        pages=[];frames=[];page=Image.new('RGBA',(2048,2048));x=y=rowh=0
+        pages=[];frames=[];page=Image.new('RGBA',(page_size,page_size));x=y=rowh=0
         def finish():
             nonlocal page,x,y,rowh
             height=max(4,((y+rowh+3)//4)*4)
-            trimmed=page.crop((0,0,2048,height))
-            data=bc.compress_blocks_bc7(bc.RGBASurface(trimmed.tobytes(),2048,height),settings)
-            assert len(data)==2048*height
+            trimmed=page.crop((0,0,page_size,height))
+            data=constant_blocks(trimmed,bc,settings,block_cache) if solid_blocks else None
+            if data is None:data=bc.compress_blocks_bc7(bc.RGBASurface(trimmed.tobytes(),page_size,height),settings)
+            assert len(data)==page_size*height
             index=len(pages);name=dst.with_suffix(f'.p{index}.bc7')
-            name.write_bytes(struct.pack('<II',2048,height)+data)
-            pages.append((name.name,2048,height,len(data)))
-            page=Image.new('RGBA',(2048,2048));x=y=rowh=0
+            name.write_bytes(struct.pack('<II',page_size,height)+data)
+            pages.append((name.name,page_size,height,len(data)))
+            page=Image.new('RGBA',(page_size,page_size));x=y=rowh=0
         for col in range(cols):
             for row in range(rows):
                 cell=image.crop((col*cw,row*ch,(col+1)*cw,(row+1)*ch))
@@ -50,9 +76,9 @@ def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.
                 left,top,right,bottom=box
                 # 4-texel transparent gutter; BC7 blocks cannot mix adjacent frames.
                 w=((right-left+8+3)//4)*4;h=((bottom-top+8+3)//4)*4
-                assert w<=2048 and h<=2048
-                if x+w>2048:x=0;y+=rowh;rowh=0
-                if y+h>2048:finish()
+                assert w<=page_size and h<=page_size
+                if x+w>page_size:x=0;y+=rowh;rowh=0
+                if y+h>page_size:finish()
                 page.paste(cell.crop(box),(x+4,y+4))
                 frames.append((len(pages),x+4,y+4,right-left,bottom-top,left,top))
                 x+=w;rowh=max(rowh,h)
@@ -78,7 +104,9 @@ if __name__=='__main__':
     p.add_argument('--inventory',type=Path,help='Validated original-CL2 grids for arbitrary installed world sheets')
     p.add_argument('--proof-name',default='gpu-pack-proof.json')
     p.add_argument('--finalize-index',action='store_true',help='After all workers finish, publish the one runtime index')
-    a=p.parse_args();pack(a.hd,a.custom,a.log,a.output,a.encoder_path,a.only,a.proof_name,json.loads(a.inventory.read_text()) if a.inventory else None)
+    p.add_argument('--page-size',type=int,choices=(2048,4096),default=2048)
+    p.add_argument('--solid-blocks',action='store_true',help='Reuse identical native-4x solid BC7 blocks; requires numpy')
+    a=p.parse_args();pack(a.hd,a.custom,a.log,a.output,a.encoder_path,a.only,a.proof_name,json.loads(a.inventory.read_text()) if a.inventory else None,a.page_size,a.solid_blocks)
     if a.finalize_index:
         from gpu_index import consolidate
         consolidate(a.output/'HD')
