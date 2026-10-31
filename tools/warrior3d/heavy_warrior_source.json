@@ -22,10 +22,13 @@
     "script": "tint_heavy_warrior.py",
     "red_armor": "dark gray",
     "gold_trim_preserved": false,
-    "normal_roughness_metallic_maps_unchanged": true,
     "source_file_unchanged": true,
     "status": "preview_not_installed",
     "gold_trim": "dark silver",
-    "gold_to_silver": true
+    "gold_to_silver": true,
+    "normal_maps_unchanged": true,
+    "trim_metallic": 0.95,
+    "trim_roughness": 0.28,
+    "trim_color": "brighter cool silver with metallic reflections"
   }
 }
