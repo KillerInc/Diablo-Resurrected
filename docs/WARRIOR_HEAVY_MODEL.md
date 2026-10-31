@@ -34,3 +34,15 @@ compare all three options: undersuit/recesses, main plates, and both. Fresh
 rotating previews use identical pose and lighting with front cloth removed.
 Full production is on hold for that appearance selection. The installed medium
 shield revision and light/medium artwork remain unchanged.
+
+## Updated user model
+
+The user supplied D1 Warrior Heavy black.glb in place of the generated recolor
+options, then updated it again. The current tested source identity is recorded
+in heavy_warrior_source.json. Its 15 meshes and supplied textures/materials are
+preserved in an immutable private snapshot for testing. All 193 animated bones
+match the approved idle donor; rest-matrix error remains below 0.000011.
+The detached front cloth is removed using the same audited component pass.
+No recolor pass is applied to this supplied model. No heavy sheets are installed.
+The older generated-model production plan must be regenerated from this updated
+source before rendering or installation; it is not the current body candidate.

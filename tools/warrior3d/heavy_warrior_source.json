@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "armor": "heavy",
-  "status": "awaiting_black_selection",
-  "source_file": "D1 Warrior Heavy.glb",
-  "source_sha256": "f590eddf72033434d8ab3ce726e820271b8e5fc5067249add7196aefb009cced",
+  "status": "updated_user_black_model_tested",
+  "source_file": "D1 Warrior Heavy black.glb",
+  "source_sha256": "0cf8fc155da79f91b2225e7475e735a41bae9f7b9cbb4e7a261b81937d3debcc",
   "has_embedded_textures": true,
   "has_original_animation_clips": false,
   "idle_motion_compatible": true,
@@ -19,22 +19,12 @@
   "installed_heavy_sheets_unchanged": true,
   "previewed_on": "2026-10-31",
   "preview_material_pass": {
-    "script": "tint_heavy_warrior.py",
-    "red_armor": "dark gray",
-    "gold_trim_preserved": false,
-    "source_file_unchanged": true,
-    "status": "awaiting_black_selection",
-    "gold_trim": "dark silver",
-    "gold_to_silver": true,
-    "normal_maps_unchanged": true,
-    "trim_metallic": 0.95,
-    "trim_roughness": 0.28,
-    "trim_color": "brighter cool silver with metallic reflections",
-    "helm_to_silver": true,
-    "helm_finish": "same metallic silver as trim"
+    "supplied_materials_preserved": true,
+    "recolor_applied": false,
+    "front_cloth_removed": true,
+    "status": "tested_not_installed"
   },
   "approved_on": "2026-10-31",
-  "approved_model_sha256": "AA31CDA058D3A2C5E979DC45DDD74187F718ABEF62B01728391320D6DEE6925B",
   "shadow_material_tokens": [
     "P00_BOD",
     "P00_HED",
@@ -50,11 +40,33 @@
   "front_cloth_removed_components": 9,
   "remaining_geometry_uv_weights_unchanged": true,
   "mesh_change": "detached front cloth removed; waist armor and leg plates retained",
-  "black_variant_selected": null,
+  "black_variant_selected": "user-supplied black model",
   "black_options": [
     "undersuit",
     "plates",
     "both"
   ],
-  "heavy_sheets_installed": false
+  "heavy_sheets_installed": false,
+  "previous_preview_source": {
+    "source_file": "D1 Warrior Heavy.glb",
+    "source_sha256": "f590eddf72033434d8ab3ce726e820271b8e5fc5067249add7196aefb009cced"
+  },
+  "previous_preview_material_pass": {
+    "script": "tint_heavy_warrior.py",
+    "red_armor": "dark gray",
+    "gold_trim_preserved": false,
+    "source_file_unchanged": true,
+    "status": "awaiting_black_selection",
+    "gold_trim": "dark silver",
+    "gold_to_silver": true,
+    "normal_maps_unchanged": true,
+    "trim_metallic": 0.95,
+    "trim_roughness": 0.28,
+    "trim_color": "brighter cool silver with metallic reflections",
+    "helm_to_silver": true,
+    "helm_finish": "same metallic silver as trim"
+  },
+  "previous_generated_model_sha256": "AA31CDA058D3A2C5E979DC45DDD74187F718ABEF62B01728391320D6DEE6925B",
+  "source_mesh_count": 15,
+  "recolor_options_superseded": true
 }
