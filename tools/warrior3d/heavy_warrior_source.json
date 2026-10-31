@@ -108,7 +108,7 @@
     "source_sha256": "237560FEAE8E8E5E22DD133D6405ED0E6B8E6FADE25F372429DD0C1E04753D22",
     "preview_model_sha256": "2F998E5D9C142B319EA3EC0128AF977331DB6DDA204134FECC010BFDD8A8CD15",
     "reviewed_on": "2026-10-31",
-    "status": "preview_only_not_installed",
+    "status": "approved_building",
     "animated_bones_matched": 193,
     "max_rest_matrix_difference": 0,
     "supplied_materials_preserved": true,
@@ -125,7 +125,7 @@
     ],
     "extra_brightness_pass_applied": false,
     "brightness_preview": {
-      "status": "preview_only_not_installed",
+      "status": "approved_building",
       "exposure_stops": 1.0,
       "model_sha256": "304F2A3C0022E07CB35C06595638C393ACAEE3E15D1667080ECF208B71BBAF85",
       "armor_base_color_materials": 5,
@@ -146,5 +146,19 @@
         "mace_idle_directional_frames": 80
       }
     ]
+  },
+  "pending_replacement": {
+    "revision": "heavy-colour-v2",
+    "approved_on": "2026-10-31",
+    "model_sha256": "304F2A3C0022E07CB35C06595638C393ACAEE3E15D1667080ECF208B71BBAF85",
+    "original_source_sha256": "237560FEAE8E8E5E22DD133D6405ED0E6B8E6FADE25F372429DD0C1E04753D22",
+    "exposure_stops": 1.0,
+    "status": "approved_preflighting",
+    "sheets": 85,
+    "unique_motion_models": 39,
+    "mesh_geometry_weights_bindings_unchanged": true,
+    "all_599_node_transforms_unchanged": true,
+    "shadow_rasters_reused": true,
+    "protected_light_medium_sheets": 170
   }
 }

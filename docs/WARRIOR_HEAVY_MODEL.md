@@ -116,3 +116,19 @@ The user requested another half stop. The latest candidate is +1.0 EV total
 rather than re-encoding the previous adjustment. The same 80-cell idle was
 rendered and compared against +0.5 EV. The other material/geometry protections
 and preview-only installation status are unchanged.
+
+
+## Approved Colour rebuild in progress
+
+The user selected the +1.0 EV Colour candidate for all 85 heavy sheets. A new
+heavy-colour-v2 plan preserves the installed heavy motions and references,
+including the shield-only helmet clearance correction. Exact compact motion
+donors reduce temporary artwork duplication. All primitive attributes/indices,
+skin bindings and all 599 node transforms/parents match the installed body;
+therefore the validated shadow rasters can be reused while color frames are
+rendered again. Geometry and motion are unchanged by the brightness pass.
+The current medium-blue-gray-v2 pack is the preservation baseline. All 170
+light/medium sheets, their pages, index records and layouts must stay unchanged.
+The revision-aware transaction and rollback suite passes twelve tests.
+Installation still requires completed bounds, head-clearance, image and silent
+GPU replay proofs. The installed identity remains unchanged until then.
