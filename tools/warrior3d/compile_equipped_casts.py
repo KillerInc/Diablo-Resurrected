@@ -42,7 +42,7 @@ def compile(plan,baseline,encoder):
    small=work/(name+'-4x')
    if small.exists():small.rename(small.with_name(small.name+'-previous-'+str(time.time_ns())))
    prepare(hd,single,work/'native-grid.log',small,4)
-   t=custom/'HD'/rel;t.unlink();shutil.copy2(small/'HD'/rel,t)
+   t=custom/'HD'/rel;t.parent.mkdir(parents=True,exist_ok=True);t.unlink(missing_ok=True);shutil.copy2(small/'HD'/rel,t)
    meta=(compiled/'HD'/rel).with_suffix('.gpus')
    for p in [meta,*meta.parent.glob(meta.stem+'.p*.bc7')]:p.unlink()
    pack(hd,custom,work/'native-grid.log',compiled,encoder,only=[name])

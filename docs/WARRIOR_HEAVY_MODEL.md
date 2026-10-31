@@ -46,3 +46,21 @@ The detached front cloth is removed using the same audited component pass.
 No recolor pass is applied to this supplied model. No heavy sheets are installed.
 The older generated-model production plan must be regenerated from this updated
 source before rendering or installation; it is not the current body candidate.
+
+## Approved build in progress
+
+The user approved the updated black model and requested the full build. A fresh
+production source preserves its supplied material data and removes only the
+front cloth and previously disabled untextured panels. The 85-sheet plan retains
+native heavy frame counts. Identical-byte motion models were canonicalized from
+43 generated paths to 39 unique files; no motion data was changed.
+All 85 bounds audits and 66 equipped head-clearance sequences passed. Shield bash
+needed a further four-degree shield-only X rotation; arm motion is unchanged.
+The full heavy sheets are rendering. Installation remains pending complete GPU,
+replay and live-image validation; the 170 light/medium sheets must stay unchanged.
+
+The parallel medium comparison tool produces 45 individual weapon-only animation
+GIFs, five combined overviews and five eight-direction idle rotations. It reads
+actual installed PNGs and the vanilla NN-x8 reference using the runtime index's
+native row counts. Individual action comparisons show South. Generated media is
+kept in the private T-Pose Images directory, never in Git.

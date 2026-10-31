@@ -3,7 +3,7 @@ import bpy,argparse,sys,json,runpy,subprocess,time,gc,hashlib,shutil,os
 from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('plan',type=Path);p.add_argument('python',type=Path);p.add_argument('--only',nargs='+')
 a=p.parse_args(sys.argv[sys.argv.index('--')+1:]);file=a.plan.resolve();plan=json.loads(file.read_text());python=a.python.resolve();tools=Path(__file__).resolve().parent;progress_file=Path(plan['work'])/'render-progress.json';progress=json.loads(progress_file.read_text()) if progress_file.exists() else {};cache={};shadow_cache={}
-priority=['wmnst','wmnwl','wmdat','wmuat','wmbat','wmtat','wmaat','wmndt','wmnfm','wmnlm','wmnqm'];jobs=sorted(plan['jobs'],key=lambda j:priority.index(j['sheet']) if j['sheet'] in priority else 99)
+priority=['wmnst','wmnwl','wmdat','wmuat','wmbat','wmtat','wmaat','wmndt','wmnfm','wmnlm','wmnqm'];priority=[name[:1]+plan.get('armor','m')+name[2:] for name in priority];jobs=sorted(plan['jobs'],key=lambda j:priority.index(j['sheet']) if j['sheet'] in priority else 99)
 keys=['source_frames','rows','cell','equipment','root_anchor_frame','preserve_horizontal_root_motion','pose_offsets','direction_pose_offsets','redirect_fall','fire_effect','render_directions','sun_position','shadow_distance_gain','shadow_overscan','pose_image_offsets','direction_image_offsets','body_render_samples','shadow_render_samples']
 def invoke(script,args):
  sys.argv=[str(script),'--',*map(str,args)];runpy.run_path(str(script),run_name='__main__')

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "armor": "heavy",
-  "status": "updated_user_black_model_tested",
+  "status": "approved_rendering",
   "source_file": "D1 Warrior Heavy black.glb",
   "source_sha256": "0cf8fc155da79f91b2225e7475e735a41bae9f7b9cbb4e7a261b81937d3debcc",
   "has_embedded_textures": true,
@@ -22,7 +22,7 @@
     "supplied_materials_preserved": true,
     "recolor_applied": false,
     "front_cloth_removed": true,
-    "status": "tested_not_installed"
+    "status": "approved_building"
   },
   "approved_on": "2026-10-31",
   "shadow_material_tokens": [
@@ -40,7 +40,7 @@
   "front_cloth_removed_components": 9,
   "remaining_geometry_uv_weights_unchanged": true,
   "mesh_change": "detached front cloth removed; waist armor and leg plates retained",
-  "black_variant_selected": "user-supplied black model",
+  "black_variant_selected": "user-supplied updated black model",
   "black_options": [
     "undersuit",
     "plates",
@@ -68,5 +68,10 @@
   },
   "previous_generated_model_sha256": "AA31CDA058D3A2C5E979DC45DDD74187F718ABEF62B01728391320D6DEE6925B",
   "source_mesh_count": 15,
-  "recolor_options_superseded": true
+  "recolor_options_superseded": true,
+  "approved_model_sha256": "EF5937A6DC823A572ADA322932FEA6F9135ED55062B660183971928D0BB0359E",
+  "planned_sheet_count": 85,
+  "prepared_motion_models": 39,
+  "equipped_sequences_head_clear": 66,
+  "supplied_materials_preserved": true
 }

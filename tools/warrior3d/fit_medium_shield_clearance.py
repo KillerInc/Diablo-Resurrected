@@ -10,8 +10,7 @@ from paladin_equipment import attach_equipment
 parser=argparse.ArgumentParser(description='Fit shield-only helmet clearance; preserve character animation and approved idle fit.');parser.add_argument('plan',type=Path);args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);root=args.plan.resolve().parent;plan=json.loads(args.plan.read_text());audit=json.loads((root/'all-equipment-head-audit.json').read_text());bad={r['sheet'] for r in audit if r['head_contacts']};results=json.loads((root/'shield-pose-clearance.json').read_text()) if (root/'shield-pose-clearance.json').exists() else []
 for job in plan['jobs']:
  if job['sheet'] not in bad:continue
- if any(e.get('pose_clearance') for e in json.loads(Path(job['reference']).read_text()).get('equipment',[])):continue
- ref=json.loads(Path(job['reference']).read_text());bpy.ops.wm.read_factory_settings(use_empty=True);bpy.context.scene.render.fps=30;bpy.ops.import_scene.gltf(filepath=job['model']);rig=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE');gear=attach_equipment(rig,ref['equipment']);shield=next(o for o in gear if o.get('d1r_asset')=='shield_Medium.glb');item=next(e for e in ref['equipment'] if 'shield_Medium' in e['path']);bone=item['bone'];base=Matrix(item['local_transform']);vertices=[v.co.copy() for v in shield.data.vertices];faces=[tuple(p.vertices) for p in shield.data.polygons];heads=[o for o in bpy.context.scene.objects if o.type=='MESH' and any(s.material and any(t in s.material.name for t in ['P00_HED','Helmet dark gray metal']) for s in o.material_slots)];cache=[]
+ ref=json.loads(Path(job['reference']).read_text());bpy.ops.wm.read_factory_settings(use_empty=True);bpy.context.scene.render.fps=30;bpy.ops.import_scene.gltf(filepath=job['model']);rig=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE');gear=attach_equipment(rig,ref['equipment']);shield=next(o for o in gear if o.get('d1r_asset')=='shield_Medium.glb');item=next(e for e in ref['equipment'] if 'shield_Medium' in e['path']);bone=item['bone'];base=Matrix(item['local_transform']);vertices=[v.co.copy() for v in shield.data.vertices];faces=[tuple(p.vertices) for p in shield.data.polygons];heads=[o for o in bpy.context.scene.objects if o.type=='MESH' and any(s.material and any(t in s.material.name for t in ['P00_HED','Helmet dark gray metal','HLM']) for s in o.material_slots)];cache=[]
  for frame in ref['source_frames']:
   bpy.context.scene.frame_set(frame);bpy.context.view_layer.update();deps=bpy.context.evaluated_depsgraph_get();trees=[]
   for o in heads:
@@ -19,7 +18,7 @@ for job in plan['jobs']:
   cache.append((rig.matrix_world@rig.pose.bones[bone].matrix,trees))
  bpy.context.scene.frame_set(ref['source_frames'][0]);bpy.context.view_layer.update();pivot=rig.pose.bones[bone].matrix.inverted()@rig.pose.bones['hand.L'].head;normal=base.to_3x3().col[2].normalized();chosen=None
  for distance in (0,.03,.06,.10,.15,.20,.25):
-  for axis,degrees in [('Y',v) for v in (0,-15,-30,-45,-60,15,30,45,60)]+[(axis,v) for axis in ('X','Z') for v in (-15,15,-30,30,-45,45,-60,60)]:
+  for axis,degrees in [('Y',0)]+[(axis,sign*degrees) for degrees in range(2,62,2) for axis in ('X','Y','Z') for sign in (-1,1)]:
    transform=Matrix.Translation(normal*distance)@Matrix.Translation(pivot)@Matrix.Rotation(math.radians(degrees),4,axis)@Matrix.Translation(-pivot)@base
    okay=True
    for boneworld,trees in cache:
