@@ -25,14 +25,17 @@ void SurfaceBlit(const Surface &src, SDL_Rect srcRect, const Surface &dst, Point
 	for (unsigned h = srcRect.h; h != 0; --h) {
 		if (SkipColorIndexZero) {
 			for (unsigned w = srcRect.w; w != 0; --w) {
-				if (*srcBuf != 0)
+				if (*srcBuf != 0) {
 					*dstBuf = *srcBuf;
+					if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dstBuf, 1);
+				}
 				++srcBuf, ++dstBuf;
 			}
 			srcBuf += srcPitch - srcRect.w;
 			dstBuf += dstPitch - srcRect.w;
 		} else {
 			std::memcpy(dstBuf, srcBuf, srcRect.w);
+			if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dstBuf, srcRect.w);
 			srcBuf += srcPitch;
 			dstBuf += dstPitch;
 		}

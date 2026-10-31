@@ -475,3 +475,7 @@ uwp-project/Assets/ui_art
 /tmp/
 /compile_commands.json
 /tools/tmp
+
+# Written release notes are source documentation, not compiled Release output.
+!/docs/releases/
+!/docs/releases/*.md

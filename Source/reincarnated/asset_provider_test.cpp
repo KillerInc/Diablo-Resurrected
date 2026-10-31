@@ -1,12 +1,15 @@
 #include "asset_provider.hpp"
 
 #include <cassert>
+#include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
 #include <utility>
+#include <thread>
 
 using namespace reincarnated;
 namespace fs = std::filesystem;
@@ -24,6 +27,35 @@ public:
     }
 private:
     AssetBytes data_;
+};
+class TableProvider final : public AssetProvider {
+public:
+    std::string csv, gpu;
+    mutable unsigned gpuReads = 0;
+    mutable unsigned tableReads = 0;
+    mutable unsigned individualLayoutReads = 0;
+    bool read(const std::string &id, AssetBytes &bytes) const override
+    {
+        if (id == "hd/sprites.gpus") {
+            ++gpuReads; bytes.assign(gpu.begin(), gpu.end()); return !gpu.empty();
+        }
+        if (id == "hd/layouts.csv") {
+            ++tableReads;
+            bytes.assign(csv.begin(), csv.end());
+            return !csv.empty();
+        }
+        if (id == "hd/players/0.png" || id == "hd/players/a,b.png") {
+            bytes = {'p', 'n', 'g'};
+            return true;
+        }
+        if (id == "hd/players/0.png.layout") {
+            ++individualLayoutReads;
+            const std::string text = "96 128 48 128";
+            bytes.assign(text.begin(), text.end());
+            return true;
+        }
+        return false;
+    }
 };
 struct TemporaryDirectory {
     fs::path path;
@@ -61,11 +93,17 @@ int main()
     Write(high / id, "high");
     Write(low / (id + ".layout"), "96 128 48 128");
 
+    Write(low / "hd/layouts.csv", "path,layout\nplayers/0.png,96 128 48 128\n");
+
     AssetStore store;
     store.mount(std::make_unique<FakeArchiveProvider>(AssetBytes {'p','a','c','k'}));
     store.mountLoose(low.string());
     store.mountLoose(high.string());
     assert(store.providerCount() == 3);
+    const auto listed = store.list("hd/players/");
+    assert(std::count(listed.begin(), listed.end(), id) == 1);
+    assert(store.list("hd/../players").empty());
+    assert(store.list("hd/monsters").empty());
     AssetBytes value;
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "high");
@@ -74,7 +112,7 @@ int main()
     assert(std::string(value.begin(), value.end()) == "high");
     AssetBytes pairedImage;
     AssetBytes pairedLayout;
-    assert(store.readWithSidecar(id, pairedImage, pairedLayout));
+    assert(store.readWithLayout(id, pairedImage, pairedLayout));
     assert(std::string(pairedImage.begin(), pairedImage.end()) == "high");
     assert(pairedLayout.empty()); // high-priority override must not inherit base metadata
     assert(store.read(id + ".layout", value));
@@ -85,16 +123,148 @@ int main()
     fs::remove(high / id);
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "low");
-    assert(store.readWithSidecar(id, pairedImage, pairedLayout));
+    assert(store.readWithLayout(id, pairedImage, pairedLayout));
     assert(std::string(pairedLayout.begin(), pairedLayout.end()) == "96 128 48 128");
     fs::remove(low / id);
     assert(store.read(id, value));
     assert(std::string(value.begin(), value.end()) == "pack");
-    assert(store.readWithSidecar(id, pairedImage, pairedLayout));
+    assert(store.readWithLayout(id, pairedImage, pairedLayout));
     assert(pairedLayout.empty());
-    assert(!store.readWithSidecar("hd/../players/0.png", pairedImage, pairedLayout));
+    assert(!store.readWithLayout("hd/../players/0.png", pairedImage, pairedLayout));
     assert(pairedImage.empty() && pairedLayout.empty());
     assert(!store.read("hd/../players/0.png", value) && value.empty());
+
+    // A table wins over stale sidecars, and remains cached for the store's
+    // entire lifetime even if the source file changes or disappears.
+    AssetStore indexed;
+    auto provider = std::make_unique<TableProvider>();
+    auto *table = provider.get();
+    table->csv = "\xEF\xBB\xBFpath,layout\r\n"
+                 "PLAYERS/0.PNG,D1R_SHEET_V1 8 96 160\r\n"
+                 "\"players/a,b.png\",\"D1R_SHEET_V1 4 48 96\"\r\n";
+    indexed.mount(std::move(provider));
+    for (int i = 0; i < 20; ++i) {
+        assert(indexed.readWithLayout(id, pairedImage, pairedLayout));
+        assert(std::string(pairedLayout.begin(), pairedLayout.end()) == "D1R_SHEET_V1 8 96 160");
+    }
+    assert(table->tableReads == 1);
+    assert(table->individualLayoutReads == 0);
+
+    AssetStore parallel;
+    auto parallelProvider = std::make_unique<TableProvider>();
+    auto *parallelSource = parallelProvider.get();
+    parallelSource->csv = "path,layout\nplayers/0.png,D1R_SHEET_V1 8 96 160\n";
+    parallel.mount(std::move(parallelProvider));
+    std::vector<std::thread> readers;
+    for (int i = 0; i < 8; ++i) readers.emplace_back([&] {
+        for (int n = 0; n < 100; ++n) {
+            AssetBytes image, layout;
+            assert(parallel.readWithLayout(id, image, layout));
+            assert(std::string(layout.begin(), layout.end()) == "D1R_SHEET_V1 8 96 160");
+        }
+    });
+    for (auto &reader : readers) reader.join();
+    assert(parallelSource->tableReads == 1 && parallelSource->individualLayoutReads == 0);
+
+    AssetStore missingTable;
+    auto missing = std::make_unique<TableProvider>();
+    auto *missingSource = missing.get();
+    missingTable.mount(std::move(missing));
+    assert(missingTable.readWithLayout(id, pairedImage, pairedLayout) && pairedLayout.empty());
+    assert(missingSource->tableReads == 1 && missingSource->individualLayoutReads == 0);
+    table->csv.clear();
+    assert(indexed.readWithLayout("hd/players/a,b.png", pairedImage, pairedLayout));
+    assert(std::string(pairedLayout.begin(), pairedLayout.end()) == "D1R_SHEET_V1 4 48 96");
+    assert(table->tableReads == 1);
+
+    // A new store (the next process) reads the edited table. Missing rows use
+    // default alignment, never a lower provider's consolidated metadata.
+    Write(low / id, "low"); Write(high / id, "high");
+    Write(low / "hd/layouts.csv", "path,layout\nplayers/0.png,D1R_SHEET_V1 8 96 160\n");
+    Write(high / "hd/layouts.csv", "path,layout\nplayers/other.png,D1R_SHEET_V1 4 48 96\n");
+    AssetStore isolated;
+    isolated.mountLoose(low.string()); isolated.mountLoose(high.string());
+    assert(isolated.readWithLayout(id, pairedImage, pairedLayout) && pairedLayout.empty());
+    Write(high / "hd/layouts.csv", "path,layout\nplayers/0.png,D1R_SHEET_V1 8 50 100\n");
+    assert(isolated.readWithLayout(id, pairedImage, pairedLayout) && pairedLayout.empty());
+    AssetStore restarted;
+    restarted.mountLoose(high.string());
+    assert(restarted.readWithLayout(id, pairedImage, pairedLayout));
+    assert(std::string(pairedLayout.begin(), pairedLayout.end()) == "D1R_SHEET_V1 8 50 100");
+    fs::remove(high / id);
+    assert(isolated.readWithLayout(id, pairedImage, pairedLayout));
+    assert(std::string(pairedLayout.begin(), pairedLayout.end()) == "D1R_SHEET_V1 8 96 160");
+
+    // Invalid/ambiguous CSVs fail as a unit; individual sidecars are ignored.
+    for (const std::string &csv : {
+             "wrong,header\nplayers/0.png,bad\n",
+             "path,layout\n../escape.png,bad\n",
+             "path,layout\nplayers/0.png,first\nPLAYERS/0.PNG,duplicate\n",
+             "path,layout\n\"players/0.png,unclosed\n",
+             "path,layout\nplayers/0.png,value,extra\n" }) {
+        AssetStore invalid;
+        auto bad = std::make_unique<TableProvider>(); bad->csv = csv;
+        invalid.mount(std::move(bad));
+        assert(invalid.readWithLayout(id, pairedImage, pairedLayout));
+        assert(pairedLayout.empty());
+    }
+
+    {
+        const std::string sheet = "SHEET plrgfx/warrior/test.png 1 1 * * * *\npage.bc7 8 8\n0 0 0 8 8 0 0\n";
+        const std::string index = "D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\n" + sheet;
+        const std::string gpuId = "hd/plrgfx/warrior/test.png";
+        AssetStore gpuStore;
+        auto base = std::make_unique<TableProvider>(); auto *owner = base.get();
+        base->gpu = index; base->csv = "path,layout\nplrgfx/warrior/test.png,D1R_SHEET_V1 8 1 2\n";
+        gpuStore.mount(std::move(base));
+        auto overlay = std::make_unique<TableProvider>(); auto *top = overlay.get();
+        overlay->gpu = "D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET plrgfx/warrior/other.png 1 1 * * 3 4\nother.bc7 8 8\n0 0 0 8 8 0 0\n";
+        gpuStore.mount(std::move(overlay));
+        std::vector<std::thread> workers;
+        for (int i=0; i<8; ++i) workers.emplace_back([&] {
+            for (int j=0; j<50; ++j) {
+                AssetBytes metadata, anchors; const AssetProvider *actual=nullptr;
+                assert(gpuStore.readGpuWithLayout(gpuId,metadata,anchors,&actual));
+                assert(actual==owner && !anchors.empty());
+                assert(std::string(metadata.begin(),metadata.end()).find("D1R_GPU_SHEET_V1 4 1 1 2 2 1") == 0);
+            }
+        });
+        for(auto &worker:workers)worker.join();
+        assert(owner->gpuReads==1 && top->gpuReads==1 && owner->tableReads==1);
+        owner->gpu.clear(); // Cache remains immutable across later file changes.
+        assert(gpuStore.readGpuWithLayout(gpuId,pairedImage,pairedLayout));
+        assert(gpuStore.readGpuWithLayout("hd/plrgfx/warrior/other.png",pairedImage,pairedLayout));
+        assert(pairedLayout.empty()); // Never take an anchor from another provider.
+        assert(std::string(pairedImage.begin(),pairedImage.end()).find("4 1 1 3 4 1")!=std::string::npos);
+        for (const auto &bad : {index+sheet, index.substr(0,index.size()-10),
+                 std::string("D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET ../bad.png 1 1 * * * *\n"),
+                 std::string("D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET plrgfx/warrior/test.png 1 1 -4 * * *\n")}) {
+            AssetStore invalid;auto source=std::make_unique<TableProvider>();source->gpu=bad;
+            invalid.mount(std::move(source));
+            assert(!invalid.readGpuWithLayout(gpuId,pairedImage,pairedLayout));
+        }
+        AssetStore missing;auto source=std::make_unique<TableProvider>();auto *empty=source.get();
+        missing.mount(std::move(source));
+        assert(!missing.readGpuWithLayout(gpuId,pairedImage,pairedLayout));
+        empty->gpu=index;
+        assert(!missing.readGpuWithLayout(gpuId,pairedImage,pairedLayout) && empty->gpuReads==1);
+    }
+
+    // A sparse synthetic resource above the former 256 MiB byte cap must
+    // reach the PNG decoder. Other resource types retain their old policy.
+    const auto large = high / "hd/large.PNG";
+    {
+        std::ofstream file(large, std::ios::binary);
+        file.seekp(256ULL * 1024 * 1024);
+        file.put('\0');
+        if (!file) { std::fputs("Cannot create synthetic oversized PNG\n", stderr); return 1; }
+    }
+    LooseFileAssetProvider loose(high.string());
+    if (!loose.read("hd/large.PNG", value)) { std::fputs("Oversized PNG rejected by provider\n", stderr); return 1; }
+    if (value.size() != 256ULL * 1024 * 1024 + 1) { std::fputs("Oversized PNG truncated\n", stderr); return 1; }
+    value.clear(); value.shrink_to_fit();
+    fs::rename(large, high / "hd/large.dds");
+    if (loose.read("hd/large.dds", value)) { std::fputs("Non-PNG guard changed unexpectedly\n", stderr); return 1; }
 
     // Layout metadata is resolved by the same provider chain as image bytes.
     // An archive can supply the same asset ID later without touching renderer code.

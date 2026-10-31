@@ -1,3 +1,4 @@
+#include "reincarnated/performance_monitor.hpp"
 /**
  * @file diablo.cpp
  *
@@ -98,6 +99,7 @@
 #include "qol/xpbar.h"
 #include "quick_messages.hpp"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_presenter.hpp"
 #include "restrict.h"
 #include "stores.h"
 #include "storm/storm_net.hpp"
@@ -199,6 +201,9 @@ void StartGame(interface_mode uMsg)
 
 void FreeGame()
 {
+#ifdef USE_SDL3
+    reincarnated::ReleaseHdPlayerSheets();
+#endif
 	FreeMonsterHealthBar();
 	FreeXPBar();
 	FreeControlPan();
@@ -779,15 +784,41 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 
 	switch (event.type) {
 	case SDL_EVENT_KEY_DOWN:
+#ifdef USE_SDL3
+        if (SDLC_EventKey(event) == SDLK_F11) {
+            if (!event.key.repeat) {
+                auto &monitor = reincarnated::GetPerformanceMonitor();
+                monitor.visible = !monitor.visible;
+                Log("Performance overlay: {}", monitor.visible ? "on" : "off");
+                RedrawEverything();
+            }
+            return;
+        }
+#endif
 		// F10 is an application-level renderer hotkey, never a held action.
 		if (SDLC_EventKey(event) == SDLK_F10) {
 #ifndef USE_SDL1
 			if (!event.key.repeat) {
-				if (renderer == nullptr) {
+				if (
+#ifdef USE_SDL3
+                    !reincarnated::HasGpuPresenter()
+#else
+                    renderer == nullptr
+#endif
+                ) {
 					GetOptions().Graphics.upscale.SetValue(true);
 					ReinitializeRenderer();
 				}
-				if (renderer != nullptr) {
+				if (
+#ifdef USE_SDL3
+                    reincarnated::HasGpuPresenter()
+#else
+                    renderer != nullptr
+#endif
+                ) {
+#ifdef USE_SDL3
+                    reincarnated::GetPerformanceMonitor().resetWindow();
+#endif
 					reincarnated::GetRendererSwitch().onF10KeyDown(false);
 					Log("Renderer mode: {}", reincarnated::GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic");
 					reincarnated::ResetHdAssets();
@@ -1016,16 +1047,22 @@ FILE *SdlLogFile = nullptr;
 extern "C" void SdlLogToFile(void *userdata, int /*category*/, SDL_LogPriority priority, const char *message)
 {
 	FILE *file = reinterpret_cast<FILE *>(userdata);
-	static const char *const LogPriorityPrefixes[SDL_LOG_PRIORITY_COUNT] = {
-		"",
-		"VERBOSE",
-		"DEBUG",
-		"INFO",
-		"WARN",
-		"ERROR",
-		"CRITICAL"
-	};
-	std::fprintf(file, "%s: %s\n", LogPriorityPrefixes[priority], message);
+	// SDL3 adds TRACE before VERBOSE; positional SDL2 labels misclassify every
+	// priority. Select by enum value so diagnostics retain their real severity.
+	const char *prefix = "UNKNOWN";
+	switch (priority) {
+#ifdef USE_SDL3
+	case SDL_LOG_PRIORITY_TRACE: prefix = "TRACE"; break;
+#endif
+	case SDL_LOG_PRIORITY_VERBOSE: prefix = "VERBOSE"; break;
+	case SDL_LOG_PRIORITY_DEBUG: prefix = "DEBUG"; break;
+	case SDL_LOG_PRIORITY_INFO: prefix = "INFO"; break;
+	case SDL_LOG_PRIORITY_WARN: prefix = "WARN"; break;
+	case SDL_LOG_PRIORITY_ERROR: prefix = "ERROR"; break;
+	case SDL_LOG_PRIORITY_CRITICAL: prefix = "CRITICAL"; break;
+	default: break;
+	}
+	std::fprintf(file, "%s: %s\n", prefix, message);
 	std::fflush(file);
 }
 #endif

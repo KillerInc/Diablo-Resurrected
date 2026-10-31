@@ -1,3 +1,4 @@
+#include "reincarnated/performance_monitor.hpp"
 /**
  * @file dx.cpp
  *
@@ -25,9 +26,11 @@
 #include "controls/plrctrls.h"
 #include "engine/render/primitive_render.hpp"
 #include "headless_mode.hpp"
+#include "game_mode.hpp"
 #include "init.hpp"
 #include "options.h"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_presenter.hpp"
 #include "utils/display.h"
 #include "utils/log.hpp"
 #include "utils/sdl_wrap.h"
@@ -85,7 +88,10 @@ bool CanRenderDirectlyToOutputSurface()
 	    && outputSurface->format->BitsPerPixel == 8);
 #endif
 #else // !USE_SDL1
-	if (renderer != nullptr) return false;
+	#ifdef USE_SDL3
+    if (reincarnated::HasGpuPresenter()) return false;
+#endif
+    if (renderer != nullptr) return false;
 	SDL_Surface *outputSurface = GetOutputSurface();
 	// Assumes double-buffering is available.
 	return outputSurface->w == static_cast<int>(gnScreenWidth)
@@ -149,6 +155,9 @@ void dx_cleanup()
 	FreeVirtualGamepadTextures();
 	if (*GetOptions().Graphics.upscale)
 		SDL_DestroyRenderer(renderer);
+#endif
+#ifdef USE_SDL3
+    reincarnated::DestroyGpuPresenter();
 #endif
 	SDL_DestroyWindow(ghMainWnd);
 }
@@ -296,6 +305,9 @@ void RenderPresent()
 	SDL_Surface *surface = GetOutputSurface();
 
 	if (!gbActive) {
+#ifdef USE_SDL3
+        reincarnated::GetPerformanceMonitor().resetWindow();
+#endif
 #ifdef __EMSCRIPTEN__
 		// Just yield to browser when inactive instead of blocking
 		emscripten_sleep(1);
@@ -305,7 +317,15 @@ void RenderPresent()
 		return;
 	}
 
-#ifndef USE_SDL1
+#ifdef USE_SDL3
+    const uint64_t perfStart = SDL_GetTicksNS();
+    SDL_Surface *presentation = reincarnated::ComposeHdFrame(surface);
+    const uint64_t perfComposed = SDL_GetTicksNS();
+    if (ControlMode == ControlTypes::VirtualGamepad) RenderVirtualGamepad(presentation);
+    reincarnated::PresentGpuFrame(presentation);
+    reincarnated::GetPerformanceMonitor().record(perfStart, double(perfComposed - perfStart)/1e6, double(SDL_GetTicksNS() - perfComposed)/1e6, gbRunGame);
+    if (*GetOptions().Graphics.frameRateControl != FrameRateControl::VerticalSync) LimitFrameRate();
+#elif !defined(USE_SDL1)
 	if (renderer != nullptr) {
 #ifdef USE_SDL3
 		if (!SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)) ErrSdl();

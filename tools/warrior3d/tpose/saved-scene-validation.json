@@ -1,0 +1,8 @@
+{
+  "baked_loop_error": 0.0,
+  "bones": 66,
+  "action": "Tpose_repaired_joint_review",
+  "source_torso_joint_positions_preserved": true,
+  "shield_hidden": true,
+  "independent_pauldron": true
+}

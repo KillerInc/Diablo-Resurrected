@@ -86,6 +86,15 @@ project(DevilutionX
   LANGUAGES C CXX)
 set(PROJECT_VERSION_WITH_SUFFIX "${VERSION_PREFIX}${VERSION_SUFFIX}")
 
+# Product identity is independent of upstream network/save-format versions.
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/REINCARNATED_VERSION" REINCARNATED_DISPLAY_VERSION LIMIT_COUNT 1)
+if(NOT REINCARNATED_DISPLAY_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-[0-9A-Za-z.-]+)?$")
+  message(FATAL_ERROR "Invalid REINCARNATED_VERSION")
+endif()
+set(REINCARNATED_VERSION_MAJOR ${CMAKE_MATCH_1})
+set(REINCARNATED_VERSION_MINOR ${CMAKE_MATCH_2})
+set(REINCARNATED_VERSION_PATCH ${CMAKE_MATCH_3})
+
 # Platform definitions can override options and we want `cmake_dependent_option` to see the effects.
 # Note that a few options are still defined before this because they're needed by `VcPkgManifestFeatures.cmake`.
 include(Platforms)
@@ -101,6 +110,7 @@ DEBUG_OPTION(ASAN "Enable address sanitizer")
 DEBUG_OPTION(UBSAN "Enable undefined behaviour sanitizer")
 option(TSAN "Enable thread sanitizer (not compatible with ASAN=ON)" OFF)
 DEBUG_OPTION(DEBUG "Enable debug mode in engine")
+option(REINCARNATED_DEBUG_COMPANION "Build the separately named developer-console executable" OFF)
 option(GPERF "Build with GPerfTools profiler" OFF)
 cmake_dependent_option(GPERF_HEAP_FIRST_GAME_ITERATION "Save heap profile of the first game iteration" OFF "GPERF" OFF)
 option(ENABLE_CODECOVERAGE "Instrument code for code coverage (only enabled with BUILD_TESTING)" OFF)
@@ -410,7 +420,18 @@ endif()
 # Keep the Windows prototype executable distinct from installed DevilutionX.
 # Retain the upstream CMake target name for its build dependencies.
 if(WIN32 AND NOT UWP_LIB)
-  set_target_properties(${BIN_TARGET} PROPERTIES OUTPUT_NAME "Diablo Reincarnated")
+  set(REINCARNATED_EXECUTABLE_NAME "Diablo Reincarnated")
+  if(REINCARNATED_DEBUG_COMPANION)
+    if(NOT DEBUG STREQUAL "ON")
+      message(FATAL_ERROR "The debug companion requires -DDEBUG=ON")
+    endif()
+    string(APPEND REINCARNATED_EXECUTABLE_NAME " Debug")
+  endif()
+  set_target_properties(${BIN_TARGET} PROPERTIES OUTPUT_NAME "${REINCARNATED_EXECUTABLE_NAME}")
+  if(USE_SDL3)
+    configure_file(Packaging/windows/reincarnated_version.rc.in "${CMAKE_CURRENT_BINARY_DIR}/reincarnated_version.rc" @ONLY)
+    target_sources(${BIN_TARGET} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/reincarnated_version.rc")
+  endif()
 endif()
 
 if(NOT UWP_LIB)

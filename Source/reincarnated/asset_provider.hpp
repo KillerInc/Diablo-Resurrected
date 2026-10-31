@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace reincarnated {
@@ -20,12 +21,14 @@ class AssetProvider {
 public:
     virtual ~AssetProvider() = default;
     virtual bool read(const std::string &assetId, AssetBytes &bytes) const = 0;
+    virtual std::vector<std::string> list(const std::string &prefix) const { return {}; }
 };
 
 class LooseFileAssetProvider final : public AssetProvider {
 public:
     explicit LooseFileAssetProvider(std::string root);
     bool read(const std::string &assetId, AssetBytes &bytes) const override;
+    std::vector<std::string> list(const std::string &prefix) const override;
 private:
     std::string root_;
 };
@@ -41,13 +44,25 @@ public:
     void mountLoose(std::string root);
 
     [[nodiscard]] bool read(const std::string &assetId, AssetBytes &bytes) const;
-    // Resolve image + optional metadata from the SAME mounted provider.
+    [[nodiscard]] std::vector<std::string> list(const std::string &prefix) const;
+    // Resolve image + optional HD/layouts.csv row from the SAME provider.
     // This avoids mixing an overriding PNG with stale metadata from a base pack.
-    [[nodiscard]] bool readWithSidecar(const std::string &assetId,
-        AssetBytes &bytes, AssetBytes &sidecar) const;
+    [[nodiscard]] bool readWithLayout(const std::string &assetId,
+        AssetBytes &bytes, AssetBytes &sidecar, const AssetProvider **provider = nullptr) const;
     [[nodiscard]] size_t providerCount() const noexcept { return providers_.size(); }
+    // Resolve a PNG's compiled record from the process-lifetime root GPU index.
+    // Records, pages and anchors always belong to the same provider.
+    [[nodiscard]] bool readGpuWithLayout(const std::string &pngId,
+        AssetBytes &bytes, AssetBytes &layout, const AssetProvider **provider = nullptr) const;
 private:
+    using LayoutRows = std::unordered_map<std::string, AssetBytes>;
+    const LayoutRows &layoutRows(const AssetProvider &provider) const;
     std::vector<std::unique_ptr<AssetProvider>> providers_;
+    // Loaded on first use, including a missing/invalid table. The global HD
+    // store lives until process exit; F10/image-cache resets do not evict this.
+    mutable std::unordered_map<const AssetProvider *, LayoutRows> layoutTables_;
+    const LayoutRows &gpuRows(const AssetProvider &provider) const;
+    mutable std::unordered_map<const AssetProvider *, LayoutRows> gpuTables_;
 };
 
 } // namespace reincarnated

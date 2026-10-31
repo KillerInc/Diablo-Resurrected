@@ -4,6 +4,7 @@
 #include "scene_commands.hpp"
 #ifndef USE_SDL1
 struct SDL_Renderer;
+struct SDL_Surface;
 #endif
 namespace reincarnated {
 RendererSwitch &GetRendererSwitch() noexcept;
@@ -23,5 +24,19 @@ bool QueueHdTile(int dungeonType, unsigned pieceId,
 #ifndef USE_SDL1
 void PresentHdOverlay(SDL_Renderer *renderer);
 void ResetHdAssets();
+#ifdef USE_SDL3
+struct SheetSource;
+struct HdCacheMetrics { size_t sheets = 0, bytes = 0, pinned = 0; uint64_t hits = 0, misses = 0, decodes = 0, failures = 0, evictions = 0, decodeNs = 0; };
+HdCacheMetrics GetHdCacheMetrics();
+struct HdPlayerCacheStats { size_t sheets; size_t bytes; };
+bool BeginHdPlayerPreload(const std::string &classPath);
+bool PreloadHdPlayerSheet(const SheetSource &source);
+HdPlayerCacheStats GetHdPlayerCacheStats();
+void ReleaseHdPlayerSheets();
+void EndHdWorldFrame();
+void SaveHdCursorBackground(int x, int y, int width, int height);
+void RestoreHdCursorBackground();
+SDL_Surface *ComposeHdFrame(SDL_Surface *classic);
+#endif
 #endif
 } // namespace reincarnated

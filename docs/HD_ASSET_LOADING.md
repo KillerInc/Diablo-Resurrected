@@ -11,17 +11,17 @@ All roots contain the `hd/` folder. Paths are checked in this order (first exist
 3. **Executable folder:** `<DevilutionX BasePath>/hd/...` — portable installation.
 4. **Engine assets directory:** `<DevilutionX AssetsPath>/hd/...` — shipped or unpacked defaults.
 
-There is no manifest, conversion step or repacking requirement: copy PNGs and optional text sidecars to a matching directory. No art is distributed by this repository.
+Copy PNGs to the matching directory and keep their optional alignment metadata in `hd/layouts.csv`. There is no artwork conversion or repacking requirement. No art is distributed by this repository.
 
 Example:
 
 ```text
 hd/
+  layouts.csv                   # one resident alignment table
   players/
     0.png                       # static Warrior smoke-test art
     0/
       0_0.png                   # class 0, direction 0, frame 0
-      0_0.png.layout            # optional logical size/pivot metadata
   monsters/
     12/
       2_3.png
@@ -32,10 +32,10 @@ hd/
 
 Use `python3 tools/generate_hd_test_pack.py --out .` to create a non-Blizzard 384×512 placeholder Warrior. Start the game from that directory and press F10 to compare it against classic art. The graphics still use the old renderer's logical 1×/2× world-space coordinates.
 
-The `.png.layout` files contain four whitespace-separated numbers:
-`width height pivot_x pivot_y` in *logical world-rendering pixels*, not source texels. PNGs without sidecars inherit classic draw dimensions and effective bottom-centered pivots.
+The `layout` CSV field for numeric images contains four whitespace-separated numbers:
+`width height pivot_x pivot_y` in *logical world-rendering pixels*, not source texels. Images without matching CSV rows inherit classic draw dimensions and effective bottom-centered pivots.
 
-Asset IDs must be normalized relative paths separated by `/`; absolute paths, `..`, `.`, empty path segments and backslashes are rejected. A single loose resource is limited to 256 MiB of compressed file data. Successfully loaded and missing images are cached until F10 switches modes or the SDL renderer is recreated, so editing files while staying in HD mode does not hot-reload them.
+Asset IDs must be normalized relative paths separated by `/`; absolute paths, `..`, `.`, empty path segments and backslashes are rejected. Non-PNG resources retain a 256 MiB byte guard; PNG size is diagnosed by the sheet loader without that arbitrary cap. Successfully loaded and missing images are cached until F10 switches modes or the SDL renderer is recreated, so editing files while staying in HD mode does not hot-reload them.
 
 ## Future archives: zero renderer changes
 
@@ -47,9 +47,9 @@ Asset IDs must be normalized relative paths separated by `/`; absolute paths, `.
 
 A future ZIP, MPQ or custom archive implementation only needs to provide `read()`, supplying exactly the same PNG and layout bytes. Mount it with `GetHdAssetStore().mountFallback(...)` to keep all loose overrides **higher priority**. There is no archive reader or encryption/compression format defined or promised in this patch.
 
-Image and sidecar metadata are loaded as a **pair from one provider**. If you override a PNG in a higher-priority loose folder without providing a sidecar, its metadata defaults to the original game size and pivot rather than borrowing the lower-priority pack's `.layout`.
+Images and CSV layout rows resolve from **one provider**. A higher-priority image without a row in its own table uses default metadata; it never borrows a lower provider's anchors. Individual `.layout` files are ignored. Tables are read once on first use and stay resident for the whole process; editing the CSV requires restarting the game, even after F10.
 
-The bytes flow through SDL_image's in-memory image decoder (`IMG_Load_RW` on SDL2 or `IMG_Load_IO` on SDL3), and layout sidecars are read from the same abstraction. Texture-cache invalidation after mounts is still the caller's responsibility; F10 toggling invokes `ResetHdAssets()`.
+The bytes flow through SDL_image's in-memory image decoder (`IMG_Load_RW` on SDL2 or `IMG_Load_IO` on SDL3), and `hd/layouts.csv` is read once from the same abstraction. Texture-cache invalidation after mounts is still the caller's responsibility; F10 toggling invokes `ResetHdAssets()`.
 
 ## Verification
 

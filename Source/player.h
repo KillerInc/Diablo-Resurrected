@@ -936,6 +936,9 @@ ClxSprite GetPlayerPortraitSprite(Player &player);
 bool IsPlayerUnarmed(Player &player);
 
 void LoadPlrGFX(Player &player, player_graphic graphic);
+#ifdef USE_SDL3
+void PreloadPlayerHdSprites(const Player &player, void (*progress)(size_t, size_t));
+#endif
 void InitPlayerGFX(Player &player);
 void ResetPlayerGFX(Player &player);
 

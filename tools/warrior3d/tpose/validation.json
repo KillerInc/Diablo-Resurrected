@@ -1,0 +1,142 @@
+{
+  "input": "D1+Warrior+T-Pose.glb",
+  "status": "working candidate",
+  "body_joint_positions_preserved": true,
+  "original_arms_down": {
+    "maximum": 5.0958800264552435,
+    "p99": 1.1984322483891885,
+    "over_3x": 10,
+    "worst_parts": {
+      "tripo_part_0": 4.365007810394877,
+      "tripo_part_1": 2.3814122878851633,
+      "tripo_part_27": 5.0958800264552435,
+      "tripo_part_36": 2.2093095381948107
+    }
+  },
+  "original_bend": {
+    "maximum": 2.496037811421594,
+    "p99": 1.0678008352368262,
+    "over_3x": 0,
+    "worst_parts": {
+      "tripo_part_0": 2.496037811421594,
+      "tripo_part_21": 2.1340440777214797,
+      "tripo_part_24": 2.1407360217974434
+    }
+  },
+  "pauldron_faces": 283,
+  "shield_hidden_reversibly": true,
+  "repaired_arms_down": {
+    "maximum": 1.9683707412197786,
+    "p99": 1.011528552775955,
+    "over_3x": 0,
+    "worst_parts": {}
+  },
+  "repaired_bend": {
+    "maximum": 1.9346250991455722,
+    "p99": 1.0560842421499481,
+    "over_3x": 0,
+    "worst_parts": {}
+  },
+  "pauldron_clearance": [
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -35
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20.0
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20.57090350616535
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -22.196699141100893
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -24.629874257261825
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -27.5
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -30.37012574273817
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -32.80330085889911
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -34.42909649383465
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -35.0
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -34.42909649383465
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -32.80330085889911
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -30.370125742738175
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.1926748300777466e-07,
+      "angle_degrees": -27.5
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -24.629874257261825
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.194999734487045e-07,
+      "angle_degrees": -22.196699141100893
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20.57090350616535
+    },
+    {
+      "intersections": 0,
+      "hinge_drift": 1.201947465904182e-07,
+      "angle_degrees": -20.0
+    }
+  ]
+}
