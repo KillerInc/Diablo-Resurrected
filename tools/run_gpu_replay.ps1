@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Root,[string]$Case='ui',[int]$Demo=1,[switch]$Capture,[switch]$NormalSpeed,[switch]$DisableGpuSprites,[string]$Executable,[switch]$ConfigureOnly)
+param([Parameter(Mandatory=$true)][string]$Root,[string]$Case='ui',[int]$Demo=1,[switch]$Capture,[switch]$NormalSpeed,[switch]$DisableGpuSprites,[string]$Executable,[switch]$ConfigureOnly,[ValidateRange(1,3600)][int]$TimeoutSeconds=360)
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path -LiteralPath $Root).Path
 $taskPackage=Join-Path $taskRoot 'package';$taskSave=Join-Path $taskRoot $Case
@@ -32,7 +32,7 @@ $taskArgs='--spawn --diablo --demo '+$Demo+$taskTimed+' --save-dir "'+$taskSave+
 $taskClock=[Diagnostics.Stopwatch]::StartNew()
 $taskProcess=Start-Process -FilePath $taskExecutable -ArgumentList $taskArgs -WorkingDirectory $taskPackage -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $taskRoot ($Case+'-stdout.log')) -RedirectStandardError (Join-Path $taskRoot ($Case+'-stderr.log'))
 $taskPeak=0L;$taskWorkingSet=0L
-while(-not $taskProcess.WaitForExit(1000)){$taskProcess.Refresh();$taskPeak=[Math]::Max($taskPeak,$taskProcess.PrivateMemorySize64);$taskWorkingSet=[Math]::Max($taskWorkingSet,$taskProcess.WorkingSet64);if($taskClock.Elapsed.TotalSeconds -gt 360){$taskProcess.Kill();throw 'Isolated GPU replay timeout'}}
+while(-not $taskProcess.WaitForExit(1000)){$taskProcess.Refresh();$taskPeak=[Math]::Max($taskPeak,$taskProcess.PrivateMemorySize64);$taskWorkingSet=[Math]::Max($taskWorkingSet,$taskProcess.WorkingSet64);if($taskClock.Elapsed.TotalSeconds -gt $TimeoutSeconds){$taskProcess.Kill();throw 'Isolated GPU replay timeout'}}
 $taskProcess.WaitForExit()
 @{exit=$taskProcess.ExitCode;peak_private_bytes=$taskPeak;peak_working_set_bytes=$taskWorkingSet;elapsed_seconds=$taskClock.Elapsed.TotalSeconds}|ConvertTo-Json|Set-Content (Join-Path $taskRoot ($Case+'-process.json'))
 Write-Output ($Case+': exit '+$taskProcess.ExitCode+' after '+[int]$taskClock.Elapsed.TotalSeconds+' seconds')
