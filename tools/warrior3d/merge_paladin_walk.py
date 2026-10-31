@@ -24,6 +24,15 @@ def matrix(node):
          2*(x*y-z*w)*s[1],(1-2*(x*x+z*z))*s[1],2*(y*z+x*w)*s[1],0,
          2*(x*z+y*w)*s[2],2*(y*z-x*w)*s[2],(1-2*(x*x+y*y))*s[2],0,*t,1]
 
+def logical_parent(doc,parents,index,animated_names):
+ parent=parents.get(index);joints={joint for skin in doc.get('skins',[]) for joint in skin.get('joints',[])}
+ while parent is not None:
+  node=doc['nodes'][parent];identity=max(abs(x-y) for x,y in zip(matrix(node),matrix({})))<1e-6
+  wrapper=node.get('name','').lower().startswith('armature') and parent not in joints and node.get('name') not in animated_names and identity
+  if not wrapper:return node.get('name')
+  parent=parents.get(parent)
+ return None
+
 def merge(character,animation,destination):
  c,cb=read(character);a,ab=read(animation);original=copy.deepcopy(c)
  assert not c.get('animations'),'Do not silently replace existing character animations'
@@ -31,16 +40,15 @@ def merge(character,animation,destination):
  ap={ch:i for i,n in enumerate(a['nodes']) for ch in n.get('children',[])}
  cp={ch:i for i,n in enumerate(c['nodes']) for ch in n.get('children',[])}
  targets={ch['target']['node'] for clip in a['animations'] for ch in clip['channels']}
+ animated_names={a['nodes'][i]['name'] for i in targets}
  max_delta=0
  for i in targets:
   name=a['nodes'][i]['name'];assert name in cn,('missing bone',name)
   j=cn[name];delta=max(abs(x-y) for x,y in zip(matrix(a['nodes'][i]),matrix(c['nodes'][j])))
   max_delta=max(max_delta,delta);assert delta<1e-4,('incompatible rest transform',name,delta)
-  if i in ap:
-   assert j in cp and a['nodes'][ap[i]]['name']==c['nodes'][cp[j]]['name'],('different parent',name)
-  elif j in cp:
-   # Blender wraps the skeleton in an identity Armature node.
-   parent=cp[j];assert max(abs(x-y) for x,y in zip(matrix(c['nodes'][parent]),matrix({})))<1e-6
+  # Exporters may add an unanimated identity Armature wrapper on either side.
+  # Compare logical parents without modifying either hierarchy or bind matrix.
+  assert logical_parent(a,ap,i,animated_names)==logical_parent(c,cp,j,animated_names),('different parent',name)
  viewbase=len(c.get('bufferViews',[]));accbase=len(c.get('accessors',[]));offset=len(cb)
  for v in a.get('bufferViews',[]):
   v=copy.deepcopy(v);assert v.get('buffer',0)==0;v['byteOffset']=v.get('byteOffset',0)+offset;c['bufferViews'].append(v)

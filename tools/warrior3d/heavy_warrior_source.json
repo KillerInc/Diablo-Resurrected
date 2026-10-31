@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "armor": "heavy",
+  "status": "preview_not_installed",
+  "source_file": "D1 Warrior Heavy.glb",
+  "source_sha256": "f590eddf72033434d8ab3ce726e820271b8e5fc5067249add7196aefb009cced",
+  "has_embedded_textures": true,
+  "has_original_animation_clips": false,
+  "idle_motion_compatible": true,
+  "animated_bones_matched": 193,
+  "max_rest_matrix_difference": 1.0129064321517944e-05,
+  "mesh_skin_and_nodes_unchanged": true,
+  "preview_hidden_material_tokens": [
+    "cape_sim",
+    "skirt_sim",
+    "loin_sim"
+  ],
+  "source_file_modified": false,
+  "installed_heavy_sheets_unchanged": true,
+  "previewed_on": "2026-10-31"
+}
