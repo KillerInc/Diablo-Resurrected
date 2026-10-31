@@ -82,3 +82,19 @@ One root index and one layout CSV remain process-cached. Engine 0.4.7-pre,
 normal user settings and saves were verified unchanged. All graphics tests
 muted their isolated audio settings. Artwork and reproducible inputs are
 private; Git contains source, tests and identity/validation metadata only.
+
+
+## Colour export review, 2026-10-31
+
+After reporting that the installed black armor loses detail, the user supplied
+D1 Warrior Heavy Colour.glb. Its identity is recorded as a candidate in the
+registry; the installed black identity is unchanged. All 193 animated bones
+match with zero rest-matrix difference. The usual audited front-cloth removal
+and disabled-panel selection were applied privately without recoloring.
+
+A complete ten-frame mace idle across eight directions was rendered using the
+existing production reference, scale and lighting. A side-by-side rotating GIF
+compares it with the installed black PNG. Embedded base-color image pixels
+confirm the helmet and torso changed; gloves, legs and boots remain identical
+to the old dark textures. No additional brightness pass or installation was
+performed. Models, images and the comparison evidence remain private.

@@ -102,5 +102,27 @@
     "warm_gpu_uploads": 0,
     "runtime_indexes": 1,
     "individual_layouts": 0
+  },
+  "candidate_review": {
+    "source_file": "D1 Warrior Heavy Colour.glb",
+    "source_sha256": "237560FEAE8E8E5E22DD133D6405ED0E6B8E6FADE25F372429DD0C1E04753D22",
+    "preview_model_sha256": "2F998E5D9C142B319EA3EC0128AF977331DB6DDA204134FECC010BFDD8A8CD15",
+    "reviewed_on": "2026-10-31",
+    "status": "preview_only_not_installed",
+    "animated_bones_matched": 193,
+    "max_rest_matrix_difference": 0,
+    "supplied_materials_preserved": true,
+    "front_cloth_removed": true,
+    "mace_idle_directional_frames": 80,
+    "base_color_images_changed": [
+      "helmet",
+      "torso"
+    ],
+    "base_color_images_unchanged": [
+      "gloves",
+      "legs",
+      "boots"
+    ],
+    "extra_brightness_pass_applied": false
   }
 }
