@@ -34,7 +34,7 @@ def install(binary, game, manifest, mirror_manifest, backup, validation):
     gpu = proof.get('gpu_sprites')
     if tuple(map(int, version.split('-')[0].split('.'))) >= (0,4,6):
         assert proof['checks'].get('gpu_sprites') and gpu and gpu['cpu_player_rgba_bytes'] == 0
-        assert gpu['sheets'] == proof['class_png_count'] and gpu['pack_file_hashes']
+        assert gpu.get('player_sheets', gpu['sheets']) == proof['class_png_count'] and gpu['pack_file_hashes']
         for name, digest in gpu['pack_file_hashes'].items():
             destination = (hd / name).resolve()
             assert destination.is_relative_to(hd.resolve()) and sha(destination) == digest
@@ -54,7 +54,7 @@ def install(binary, game, manifest, mirror_manifest, backup, validation):
                    'player_preload': proof['preload'], 'validation': proof['checks'],
                    'performance_monitor': proof.get('performance_monitor', {}),
                    'gpu_sprites': gpu,
-                   'policy': 'all selected-class sheets resident across equipment/F10/levels; BC7 GPU pages preferred, compatible CPU PNG fallback preserved'}
+                   'policy': ('all selected-class sheets resident across equipment/F10/levels; BC7-only HD world sprites, Classic fallback' if proof['checks'].get('png_free_runtime') else 'all selected-class sheets resident across equipment/F10/levels; BC7 GPU pages preferred, compatible CPU PNG fallback preserved')}
         updated = copy.deepcopy(current); updated['version'] = version; updated['renderer_build_revision'] = receipt
         data = json.dumps(updated, indent=2).encode('utf-8'); manifest.write_bytes(data); mirror_manifest.write_bytes(data)
         shutil.copy2(validation, backup / 'validation.json')

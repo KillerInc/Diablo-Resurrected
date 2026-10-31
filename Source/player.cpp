@@ -2186,7 +2186,7 @@ void PreloadPlayerHdSprites(const Player &player, void (*progress)(size_t, size_
     if (!reincarnated::BeginHdPlayerPreload(data.classPath)) return;
     const uint64_t started = SDL_GetTicks();
     const std::string prefix = "hd/plrgfx/" + data.classPath + "/";
-    const auto files = reincarnated::GetHdAssetStore().list(prefix);
+    const auto files = reincarnated::GetHdAssetStore().listGpu(prefix);
     size_t skipped = 0;
     std::vector<reincarnated::SheetSource> jobs;
     for (size_t i = 0; i < files.size(); ++i) {

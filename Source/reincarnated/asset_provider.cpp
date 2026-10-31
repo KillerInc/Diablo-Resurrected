@@ -108,7 +108,7 @@ bool ParseGpuTable(const AssetBytes &bytes,
         unsigned count = 0, frames = 0, resolved[4] {};
         if (!(header >> magic >> path >> frames >> count >> fields[0] >> fields[1] >> fields[2] >> fields[3])
             || magic != "SHEET" || (header >> extra) || !IsSafeAssetId(path)
-            || path.rfind("plrgfx/", 0) != 0 || path.size() < 4
+            || !(path.starts_with("plrgfx/") || path.starts_with("monsters/") || path.starts_with("missiles/") || path.starts_with("objects/") || path.starts_with("towners/")) || path.size() < 4
             || path.substr(path.size()-4) != ".png" || !frames || frames > 16384 || !count) return false;
         for (unsigned i = 0; i < 4; ++i) {
             if (fields[i] == "*") resolved[i] = values[i];
@@ -253,6 +253,21 @@ std::vector<std::string> AssetStore::list(const std::string &prefix) const
     return result;
 }
 
+std::vector<std::string> AssetStore::listGpu(const std::string &prefix) const
+{
+    std::string directory = LayoutKey(prefix);
+    if (!directory.empty() && directory.back() == '/') directory.pop_back();
+    if (!IsSafeAssetId(directory) || !directory.starts_with("hd/")) return {};
+    directory += '/';
+    std::unordered_set<std::string> seen;
+    for (auto it = providers_.rbegin(); it != providers_.rend(); ++it)
+        for (const auto &entry : gpuRows(**it))
+            if (entry.first.starts_with(directory)) seen.insert(entry.first);
+    std::vector<std::string> result(seen.begin(), seen.end());
+    std::sort(result.begin(), result.end());
+    return result;
+}
+
 void AssetStore::mountFallback(std::unique_ptr<AssetProvider> provider)
 {
     if (provider != nullptr)
@@ -349,7 +364,7 @@ bool AssetStore::readGpuWithLayout(const std::string &pngId,
 {
     bytes.clear(); layout.clear();
     if (provider) *provider = nullptr;
-    if (!IsSafeAssetId(pngId) || pngId.rfind("hd/plrgfx/", 0) != 0) return false;
+    if (!IsSafeAssetId(pngId) || !pngId.starts_with("hd/")) return false;
     const auto key = LayoutKey(pngId);
     for (auto it = providers_.rbegin(); it != providers_.rend(); ++it) {
         const auto &rows = gpuRows(**it);

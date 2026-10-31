@@ -740,6 +740,9 @@ SDL_AudioDeviceID OptionEntryAudioDevice::id() const
 
 GraphicsOptions::GraphicsOptions()
     : OptionCategoryBase("Graphics", N_("Graphics"), N_("Graphics Settings"))
+#ifdef USE_SDL3
+    , hdGraphics("HD Graphics", OptionEntryFlags::None, N_("HD Graphics"), N_("Use HD sprites. F10 switches modes; the last selection is remembered."), false)
+#endif
     , fullscreen("Fullscreen", OnlyIfSupportsWindowed | OptionEntryFlags::CantChangeInGame | OptionEntryFlags::RecreateUI, N_("Fullscreen"), N_("Display the game in windowed or fullscreen mode."),
 #ifdef __EMSCRIPTEN__
           false // Default to windowed mode for browser
@@ -811,6 +814,9 @@ std::vector<OptionEntryBase *> GraphicsOptions::GetEntries()
 	// clang-format off
 	return {
 		&resolution,
+#ifdef USE_SDL3
+		&hdGraphics,
+#endif
 #ifndef __vita__
 		&fullscreen,
 #endif

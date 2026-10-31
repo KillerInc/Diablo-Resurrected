@@ -819,10 +819,15 @@ void GameEventHandler(const SDL_Event &event, uint16_t modState)
 #ifdef USE_SDL3
                     reincarnated::GetPerformanceMonitor().resetWindow();
 #endif
-					reincarnated::GetRendererSwitch().onF10KeyDown(false);
-					Log("Renderer mode: {}", reincarnated::GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic");
-					reincarnated::ResetHdAssets();
-					RedrawEverything();
+#ifdef USE_SDL3
+                    GetOptions().Graphics.hdGraphics.SetValue(!reincarnated::GetRendererSwitch().usesHdRenderer());
+                    if (!demo::IsRunning()) SaveOptions();
+#else
+                    reincarnated::GetRendererSwitch().onF10KeyDown(false);
+                    reincarnated::ResetHdAssets();
+                    RedrawEverything();
+#endif
+                    Log("Renderer mode: {}", reincarnated::GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic");
 				}
 			}
 #endif
@@ -1876,6 +1881,17 @@ void OptionLanguageCodeChanged()
 		ui_sound_init();
 }
 
+#ifdef USE_SDL3
+void OptionHdGraphicsChanged()
+{
+    reincarnated::GetRendererSwitch().setMode(*GetOptions().Graphics.hdGraphics
+        ? reincarnated::RenderMode::HighDefinition : reincarnated::RenderMode::Classic);
+    reincarnated::ResetHdAssets();
+    RedrawEverything();
+}
+const auto OptionChangeHandlerHdGraphics = (GetOptions().Graphics.hdGraphics.SetValueChangedCallback(OptionHdGraphicsChanged), true);
+#endif
+
 const auto OptionChangeHandlerLanguage = (GetOptions().Language.code.SetValueChangedCallback(OptionLanguageCodeChanged), true);
 
 } // namespace
@@ -2834,6 +2850,11 @@ int DiabloMain(int argc, char **argv)
 
 	// Read settings including translation next. This will use the presence of fonts.mpq and look for assets in devilutionx.mpq
 	LoadOptions();
+#ifdef USE_SDL3
+    reincarnated::GetRendererSwitch().setMode(*GetOptions().Graphics.hdGraphics
+        ? reincarnated::RenderMode::HighDefinition : reincarnated::RenderMode::Classic);
+    Log("Initial renderer mode: {}", reincarnated::GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic");
+#endif
 	if (demo::IsRunning()) demo::OverrideOptions();
 
 	// Then look for a voice pack file based on the selected translation

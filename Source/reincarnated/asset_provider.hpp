@@ -45,6 +45,7 @@ public:
 
     [[nodiscard]] bool read(const std::string &assetId, AssetBytes &bytes) const;
     [[nodiscard]] std::vector<std::string> list(const std::string &prefix) const;
+    [[nodiscard]] std::vector<std::string> listGpu(const std::string &prefix) const;
     // Resolve image + optional HD/layouts.csv row from the SAME provider.
     // This avoids mixing an overriding PNG with stale metadata from a base pack.
     [[nodiscard]] bool readWithLayout(const std::string &assetId,

@@ -210,133 +210,30 @@ int main(int argc, char **argv)
         Check(!memoryWarnings.empty() && memoryWarnings.back().find("dimension_over_65536=1")!=std::string::npos);
 
         Check(SDL_Init(0));
-        // A target smaller than one sheet must evict others, never reject it.
-        Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_SHEET_CACHE_MB", "1", true));
-        Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_PROCESS_WARN_MB", "1", true));
+        // PNG-only providers now retain Classic pixels; the runtime must not
+        // decode their images even during player preload or HD drawing.
         gnScreenWidth=8; gnScreenHeight=8;
-        Palette.reset(SDL_CreatePalette(256));
-        Check(bool(Palette));
+        Palette.reset(SDL_CreatePalette(256)); Check(bool(Palette));
         logical_palette.fill(SDL_Color{0,0,0,255});
-        logical_palette[128]={255,0,0,255}; logical_palette[129]={0,255,0,255};
-        logical_palette[130]={0,0,255,255}; logical_palette[131]={255,255,255,255};
         Check(SDL_SetPaletteColors(Palette.get(),logical_palette.data(),0,256));
         SDLSurfaceUniquePtr pal(SDL_CreateSurface(8,8,SDL_PIXELFORMAT_INDEX8));
         PalSurface=pal.get(); Check(SDL_SetSurfacePalette(PalSurface,Palette.get()));
-        SDL_FillSurfaceRect(PalSurface,nullptr,0);
         Surface out(PalSurface);
-        auto memoryProvider = std::make_unique<MemoryProvider>();
-        auto *memorySource = memoryProvider.get();
+        auto memoryProvider=std::make_unique<MemoryProvider>();
+        auto *memorySource=memoryProvider.get();
         GetHdAssetStore().mount(std::move(memoryProvider));
         Check(BeginHdPlayerPreload("warrior"));
-        Check(!BeginHdPlayerPreload("warrior"));
-        Check(PreloadHdPlayerSheet(*source));
-        const auto pinned = GetHdPlayerCacheStats();
-        Check(pinned.sheets == 1 && pinned.bytes != 0);
-        ResetHdAssets();
-        Check(GetHdPlayerCacheStats().bytes == pinned.bytes);
-        Check(PreloadHdPlayerSheet(*source) && memorySource->imageReads == 1);
-        Check(BeginHdPlayerPreload("rogue"));
-        Check(GetHdPlayerCacheStats().sheets == 0);
-        Check(PreloadHdPlayerSheet(*source));
-        ReleaseHdPlayerSheets();
-        Check(GetHdPlayerCacheStats().bytes == 0);
-        Check(BeginHdPlayerPreload("warrior"));
-        Check(PreloadHdPlayerSheet(*source) && memorySource->imageReads == 3);
-        ReleaseHdPlayerSheets();
+        Check(!PreloadHdPlayerSheet(*source));
+        Check(GetHdPlayerCacheStats().sheets==0 && GetHdPlayerCacheStats().bytes==0);
         GetRendererSwitch().setMode(RenderMode::HighDefinition);
         gbRunGame=true;
-        BeginHdWorldFrame(2,0,0,8,8);
+        BeginHdWorldFrame(1,0,0,8,8);
+        Check(!HasHdSheet(sprite));
         ClxDraw(out,{0,3},sprite);
-        Check(out[{0,3}]==128 && out[{1,2}]==131); // classic buffer remains exact
+        Check(out[{0,3}]==128 && out[{1,2}]==131);
         EndHdWorldFrame();
-        SDLSurfaceUniquePtr classic(SDL_ConvertSurface(PalSurface,SDL_PIXELFORMAT_RGBA32));
-        auto *composed=ComposeHdFrame(classic.get());
-        auto *top=static_cast<uint8_t*>(composed->pixels)+4*composed->pitch;
-        auto *bottom=static_cast<uint8_t*>(composed->pixels)+7*composed->pitch;
-        Check(top[2]==255 && top[0]==0); // logical top-left blue at 2x
-        Check(bottom[0]==255 && bottom[1]==0); // bottom-left red
-        ResetHdAssets();
-
-        BeginHdWorldFrame(2,0,0,8,8);
-        ClxDrawTRN(out,{0,3},sprite,translation.data());
-        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
-        bottom=static_cast<uint8_t*>(composed->pixels)+7*composed->pitch;
-        Check(bottom[0]==0 && bottom[1]==255); // vanilla translation, red->green
-        ResetHdAssets();
-        std::array<std::array<uint8_t,LightTableSize>,NumLightingLevels> tables;
-        for (auto &table : tables) for (unsigned i=0;i<256;++i) table[i]=static_cast<uint8_t>(i);
-        tables[1][128]=129;
-        std::array<uint8_t,64> levels {}; levels.fill(1);
-        Lightmap lighting(static_cast<uint8_t*>(PalSurface->pixels),levels,PalSurface->pitch,tables,tables[0].data(),tables.back().data());
-        BeginHdWorldFrame(2,0,0,8,8);
-        ClxDrawWithLightmap(out,{0,3},sprite,lighting);
-        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
-        bottom=static_cast<uint8_t*>(composed->pixels)+7*composed->pitch;
-        Check(bottom[0]==0 && bottom[1]==255);
-        ResetHdAssets();
-        BeginHdWorldFrame(2,0,0,8,8);
-        ClxDrawBlended(out,{0,3},sprite);
-        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
-        bottom=static_cast<uint8_t*>(composed->pixels)+7*composed->pitch;
-        Check(bottom[0]==127 && bottom[1]==0);
-        ResetHdAssets();
-        BeginHdWorldFrame(2,0,0,8,8);
-        ClxDraw(out,{0,3},sprite);
-        out.SetPixel({0,3},131); // a later classic foreground covers the HD sprite
-        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
-        bottom=static_cast<uint8_t*>(composed->pixels)+7*composed->pitch;
-        Check(bottom[0]==255 && bottom[1]==255 && bottom[2]==255);
-        ResetHdAssets();
-        GetHdAssetStore().mount(std::make_unique<CanvasProvider>("D1R_SHEET_V1 2 2 3\n"));
-        SDL_FillSurfaceRect(PalSurface,nullptr,0);
-        BeginHdWorldFrame(1,0,0,8,8);
-        ClxDraw(out,{2,4},sprite);
-        Check(out[{1,2}]==0 && out[{2,4}]==128); // expanded HD pixels never enter the Classic buffer
-        EndHdWorldFrame(); classic.reset(SDL_ConvertSurface(PalSurface,SDL_PIXELFORMAT_RGBA32));
-        composed=ComposeHdFrame(classic.get());
-        auto pixel = [&](int x,int y) { return static_cast<uint8_t*>(composed->pixels)+y*composed->pitch+x*4; };
-        Check(pixel(1,2)[2]==255 && pixel(4,2)[0]==255); // larger than the original 2-pixel width
-        Check(pixel(1,5)[0]==255 && pixel(4,5)[1]==255); // extra bottom canvas and anchor
-        ResetHdAssets();
-        SDL_FillSurfaceRect(PalSurface,nullptr,0);
-        BeginHdWorldFrame(2,0,0,8,8);
-        ClxDraw(out,{1,2},sprite);
-        EndHdWorldFrame(); classic.reset(SDL_ConvertSurface(PalSurface,SDL_PIXELFORMAT_RGBA32));
-        composed=ComposeHdFrame(classic.get());
-        Check(pixel(0,0)[2]==255 && pixel(7,7)[1]==255); // same pivot at 2x
-        ResetHdAssets();
-        BeginHdWorldFrame(2,0,0,8,8);
-        ClxDraw(out,{1,2},sprite);
-        out.SetPixel({0,0},131); // later foreground covers extended pixels too
-        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
-        Check(pixel(0,0)[0]==255 && pixel(0,0)[1]==255 && pixel(0,0)[2]==255);
-        ResetHdAssets();
-        BeginHdWorldFrame(2,0,0,8,8);
-        ClxDraw(out,{0,0},sprite); // viewport clipping must retain the correct texture origin
-        EndHdWorldFrame(); composed=ComposeHdFrame(classic.get());
-        Check(pixel(0,0)[0]==255 && pixel(0,0)[2]==0);
-        ResetHdAssets();
-        GetHdAssetStore().mount(std::make_unique<CanvasProvider>("D1R_SHEET_V1 3 2 3"));
-        BeginHdWorldFrame(1,0,0,8,8);
-        Check(!HasHdSheet(sprite)); // malformed metadata takes the existing Classic fallback
-        EndHdWorldFrame();
-        ResetHdAssets();
-        GetHdAssetStore().mount(std::make_unique<LargeProvider>());
-        memoryWarnings.clear();
-        BeginHdWorldFrame(1,0,0,8,8);
-        Check(HasHdSheet(sprite)); // >128 MiB retained; >1 MiB cache target
-        EndHdWorldFrame();
-        Check(std::any_of(memoryWarnings.begin(), memoryWarnings.end(), [](const std::string &line) {
-            return line.find("HD_PNG_WARNING")!=std::string::npos && line.find("flags=7")!=std::string::npos;
-        }));
-        Check(std::any_of(memoryWarnings.begin(), memoryWarnings.end(), [](const std::string &line) {
-            return line.find("kind=sheet_cache flags=7")!=std::string::npos;
-        }));
-#ifdef _WIN32
-        Check(std::any_of(memoryWarnings.begin(), memoryWarnings.end(), [](const std::string &line) {
-            return line.find("kind=process_private_commit flags=7")!=std::string::npos;
-        }));
-#endif
+        Check(memorySource->imageReads==0);
+        ReleaseHdPlayerSheets();
         const auto perfPath = diagnosticPath.string() + ".csv";
         Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_PERF_LOG", perfPath.c_str(), true));
         {
@@ -371,10 +268,9 @@ int main(int argc, char **argv)
             std::ifstream file(diagnosticPath);
             const std::string diagnostics(std::istreambuf_iterator<char>(file), {});
             Check(diagnostics.find("HD_PNG_WARNING")!=std::string::npos);
-            Check(diagnostics.find("kind=sheet_cache flags=7")!=std::string::npos);
         }
         std::filesystem::remove(diagnosticPath);
-        std::puts("PASS: provenance, translations, legacy/expanded decode, 1x/2x anchors, viewport clipping, invalid metadata fallback, Classic buffer, lighting, blending and foreground occlusion");
+        std::puts("PASS: offline PNG diagnostics, provenance, PNG-free runtime Classic fallback and performance samples");
         return 0;
     } catch (const std::exception &e) { std::fprintf(stderr,"%s\n",e.what()); return 1; }
 }

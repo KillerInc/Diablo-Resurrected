@@ -5,6 +5,7 @@
 #include "controls/control_mode.hpp"
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <charconv>
 #include <cstring>
 #include <sstream>
@@ -12,13 +13,10 @@
 #include <unordered_map>
 #include <vector>
 #include <SDL3/SDL_surface.h>
-#include <SDL3_image/SDL_image.h>
 #include "engine/render/light_render.hpp"
 #include "game_mode.hpp"
 #include "dds_decode.hpp"
 #include "sheet_png.hpp"
-#include "sheet_memory.hpp"
-#include "sheet_diagnostics.hpp"
 #include "engine/palette.h"
 #include "engine/surface.hpp"
 #include "utils/display.h"
@@ -44,118 +42,9 @@ bool inWorld, ready, suppressed;
 int scale = 1, offsetX;
 SDL_Rect clip;
 
-struct CachedSheet { SheetImage image; uint64_t used = 0; bool pinned = false; };
-std::unordered_map<std::string, CachedSheet> sheets;
 std::mutex sheetMutex;
 std::string preloadedPlayerClass;
-size_t pinnedSheetBytes = 0;
-std::unordered_map<uint32_t, uint8_t> nearestColors;
 std::array<SDL_Color, 256> matchingPalette {};
-size_t sheetBytes = 0;
-uint64_t sheetClock = 0;
-HdCacheMetrics cacheMetrics;
-unsigned cacheWarningFlags = 0, processWarningFlags = 0;
-size_t SheetBudget()
-{
-    static const size_t bytes = MemoryTarget(SDL_getenv("D1R_SHEET_CACHE_MB"), 4096);
-    return bytes;
-}
-void WarnMemory(const char *kind, size_t bytes, size_t target, unsigned &seen, const std::string &source)
-{
-    const unsigned flags = MemoryWarningFlags(bytes, target);
-    if ((flags & ~seen) == 0) return;
-    seen |= flags;
-    SheetWarning(
-        "HD_MEMORY_WARNING kind={} flags={} used_mib={:.2f} target_mib={:.2f} source={} action=continue",
-        kind, flags, double(bytes) / MemoryMiB, double(target) / MemoryMiB, source);
-}
-void WarnProcessMemory(const std::string &source)
-{
-    static const size_t target = MemoryTarget(SDL_getenv("D1R_PROCESS_WARN_MB"), 8192);
-    WarnMemory("process_private_commit", ProcessPrivateMemoryBytes(), target, processWarningFlags, source);
-}
-
-CachedSheet *LoadSheet(const SheetSource &source, bool pin = false)
-{
-    std::unique_lock<std::mutex> lock(sheetMutex);
-    const std::string key = source.path + ":" + std::to_string(source.columns) + ":" + std::to_string(source.rows) + ":" + std::to_string(source.width);
-    auto found = sheets.find(key);
-    if (found != sheets.end()) {
-        ++cacheMetrics.hits;
-        if (pin && !found->second.pinned) { found->second.pinned = true; pinnedSheetBytes += found->second.image.rgba.size(); }
-        found->second.used = ++sheetClock; return &found->second;
-    }
-    // Independent PNG decoders run concurrently during the loading screen.
-    // MPQ/provenance discovery has already finished on the loading thread.
-    ++cacheMetrics.misses;
-    const uint64_t decodeStart = SDL_GetTicksNS();
-    lock.unlock();
-    CachedSheet entry;
-    entry.pinned = pin;
-    AssetBytes bytes, sidecar;
-    bool decoded = false;
-    if (GetHdAssetStore().readWithLayout(source.path, bytes, sidecar)) {
-        { const std::lock_guard<std::mutex> memoryLock(sheetMutex); WarnProcessMemory(source.path); }
-        SheetLayout layout;
-        const bool validLayout = sidecar.empty() || ParseSheetLayout(sidecar, layout);
-        decoded = validLayout && DecodeSheetPng(bytes, source, entry.image, sidecar.empty() ? nullptr : &layout);
-        if (!decoded) devilution::Log("HD sheet layout/decode rejected; preserving Classic fallback: {}", source.path);
-    }
-    lock.lock();
-    cacheMetrics.decodeNs += SDL_GetTicksNS() - decodeStart;
-    if (decoded) ++cacheMetrics.decodes; else ++cacheMetrics.failures;
-    // A concurrent request may have completed the same key first.
-    found = sheets.find(key);
-    if (found != sheets.end()) {
-        if (pin && !found->second.pinned) { found->second.pinned = true; pinnedSheetBytes += found->second.image.rgba.size(); }
-        found->second.used = ++sheetClock; return &found->second;
-    }
-    if (decoded) {
-        const size_t added = entry.image.rgba.size();
-        // Hero sheets are session-pinned. Leave at least 512 MiB for scene
-        // sprites when the requested hero set exceeds the ordinary LRU target.
-        const size_t pinnedAfter = pinnedSheetBytes + (pin ? added : 0);
-        const size_t available = SheetBudget() > pinnedAfter ? SheetBudget() - pinnedAfter : 0;
-        const size_t budget = pinnedAfter ? std::max(size_t(512 * MemoryMiB), available) : SheetBudget();
-        const size_t incoming = pin ? 0 : added;
-        while (incoming > budget || sheetBytes - pinnedSheetBytes > budget - incoming) {
-            auto victim = sheets.end();
-            for (auto it = sheets.begin(); it != sheets.end(); ++it)
-                if (!it->second.pinned && !it->second.image.rgba.empty() && (victim == sheets.end() || it->second.used < victim->second.used)) victim = it;
-            if (victim == sheets.end()) break;
-            sheetBytes -= victim->second.image.rgba.size();
-            sheets.erase(victim);
-            ++cacheMetrics.evictions;
-        }
-        sheetBytes += added;
-        if (pin) pinnedSheetBytes += added;
-        WarnMemory("sheet_cache", sheetBytes, SheetBudget(), cacheWarningFlags, source.path);
-        WarnProcessMemory(source.path);
-        devilution::Log("Loaded HD sheet: {} ({}x{}, {} directions, {} frames, {}x retained density)", source.path,
-            entry.image.width, entry.image.height, source.columns, source.rows, entry.image.density);
-    }
-    entry.used = ++sheetClock;
-    return &sheets.emplace(key, std::move(entry)).first->second;
-}
-
-uint8_t MatchColor(const uint8_t *rgba)
-{
-    const uint32_t rgb = (uint32_t(rgba[0]) << 16) | (uint32_t(rgba[1]) << 8) | rgba[2];
-    const auto found = nearestColors.find(rgb);
-    if (found != nearestColors.end()) return found->second;
-    unsigned distance = ~0U;
-    uint8_t match = 0;
-    for (unsigned i = 0; i < 256; ++i) {
-        const auto &c = matchingPalette[i];
-        const int r = int(rgba[0]) - c.r, g = int(rgba[1]) - c.g, b = int(rgba[2]) - c.b;
-        const unsigned d = r * r + g * g + b * b;
-        if (d < distance) { distance = d; match = static_cast<uint8_t>(i); }
-    }
-    // Bound the auxiliary truecolor matching table as well as the image cache.
-    if (nearestColors.size() >= 262144) nearestColors.clear();
-    nearestColors.emplace(rgb, match);
-    return match;
-}
 
 void EnsureSurface(devilution::SDLSurfaceUniquePtr &surface)
 {
@@ -216,6 +105,7 @@ void Pixel(int x, int y, SDL_Color color, bool blend)
 }
 Asset *Load(const std::string &path)
 {
+    if (path.ends_with(".png")) return nullptr; // HD world assets are compiled offline.
     const auto found = assets.find(path);
     if (found != assets.end()) return found->second.surface ? &found->second : nullptr;
     Asset image;
@@ -230,9 +120,6 @@ Asset *Load(const std::string &path)
                     std::memcpy(static_cast<uint8_t *>(image.surface->pixels) + y * image.surface->pitch,
                         decoded.rgba.data() + size_t(y) * decoded.width * 4, decoded.width * 4);
             }
-        } else {
-            auto *stream = SDL_IOFromConstMem(bytes.data(), bytes.size());
-            if (stream) image.surface.reset(IMG_Load_IO(stream, true));
         }
         if (image.surface) {
             if(image.surface->format!=SDL_PIXELFORMAT_RGBA32)image.surface.reset(SDL_ConvertSurface(image.surface.get(),SDL_PIXELFORMAT_RGBA32));
@@ -289,11 +176,22 @@ AssetStore &GetHdAssetStore()
 {
     static AssetStore store;
     static const bool initialized = [&] {
-        store.mountLoose(devilution::paths::AssetsPath());
-        store.mountLoose(devilution::paths::ExecutablePath());
-        store.mountLoose(devilution::paths::BasePath());
-        store.mountLoose(devilution::paths::PrefPath());
-        store.mountLoose(".");
+        // Keep the last occurrence at its original priority when executable,
+        // data and current directories identify the same physical pack.
+        const std::string roots[] { devilution::paths::AssetsPath(),
+            devilution::paths::ExecutablePath(), devilution::paths::BasePath(),
+            devilution::paths::PrefPath(), "." };
+        std::vector<std::filesystem::path> mounted;
+        std::vector<std::string> unique;
+        for (size_t i = 5; i > 0; --i) {
+            const auto &root = roots[i - 1];
+            std::error_code error;
+            const auto path = std::filesystem::weakly_canonical(root, error);
+            if (!error && std::find(mounted.begin(), mounted.end(), path) != mounted.end()) continue;
+            unique.push_back(root);
+            if (!error) mounted.push_back(path);
+        }
+        for (auto it = unique.rbegin(); it != unique.rend(); ++it) store.mountLoose(*it);
         return true;
     }();
     (void)initialized;
@@ -329,7 +227,6 @@ void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clip
     if (!HdCaptureActive) return;
     if (std::memcmp(matchingPalette.data(), devilution::logical_palette.data(), sizeof(matchingPalette)) != 0) {
         matchingPalette = devilution::logical_palette;
-        nearestColors.clear();
     }
     EnsureSurface(world); EnsureSurface(ui); EnsureSurface(composed);
     scale = zoom; offsetX = xOffset;
@@ -382,7 +279,7 @@ bool HasHdSheet(devilution::ClxSprite sprite)
 {
     if (!HdCaptureActive || !inWorld) return false;
     const auto *source = GetSheetSource(sprite);
-    return source && (LoadGpuPlayerSheet(*source) || !LoadSheet(*source)->image.rgba.empty());
+    return source && bool(LoadGpuSheet(*source));
 }
 
 bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite,
@@ -397,7 +294,7 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         static std::unordered_map<std::string,bool> traced;
         if(traced.emplace(source->path,true).second)devilution::Log("HD_PLAYER_DRAW source={}",source->path);
     }
-    if (auto gpu = devilution::ControlMode != devilution::ControlTypes::VirtualGamepad ? LoadGpuPlayerSheet(*source) : std::shared_ptr<GpuSheet>{}) {
+    if (auto gpu = devilution::ControlMode != devilution::ControlTypes::VirtualGamepad ? LoadGpuSheet(*source) : std::shared_ptr<GpuSheet>{}) {
         const auto *header=sprite.pixelData()-SheetHeaderSize;
         const unsigned group=devilution::LoadLE16(header+14), frame=devilution::LoadLE16(header+16);
         if(group>=gpu->columns || frame>=gpu->rows)return false;
@@ -429,63 +326,9 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         }
         QueueGpuSprite(std::move(draw));return true;
     }
-    auto &image = LoadSheet(*source)->image;
-    if (image.rgba.empty()) return false;
-    const auto *header = sprite.pixelData() - SheetHeaderSize;
-    const unsigned group = devilution::LoadLE16(header + 14), frame = devilution::LoadLE16(header + 16);
-    if (group >= source->columns || frame >= source->rows || image.cellHeight / image.density < sprite.height()) return false;
-    const int logicalHeight = image.cellHeight / image.density;
-    const int64_t top = int64_t(y) + 1 - image.anchorY;
-    const int64_t left = (int64_t(x) + source->width / 2 - image.anchorX + out.region.x) * scale + offsetX;
-    const int64_t upper = (top + out.region.y) * scale;
-    const int64_t w = int64_t(image.logicalWidth) * scale, h = int64_t(logicalHeight) * scale;
-    const auto *bakedTranslation = header + 18;
-    // Clip in the caller's local coordinates as well as to the world viewport.
-    const int64_t xBegin = std::max<int64_t>({left, clip.x, out.region.x * scale + offsetX, 0});
-    const int64_t xEnd = std::min<int64_t>({left + w, clip.x + clip.w, (out.region.x + out.w()) * scale + offsetX, world->w});
-    const int64_t yBegin = std::max<int64_t>({upper, out.region.y * scale, 0});
-    const int64_t yEnd = std::min<int64_t>({upper + h, clip.h, (out.region.y + out.h()) * scale, world->h});
-    if (xBegin >= xEnd || yBegin >= yEnd) return true;
-    // Nonempty clipped bounds are inside the actual screen, even when the
-    // source canvas/anchor is too large for 32-bit intermediate arithmetic.
-    for (int py = static_cast<int>(yBegin); py < yEnd; ++py) {
-        const unsigned sy = frame * image.cellHeight + (py - upper) * image.density / scale;
-        auto *dst = static_cast<uint8_t *>(world->pixels) + py * world->pitch;
-        for (int px = static_cast<int>(xBegin); px < xEnd; ++px) {
-            const unsigned sx = group * image.cellWidth + (px - left) * image.density / scale;
-            const auto *src = image.rgba.data() + (size_t(sy) * image.width + sx) * 4;
-            unsigned alpha = src[3];
-            if (!alpha) continue;
-            if (blend) alpha /= 2;
-            const uint8_t original = MatchColor(src);
-            uint8_t mapped = bakedTranslation[original];
-            if (translation) mapped = translation[mapped];
-            if (lightmap) {
-                const int localX = (px - offsetX) / scale - out.region.x;
-                const int localY = py / scale - out.region.y;
-                mapped = lightmap->adjustColor(mapped, *lightmap->getLightingAt(out.at(localX, localY)));
-            }
-            const auto &base = matchingPalette[original];
-            const auto &lit = devilution::Palette->colors[mapped];
-            const int originalChannels[3] { base.r, base.g, base.b };
-            const int litChannels[3] { lit.r, lit.g, lit.b };
-            // Preserve the sheet's truecolor smoothing residual around the
-            // nearest palette color while following vanilla TRN/light/fade.
-            const int intensity = std::min(256, (int(lit.r) + lit.g + lit.b) * 256 / std::max(1, int(base.r) + base.g + base.b));
-            for (int c = 0; c < 3; ++c) {
-                const int color = std::clamp(litChannels[c] + (int(src[c]) - originalChannels[c]) * intensity / 256, 0, 255);
-                if(c==0) {
-                    uint8_t rgb[3];
-                    for(int channel=0;channel<3;++channel)rgb[channel]=std::clamp(litChannels[channel]+(int(src[channel])-originalChannels[channel])*intensity/256,0,255);
-                    MaskGpuSpritePixel(px,py,rgb[0],rgb[1],rgb[2],alpha);
-                }
-                dst[px * 4 + c] = (color * alpha + dst[px * 4 + c] * (255 - alpha) + 127) / 255;
-            }
-            dst[px * 4 + 3] = 255;
-        }
-    }
-    return true;
+    return false; // Compiled resource unavailable: retain Classic pixels, never decode PNG.
 }
+
 bool QueueHdTile(int type, unsigned piece, int left, int bottom, int w, int h, int)
 {
     const auto base = "hd/tiles/" + std::to_string(type) + "/" + std::to_string(piece);
@@ -520,32 +363,22 @@ bool BeginHdPlayerPreload(const std::string &classPath)
 {
     const std::lock_guard<std::mutex> lock(sheetMutex);
     if (preloadedPlayerClass == classPath) return false;
-    for (auto it = sheets.begin(); it != sheets.end();) {
-        if (it->second.pinned) { sheetBytes -= it->second.image.rgba.size(); it = sheets.erase(it); }
-        else ++it;
-    }
-    pinnedSheetBytes = 0;
     preloadedPlayerClass = classPath;
     ReleaseGpuPlayerSheets();
     return true;
 }
-bool PreloadHdPlayerSheet(const SheetSource &source) { return bool(LoadGpuPlayerSheet(source)) || !LoadSheet(source, true)->image.rgba.empty(); }
+bool PreloadHdPlayerSheet(const SheetSource &source) { return bool(LoadGpuSheet(source)); }
 HdCacheMetrics GetHdCacheMetrics()
 {
-    const std::lock_guard<std::mutex> lock(sheetMutex);
-    auto result = cacheMetrics;
-    result.bytes = sheetBytes;
-    for (const auto &entry : sheets) if (!entry.second.image.rgba.empty()) ++result.sheets;
-    for (const auto &entry : sheets) if (entry.second.pinned && !entry.second.image.rgba.empty()) ++result.pinned;
-    const auto gpu=GetGpuSpriteStats();result.sheets+=gpu.sheets;result.pinned+=gpu.sheets;
-    return result;
+    const auto gpu = GetGpuSpriteStats();
+    HdCacheMetrics result;
+    result.sheets = gpu.sheets;
+    result.pinned = gpu.playerSheets;
+    return result; // No decoded CPU sheet buffers or PNG cache.
 }
 HdPlayerCacheStats GetHdPlayerCacheStats()
 {
-    const std::lock_guard<std::mutex> lock(sheetMutex);
-    size_t count = 0;
-    for (const auto &entry : sheets) if (entry.second.pinned && !entry.second.image.rgba.empty()) ++count;
-    return {count+GetGpuSpriteStats().sheets, pinnedSheetBytes};
+    return {GetGpuSpriteStats().playerSheets, 0};
 }
 void ReleaseHdPlayerSheets()
 {
@@ -554,23 +387,14 @@ void ReleaseHdPlayerSheets()
     {
         const std::lock_guard<std::mutex> lock(sheetMutex);
         preloadedPlayerClass.clear();
-        for (auto &entry : sheets) entry.second.pinned = false;
-        pinnedSheetBytes = 0;
     }
     ResetHdAssets();
 }
 void ResetHdAssets()
 {
     BeginGpuSpriteFrame();
-    const std::lock_guard<std::mutex> lock(sheetMutex);
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;
-    for (auto it = sheets.begin(); it != sheets.end();) {
-        if (!it->second.pinned) { sheetBytes -= it->second.image.rgba.size(); it = sheets.erase(it); }
-        else ++it;
-    }
-    nearestColors.clear();
-    cacheWarningFlags = 0; processWarningFlags = 0;
 }
 }
 #endif

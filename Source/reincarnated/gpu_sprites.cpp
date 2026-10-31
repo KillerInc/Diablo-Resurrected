@@ -95,8 +95,8 @@ void BeginGpuSpriteFrame(){draws.clear();ready=false;}
 void ReleaseGpuPlayerSheets(){const std::lock_guard<std::mutex> lock(cacheMutex);sheets.clear();}
 void DestroyGpuSprites(){BeginGpuSpriteFrame();ReleaseGpuPlayerSheets();
     for(auto &s:controls){if(s.mask)SDL_ReleaseGPUTexture(device,s.mask);if(s.light)SDL_ReleaseGPUTexture(device,s.light);if(s.palette)SDL_ReleaseGPUTexture(device,s.palette);}controls.clear();if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);staging=nullptr;stagingCapacity=0;if(nearestBuffer)SDL_ReleaseGPUBuffer(device,nearestBuffer);nearestBuffer=nullptr;nearestPalette.clear();if(nearestPipeline)SDL_ReleaseGPUComputePipeline(device,nearestPipeline);nearestPipeline=nullptr;if(pipeline)SDL_ReleaseGPUGraphicsPipeline(device,pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);pipeline=nullptr;sampler=nullptr;device=nullptr;}
-std::shared_ptr<GpuSheet> LoadGpuPlayerSheet(const SheetSource &source){
-    if(!pipeline||!sampler||!nearestPipeline||source.path.rfind("hd/plrgfx/",0)!=0)return {};
+std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source){
+    if(!pipeline||!sampler||!nearestPipeline)return {};
     const std::lock_guard<std::mutex> lock(cacheMutex);
     auto found=sheets.find(source.path);if(found!=sheets.end())return found->second;
     auto insertion=sheets.emplace(source.path,nullptr);
@@ -137,7 +137,7 @@ std::shared_ptr<GpuSheet> LoadGpuPlayerSheet(const SheetSource &source){
     devilution::Log("GPU_SHEET_RESIDENT source={} pages={} bytes={} density=4 cpu_rgba_bytes=0",source.path,pages,sheet->bytes);
     return sheet;
 }
-GpuSpriteStats GetGpuSpriteStats(){const std::lock_guard<std::mutex> lock(cacheMutex);GpuSpriteStats s;for(const auto &entry:sheets)if(entry.second){++s.sheets;s.bytes+=entry.second->bytes;}s.uploads=uploads;s.draws=drawCount;return s;}
+GpuSpriteStats GetGpuSpriteStats(){const std::lock_guard<std::mutex> lock(cacheMutex);GpuSpriteStats s;for(const auto &entry:sheets)if(entry.second){++s.sheets;if(entry.first.starts_with("hd/plrgfx/"))++s.playerSheets;s.bytes+=entry.second->bytes;}s.uploads=uploads;s.draws=drawCount;return s;}
 void QueueGpuSprite(GpuSpriteDraw draw){draws.push_back(std::move(draw));}
 void MaskGpuSpritePixel(int x,int y,unsigned char r,unsigned char g,unsigned char b,unsigned alpha){
     for(auto &draw:draws){int dx=x-draw.maskX,dy=y-draw.maskY;if(dx<0||dy<0||dx>=draw.maskW||dy>=draw.maskH)continue;

@@ -17,7 +17,7 @@ def install(pack,binary,game,manifest,mirror,backup,validation):
     original_manifest,original_mirror=manifest.read_bytes(),mirror.read_bytes()
     written=[];existed={};temporaries=[]
     try:
-        for name,digest in assets['files'].items():
+        for name,digest in sorted(assets['files'].items(),key=lambda item:item[0]=='sprites.gpus'):
             assert name.endswith(('.gpus','.bc7'))
             target=(hd/name).resolve();assert target.is_relative_to(hd)
             source=pack/'HD'/name;assert sha(source)==digest

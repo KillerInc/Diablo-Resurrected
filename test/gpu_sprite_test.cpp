@@ -14,6 +14,7 @@
 #include "game_mode.hpp"
 #include "options.h"
 #include "utils/display.h"
+#include "utils/paths.h"
 using namespace reincarnated;
 static void Check(bool ok,const char *what){if(!ok){std::fprintf(stderr,"FAIL %s: %s\n",what,SDL_GetError());std::exit(1);}}
 int main(){
@@ -24,10 +25,22 @@ int main(){
  {std::ofstream f(folder/"test.p0.bc7",std::ios::binary);uint32_t dimensions[2]={8,8};f.write(reinterpret_cast<char*>(dimensions),8);f.write(reinterpret_cast<const char*>(block),sizeof(block));}
  {std::ofstream f(root/"hd/sprites.gpus");f<<"D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET plrgfx/warrior/test/test.png 1 1 * * * *\ntest.p0.bc7 8 8\n0 0 0 8 8 0 0\n";}
  {std::ofstream f(root/"hd/layouts.csv");f<<"path,layout\nplrgfx/warrior/test/test.png,D1R_SHEET_V1 4 1 2\n";}
+ auto monsterFolder=root/"hd/monsters/test";std::filesystem::create_directories(monsterFolder);
+ std::filesystem::copy_file(folder/"test.p0.bc7",monsterFolder/"test.p0.bc7");
+ {std::ofstream f(root/"hd/sprites.gpus",std::ios::app);f<<"SHEET monsters/test/test.png 1 1 * * * *\ntest.p0.bc7 8 8\n0 0 0 8 8 0 0\n";}
+ // The current-directory pack must retain precedence over pref overrides,
+ // even when the data directory aliases the current directory.
+ auto pref=root/"pref-override";std::filesystem::create_directories(pref/"hd");
+ {std::ofstream f(pref/"hd/sprites.gpus");f<<"D1R_GPU_INDEX_V1\nDEFAULTS 4 1 3 2\nSHEET plrgfx/warrior/test/test.png 1 1 * * * *\nmissing.bc7 8 8\n0 0 0 8 8 0 0\n";}
+ const auto previousDirectory=std::filesystem::current_path();
+ std::filesystem::current_path(root);devilution::paths::SetBasePath(root.string());devilution::paths::SetPrefPath(pref.string());
  auto *window=SDL_CreateWindow("Synthetic GPU validation",256,256,SDL_WINDOW_HIDDEN);Check(window,"window");
  devilution::gnScreenWidth=128;devilution::gnScreenHeight=128;
- InitializeGpuPresenter(window);GetHdAssetStore().mountLoose(root.string());
- auto sheet=LoadGpuPlayerSheet(SheetSource{"hd/plrgfx/warrior/test/test.png",1,1,2});Check(bool(sheet),"BC7 load");
+ InitializeGpuPresenter(window);(void)GetHdAssetStore();
+ auto sheet=LoadGpuSheet(SheetSource{"hd/plrgfx/warrior/test/test.png",1,1,2});Check(bool(sheet),"BC7 load");
+ auto playerSheet=sheet;
+ sheet=LoadGpuSheet(SheetSource{"hd/monsters/test/test.png",1,1,2});Check(bool(sheet),"monster BC7 load without PNG");
+ Check(GetGpuSpriteStats().sheets==2&&GetGpuSpriteStats().playerSheets==1,"separate player and monster residency");
  Check(sheet->bytes==64&&sheet->anchorX==1&&sheet->anchorY==2,"resident data and anchor");
  auto *surface=SDL_CreateSurface(128,128,SDL_PIXELFORMAT_RGBA32);Check(surface,"base surface");
  SDL_FillSurfaceRect(surface,nullptr,SDL_MapSurfaceRGBA(surface,10,20,30,255));
@@ -65,8 +78,9 @@ int main(){
  Check(GetGpuSpriteStats().draws==300,"GPU lighting and translation draws");
  SDL_DestroySurface(image);SDL_DestroySurface(surface);
  // Drop every reference before releasing the GPU device.
- BeginGpuSpriteFrame();sheet.reset();ReleaseGpuPlayerSheets();Check(GetGpuSpriteStats().sheets==0,"class release");
+ BeginGpuSpriteFrame();sheet.reset();playerSheet.reset();ReleaseGpuPlayerSheets();Check(GetGpuSpriteStats().sheets==0,"class release");
  DestroyGpuPresenter();SDL_DestroyWindow(window);SDL_Quit();
+ std::filesystem::current_path(previousDirectory);
  Check(std::filesystem::equivalent(root.parent_path(),std::filesystem::temp_directory_path()),"temporary cleanup boundary");
  std::filesystem::remove_all(root);
  std::puts("PASS: synthetic BC7 GPU draw, exact lookup, shader lighting/TRN, native 2x viewport, transparent foreground, ordered actors, opaque coverage, cursor restore and resource release");

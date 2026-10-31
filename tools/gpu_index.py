@@ -18,7 +18,7 @@ def read_index(path):
         if not line:continue
         tag,rel,rows,pages,*fields=line.split()
         assert tag=='SHEET' and len(fields)==4 and rel not in records
-        assert rel.startswith('plrgfx/') and '..' not in rel and '\\' not in rel and rel.endswith('.png')
+        assert rel.startswith(('plrgfx/','monsters/','missiles/','objects/','towners/')) and '..' not in rel and '\\' not in rel and rel.endswith('.png')
         density,columns,width,height=[default if field=='*' else int(field) for field,default in zip(fields,defaults)]
         rows,pages=int(rows),int(pages)
         assert min(density,columns,width,height,rows,pages)>0
@@ -27,15 +27,18 @@ def read_index(path):
     return records
 
 
-def consolidate(hd):
-    hd=Path(hd);records={};headers=[]
-    for path in sorted((hd/'plrgfx').rglob('*.gpus')):
+def consolidate(hd,base_index=None):
+    hd=Path(hd);records=read_index(base_index) if base_index else {};headers=[]
+    for path in sorted(hd.rglob('*.gpus')):
+        if path==hd/'sprites.gpus':continue
         lines=path.read_text().splitlines()
         magic,*numbers=lines[0].split();assert magic=='D1R_GPU_SHEET_V1'
         density,columns,rows,width,height,pages=map(int,numbers)
         assert len(lines)==1+pages+columns*rows
         rel=path.relative_to(hd).with_suffix('.png').as_posix()
-        records[rel]=lines;headers.append((density,columns,width,height))
+        assert rel not in records, "Duplicate GPU record: "+rel
+        records[rel]=lines
+    headers=[tuple(int(lines[0].split()[i]) for i in (1,2,4,5)) for lines in records.values()]
     assert records,'No intermediate GPU metadata found'
     defaults=[Counter(header[i] for header in headers).most_common(1)[0][0] for i in range(4)]
     output=['D1R_GPU_INDEX_V1','DEFAULTS '+' '.join(map(str,defaults))]
@@ -56,4 +59,5 @@ def consolidate(hd):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('hd',type=Path)
-    consolidate(p.parse_args().hd)
+    p.add_argument('--base-index',type=Path,help='Preserve existing compiled records and pages')
+    a=p.parse_args();consolidate(a.hd,a.base_index)

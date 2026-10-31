@@ -250,6 +250,22 @@ int main()
         assert(!missing.readGpuWithLayout(gpuId,pairedImage,pairedLayout) && empty->gpuReads==1);
     }
 
+    // Compiled monster/missile records and class discovery need no PNG files.
+    for (const std::string &directory : {"monsters/zombie/", "missiles/", "objects/", "towners/"}) {
+        AssetStore compiled;
+        auto provider = std::make_unique<TableProvider>();
+        auto *owner = provider.get();
+        const std::string relative = directory + "test.png";
+        provider->gpu = "D1R_GPU_INDEX_V1\nDEFAULTS 4 1 2 2\nSHEET " + relative
+            + " 1 1 * * * *\npage.bc7 8 8\n0 0 0 8 8 0 0\n";
+        compiled.mount(std::move(provider));
+        const auto files = compiled.listGpu("hd/" + directory);
+        assert(files.size() == 1 && files[0] == "hd/" + relative);
+        AssetBytes metadata, anchors;
+        assert(compiled.readGpuWithLayout(files[0], metadata, anchors));
+        assert(owner->gpuReads == 1 && anchors.empty());
+    }
+
     // A sparse synthetic resource above the former 256 MiB byte cap must
     // reach the PNG decoder. Other resource types retain their old policy.
     const auto large = high / "hd/large.PNG";

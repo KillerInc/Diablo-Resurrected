@@ -6,20 +6,22 @@ from hd_layouts import read_table
 from install_layout_table import sha
 
 
-def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.json"):
+def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.json", inventory=None):
     sys.path.insert(0,str(encoder_path));import ispc_texcomp as bc
     settings=bc.BC7EncSettings.from_profile('alpha_fast')
     Image.MAX_IMAGE_PIXELS=None
     layouts=read_table(hd/'layouts.csv')
     grids={p.removeprefix('hd/'):(int(c),int(r)) for p,c,r in re.findall(r'Loaded HD sheet: (hd/[^ ]+) \([^\n]*?, (\d+) directions, (\d+) frames,',log.read_text(errors='replace'))}
+    if inventory is not None:
+        grids={name:(v['columns'],v['rows']) for name,v in inventory.items()}
     proof_file=output/proof_name
     assert Path(proof_name).name==proof_name
     proofs=json.loads(proof_file.read_text()) if proof_file.exists() else {}
     for number,(rel,(cols,rows)) in enumerate(sorted(grids.items()),1):
-        if not rel.startswith('plrgfx/warrior/') or (only and Path(rel).stem not in only):continue
+        if (inventory is None and not rel.startswith('plrgfx/warrior/')) or (only and Path(rel).stem not in only):continue
         source=hd/rel; authored=custom/'HD'/rel
         path=authored if authored.exists() else source
-        source_density=4 if authored.exists() else 8
+        source_density=inventory[rel]['source_density'] if inventory is not None else (4 if authored.exists() else 8)
         image=Image.open(path).convert('RGBA');cw,ch=image.width//cols,image.height//rows
         assert image.width%cols==image.height%rows==0 and cw%source_density==ch%source_density==0
         lw,lh=cw//source_density,ch//source_density
@@ -73,9 +75,10 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ['hd','custom','log','output','encoder_path']:p.add_argument(name,type=Path)
     p.add_argument('--only',nargs='+')
+    p.add_argument('--inventory',type=Path,help='Validated original-CL2 grids for arbitrary installed world sheets')
     p.add_argument('--proof-name',default='gpu-pack-proof.json')
     p.add_argument('--finalize-index',action='store_true',help='After all workers finish, publish the one runtime index')
-    a=p.parse_args();pack(a.hd,a.custom,a.log,a.output,a.encoder_path,a.only,a.proof_name)
+    a=p.parse_args();pack(a.hd,a.custom,a.log,a.output,a.encoder_path,a.only,a.proof_name,json.loads(a.inventory.read_text()) if a.inventory else None)
     if a.finalize_index:
         from gpu_index import consolidate
         consolidate(a.output/'HD')
