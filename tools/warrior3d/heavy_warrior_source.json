@@ -126,12 +126,25 @@
     "extra_brightness_pass_applied": false,
     "brightness_preview": {
       "status": "preview_only_not_installed",
-      "exposure_stops": 0.5,
-      "model_sha256": "CD65CCCB6BDDC9AB386FF48DB4650226551BC241A4DD9144E374843A1AEEB4D1",
+      "exposure_stops": 1.0,
+      "model_sha256": "304F2A3C0022E07CB35C06595638C393ACAEE3E15D1667080ECF208B71BBAF85",
       "armor_base_color_materials": 5,
       "geometry_alpha_normals_surface_maps_unchanged": true,
       "skin_equipment_lighting_shadows_unchanged": true,
-      "mace_idle_directional_frames": 80
-    }
+      "mace_idle_directional_frames": 80,
+      "source_exposure_stops": 0,
+      "added_since_previous": 0.5
+    },
+    "brightness_preview_history": [
+      {
+        "status": "preview_only_not_installed",
+        "exposure_stops": 0.5,
+        "model_sha256": "CD65CCCB6BDDC9AB386FF48DB4650226551BC241A4DD9144E374843A1AEEB4D1",
+        "armor_base_color_materials": 5,
+        "geometry_alpha_normals_surface_maps_unchanged": true,
+        "skin_equipment_lighting_shadows_unchanged": true,
+        "mace_idle_directional_frames": 80
+      }
+    ]
   }
 }

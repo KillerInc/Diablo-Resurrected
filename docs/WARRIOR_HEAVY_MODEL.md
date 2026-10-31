@@ -109,3 +109,10 @@ unchanged. Skin and equipment materials are excluded; no global render lift
 is applied. A second 80-cell mace-idle preview uses identical lighting and
 the unchanged shadow rasters. The variant remains a private preview, with
 installed heavy sheets unchanged.
+
+
+The user requested another half stop. The latest candidate is +1.0 EV total
+(2x scene-linear base color), calculated from the original Colour textures
+rather than re-encoding the previous adjustment. The same 80-cell idle was
+rendered and compared against +0.5 EV. The other material/geometry protections
+and preview-only installation status are unchanged.
