@@ -1919,7 +1919,16 @@ void DrawAndBlit()
 
 	const Rectangle &mainPanel = GetMainPanel();
 
-	if (gnScreenWidth > mainPanel.size.width || IsRedrawEverything()) {
+	bool persistentHud = false;
+	bool hudNeedsRedraw = false;
+#ifdef USE_SDL3
+	persistentHud = reincarnated::GetRendererSwitch().usesHdRenderer();
+	if (persistentHud) {
+		hudNeedsRedraw = !reincarnated::PrepareHdHudLayer(mainPanel.position.x, mainPanel.position.y,
+		    mainPanel.size.width, mainPanel.size.height);
+	}
+#endif
+	if ((!persistentHud && gnScreenWidth > mainPanel.size.width) || IsRedrawEverything() || hudNeedsRedraw) {
 		drawHealth = true;
 		drawMana = true;
 		drawControlButtons = true;
@@ -1932,6 +1941,10 @@ void DrawAndBlit()
 		drawCtrlPan = false;
 		hgt = gnViewportHeight;
 	}
+	// Widescreen still presents the complete world, including beside the HUD;
+	// it no longer forces unchanged HUD components to be drawn again.
+	if (persistentHud && gnScreenWidth > mainPanel.size.width)
+		hgt = gnScreenHeight;
 
 	const Surface &out = GlobalBackBuffer();
 	UndrawCursor(out);
@@ -1946,23 +1959,36 @@ void DrawAndBlit()
 #ifdef USE_SDL3
     reincarnated::GetPerformanceMonitor().drawMs = double(SDL_GetTicksNS() - perfDrawStart)/1e6;
 #endif
+	const Surface hudOut =
+#ifdef USE_SDL3
+	    reincarnated::HdHudLayerTarget(out);
+#else
+	    out;
+#endif
 	if (drawCtrlPan) {
-		DrawMainPanel(out);
+		DrawMainPanel(hudOut);
 	}
 	if (drawHealth) {
-		DrawLifeFlaskLower(out, !drawCtrlPan);
+		DrawLifeFlaskLower(hudOut, !drawCtrlPan);
 	}
 	if (drawMana) {
-		DrawManaFlaskLower(out, !drawCtrlPan);
+		DrawManaFlaskLower(hudOut, !drawCtrlPan);
 
-		DrawSpell(out);
+		DrawSpell(hudOut);
 	}
 	if (drawControlButtons) {
-		DrawMainPanelButtons(out);
+		DrawMainPanelButtons(hudOut);
 	}
 	if (drawBelt) {
-		DrawInvBelt(out);
+		DrawInvBelt(hudOut);
 	}
+#ifdef USE_SDL3
+	if (persistentHud) {
+		reincarnated::CommitHdHudLayer(drawCtrlPan || drawHealth || drawMana || drawControlButtons || drawBelt);
+		// Text and transient overlays stay above the retained HUD background.
+		DrawInfoBox(out);
+	}
+#endif
 	if (drawChatInput) {
 		DrawChatBox(out);
 	}

@@ -215,6 +215,8 @@ int main(int argc, char **argv)
         gnScreenWidth=8; gnScreenHeight=8;
         Palette.reset(SDL_CreatePalette(256)); Check(bool(Palette));
         logical_palette.fill(SDL_Color{0,0,0,255});
+        logical_palette[128]={255,0,0,255};logical_palette[129]={0,255,0,255};
+        logical_palette[130]={0,0,255,255};logical_palette[131]={255,255,255,255};
         Check(SDL_SetPaletteColors(Palette.get(),logical_palette.data(),0,256));
         SDLSurfaceUniquePtr pal(SDL_CreateSurface(8,8,SDL_PIXELFORMAT_INDEX8));
         PalSurface=pal.get(); Check(SDL_SetSurfacePalette(PalSurface,Palette.get()));
@@ -232,8 +234,99 @@ int main(int argc, char **argv)
         ClxDraw(out,{0,3},sprite);
         Check(out[{0,3}]==128 && out[{1,2}]==131);
         EndHdWorldFrame();
+        SDLSurfaceUniquePtr classic(SDL_CreateSurface(8,8,SDL_PIXELFORMAT_RGBA32));
+        auto *composed=ComposeHdFrame(classic.get());
+        const auto pixel=[&](int x,int y){return static_cast<uint8_t*>(composed->pixels)+y*composed->pitch+x*4;};
+        Check(pixel(0,3)[0]==255&&pixel(0,3)[1]==0);
+        ResetHdAssets();BeginHdWorldFrame(2,0,1,5,7);
+        ClxDraw(out,{0,3},sprite);EndHdWorldFrame();composed=ComposeHdFrame(classic.get());
+        Check(pixel(0,6)[0]==0&&pixel(1,6)[0]==255&&pixel(1,6)[1]==0);
+        Check(pixel(2,4)[0]==255&&pixel(2,4)[1]==255&&pixel(2,4)[2]==255);
+        Check(pixel(1,7)[0]==0&&pixel(1,7)[1]==0&&pixel(1,7)[2]==0);
         Check(memorySource->imageReads==0);
         ReleaseHdPlayerSheets();
+        {
+        // Compare batched writes with an independent scalar raster reference,
+        // including odd clipping, offsets, translated lighting and UI blending.
+        for(unsigned i=0;i<256;++i)logical_palette[i]={uint8_t(i),uint8_t(255-i),uint8_t(i*17),33};
+        Check(SDL_SetPaletteColors(Palette.get(),logical_palette.data(),0,256));
+        std::array<std::array<uint8_t,LightTableSize>,NumLightingLevels> spanTables{};
+        for(unsigned l=0;l<NumLightingLevels;++l)for(unsigned i=0;i<256;++i)spanTables[l][i]=uint8_t(i+l);
+        std::vector<uint8_t> levels(size_t(PalSurface->pitch)*8);
+        for(size_t i=0;i<levels.size();++i)levels[i]=uint8_t(i%NumLightingLevels);
+        Lightmap spanLight(static_cast<const uint8_t*>(PalSurface->pixels),levels,uint16_t(PalSurface->pitch),spanTables,spanTables[0].data(),spanTables.back().data());
+        std::array<uint8_t,256> translation{};for(unsigned i=0;i<256;++i)translation[i]=uint8_t(255-i);
+        std::array<uint8_t,8> incoming{};for(unsigned i=0;i<8;++i)incoming[i]=uint8_t(i*23+7);
+        for(int magnification:{1,2})for(int offset:{-3,0,3})for(int clipLeft:{0,1,3}){
+            ResetHdAssets();BeginHdWorldFrame(magnification,offset,clipLeft,5,7);
+            std::array<SDL_Color,64> expected;expected.fill(SDL_Color{0,0,0,255});
+            const auto apply=[&](int sx,int sy,unsigned length,bool blend){
+                for(unsigned i=0;i<length;++i){
+                    const auto raw=*out.at(sx+int(i),sy);
+                    const auto index=blend?spanTables[levels[size_t(sy)*PalSurface->pitch+sx+i]][translation[incoming[i]]]:raw;
+                    const auto c=logical_palette[index];
+                    for(int dy=0;dy<magnification;++dy)for(int dx=0;dx<magnification;++dx){
+                        const int px=(sx+int(i))*magnification+offset+dx,py=sy*magnification+dy;
+                        if(px<clipLeft||px>=std::min(8,clipLeft+5)||py<0||py>=7)continue;
+                        auto &dst=expected[py*8+px];
+                        if(blend){dst.r=(unsigned(dst.r)+c.r)/2;dst.g=(unsigned(dst.g)+c.g)/2;dst.b=(unsigned(dst.b)+c.b)/2;}
+                        else dst={c.r,c.g,c.b,255};
+                    }
+                }
+            };
+            for(int y=0;y<8;++y){for(int x=0;x<8;++x)*out.at(x,y)=uint8_t(x*31+y*19+offset+clipLeft);const int start=(y*3)%4;MirrorOpaque(out.at(start,y),8-start);apply(start,y,8-start,false);}
+            for(int y=0;y<8;++y){MirrorBlend(out.at(2,y),5,incoming.data(),0,translation.data(),&spanLight);apply(2,y,5,true);}
+            EndHdWorldFrame();
+            MirrorBlend(out.at(0,3),8,nullptr,20);
+            for(int x=0;x<8;++x){auto background=expected[3*8+x];if(x<clipLeft||x>=std::min(8,clipLeft+5))background=logical_palette[*out.at(x,3)];const auto c=logical_palette[20];expected[3*8+x]={uint8_t((unsigned(background.r)+c.r)/2),uint8_t((unsigned(background.g)+c.g)/2),uint8_t((unsigned(background.b)+c.b)/2),255};}
+            MirrorBlend(out.at(2,3),5,incoming.data(),0,translation.data());
+            for(int x=2;x<7;++x){auto &dst=expected[3*8+x];const auto c=logical_palette[translation[incoming[x-2]]];dst.r=(unsigned(dst.r)+c.r)/2;dst.g=(unsigned(dst.g)+c.g)/2;dst.b=(unsigned(dst.b)+c.b)/2;}
+            SDL_FillSurfaceRect(classic.get(),nullptr,SDL_MapSurfaceRGBA(classic.get(),0,0,0,255));
+            composed=ComposeHdFrame(classic.get());
+            for(int y=0;y<8;++y)for(int x=0;x<8;++x){const auto *actual=static_cast<const uint8_t*>(composed->pixels)+y*composed->pitch+x*4;const auto &e=expected[y*8+x];Check(actual[0]==e.r&&actual[1]==e.g&&actual[2]==e.b&&actual[3]==255);}
+        }
+        }
+        {
+            // HUD pixels survive a fresh world frame, while transient UI and
+            // cursor coverage do not become part of the retained layer.
+            ResetHdAssets();
+            Check(!PrepareHdHudLayer(2, 5, 4, 3));
+            BeginHdWorldFrame(1, 0, 0, 8, 8);
+            EndHdWorldFrame();
+            auto hud = HdHudLayerTarget(out);
+            Check(hud.surface != out.surface);
+            for (int y=5;y<8;++y)for(int x=2;x<6;++x)hud[{x,y}]=128;
+            CommitHdHudLayer(true);
+            out.SetPixel({3,6},130); // A temporary overlay above the HUD.
+            composed=ComposeHdFrame(classic.get());
+            Check(pixel(3,6)[2]==logical_palette[130].b);
+            Check(PrepareHdHudLayer(2,5,4,3));
+            BeginHdWorldFrame(1,0,0,8,8);
+            for(int y=0;y<8;++y)for(int x=0;x<8;++x)out.SetPixel({x,y},129);
+            EndHdWorldFrame();
+            CommitHdHudLayer(false);
+            composed=ComposeHdFrame(classic.get());
+            Check(out[{3,6}]==128);
+            Check(pixel(3,6)[0]==logical_palette[128].r && pixel(3,6)[2]==logical_palette[128].b);
+            Check(pixel(0,0)[0]==logical_palette[129].r);
+            hud=HdHudLayerTarget(out);hud[{4,6}]=131;
+            CommitHdHudLayer(true);composed=ComposeHdFrame(classic.get());
+            Check(pixel(4,6)[0]==logical_palette[131].r);
+            SaveHdCursorBackground(3,6,1,1);out.SetPixel({3,6},130);
+            RestoreHdCursorBackground();composed=ComposeHdFrame(classic.get());
+            Check(pixel(3,6)[0]==logical_palette[128].r);
+            auto changed=logical_palette[128];changed.r^=255;
+            Check(SDL_SetPaletteColors(Palette.get(),&changed,128,1));
+            Check(!PrepareHdHudLayer(2,5,4,3));
+            Check(!PrepareHdHudLayer(1,5,4,3));
+            GetRendererSwitch().setMode(RenderMode::Classic);
+            Check(!PrepareHdHudLayer(2,5,4,3));
+            BeginHdWorldFrame(1,0,0,8,8);
+            Check(HdHudLayerTarget(out).surface==out.surface);
+            GetRendererSwitch().setMode(RenderMode::HighDefinition);
+            ResetHdAssets();
+            Check(!PrepareHdHudLayer(2,5,4,3));
+        }
         const auto perfPath = diagnosticPath.string() + ".csv";
         Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_PERF_LOG", perfPath.c_str(), true));
         {

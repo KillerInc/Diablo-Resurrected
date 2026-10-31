@@ -25,7 +25,7 @@ def main():
     log = root / 'console.log'
     log.unlink(missing_ok=True)
     env = os.environ.copy()
-    env.update(D1R_TEST_AUDIO_GAIN='0.5', D1R_TRACE_PLAYER_SHEETS='1',
+    env.update(D1R_TEST_AUDIO_GAIN='0.5', D1R_TRACE_PLAYER_SHEETS='1', D1R_TEST_DISPLAY='left',
                D1R_PERF_LOG=str(root / 'console-performance.csv'))
     startup = subprocess.STARTUPINFO()
     startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW

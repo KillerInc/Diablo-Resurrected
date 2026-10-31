@@ -2,6 +2,7 @@
 #include "renderer_switch.hpp"
 #include "asset_provider.hpp"
 #include "scene_commands.hpp"
+namespace devilution { struct Surface; }
 #ifndef USE_SDL1
 struct SDL_Renderer;
 struct SDL_Surface;
@@ -34,6 +35,11 @@ bool PreloadHdPlayerSheet(const SheetSource &source);
 HdPlayerCacheStats GetHdPlayerCacheStats();
 void ReleaseHdPlayerSheets();
 void EndHdWorldFrame();
+// The persistent HUD sits below transient UI (menus, messages and cursor).
+// Its indexed backing keeps the existing dirty-component drawing routines.
+bool PrepareHdHudLayer(int x, int y, int width, int height);
+devilution::Surface HdHudLayerTarget(const devilution::Surface &fallback);
+void CommitHdHudLayer(bool changed);
 void SaveHdCursorBackground(int x, int y, int width, int height);
 void RestoreHdCursorBackground();
 SDL_Surface *ComposeHdFrame(SDL_Surface *classic);

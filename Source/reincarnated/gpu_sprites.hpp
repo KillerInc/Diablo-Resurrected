@@ -33,6 +33,9 @@ GpuSpriteStats GetGpuSpriteStats();
 void BeginGpuSpriteFrame();
 void QueueGpuSprite(GpuSpriteDraw draw);
 void MaskGpuSpritePixel(int x,int y,unsigned char r,unsigned char g,unsigned char b,unsigned alpha);
+// Opaque raster spans permanently hide earlier GPU pixels in their intersection.
+void MaskGpuSpriteOpaqueSpan(int x,int y,unsigned length);
+void MaskGpuSpriteBlendedSpan(int x,int y,const uint32_t *colors,unsigned length);
 void SaveGpuSpriteCursor();
 void RestoreGpuSpriteCursor();
 bool HasQueuedGpuSprites();

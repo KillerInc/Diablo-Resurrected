@@ -4,6 +4,7 @@
 #include "gpu_sprites.hpp"
 #include "controls/control_mode.hpp"
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <filesystem>
 #include <charconv>
@@ -13,6 +14,7 @@
 #include <unordered_map>
 #include <vector>
 #include <SDL3/SDL_surface.h>
+#include <SDL3/SDL_timer.h>
 #include "engine/render/light_render.hpp"
 #include "game_mode.hpp"
 #include "dds_decode.hpp"
@@ -34,6 +36,10 @@ struct Asset {
 };
 std::unordered_map<std::string, Asset> assets;
 devilution::SDLSurfaceUniquePtr world, ui, composed;
+devilution::SDLSurfaceUniquePtr hudIndexed, hudRgba;
+SDL_Rect hudRect {};
+std::array<SDL_Color, 256> hudPalette {};
+bool hudValid = false;
 std::vector<uint8_t> beforeUi;
 std::vector<uint8_t> cursorBehind;
 SDL_Rect cursorRect {};
@@ -45,6 +51,11 @@ SDL_Rect clip;
 std::mutex sheetMutex;
 std::string preloadedPlayerClass;
 std::array<SDL_Color, 256> matchingPalette {};
+struct DrawProfile { uint64_t opaqueSpans=0,opaquePixels=0,blendSpans=0,blendPixels=0,gpuPrepareNs=0,sprites=0; };
+DrawProfile drawProfile;
+bool profileFrame=false;
+std::vector<uint32_t> blendedColors;
+
 
 void EnsureSurface(devilution::SDLSurfaceUniquePtr &surface)
 {
@@ -203,7 +214,36 @@ void MirrorOpaque(const uint8_t *src, unsigned length)
     int x, y;
     if (!SourcePosition(src, x, y)) return;
     length = std::min(length, unsigned(devilution::PalSurface->w - x));
-    for (unsigned i = 0; i < length; ++i) Pixel(x + i, y, devilution::Palette->colors[src[i]], false);
+    if(profileFrame){++drawProfile.opaqueSpans;drawProfile.opaquePixels+=length;}
+    SDL_Surface *target = inWorld ? world.get() : ui.get();
+    const int zoom = inWorld ? scale : 1;
+    if (zoom != 1 && zoom != 2) {
+        for (unsigned i=0;i<length;++i) Pixel(x+i,y,devilution::Palette->colors[src[i]],false);
+        return;
+    }
+    const int rawLeft=x*zoom+(inWorld?offsetX:0), top=y*zoom;
+    const int left=std::max(rawLeft,inWorld?std::max(0,clip.x):0);
+    const int right=std::min(rawLeft+int(length)*zoom,inWorld?std::min(target->w,clip.x+clip.w):target->w);
+    const int bottom=std::min(top+zoom,inWorld?std::min(target->h,clip.h):target->h);
+    if(left>=right||top<0||top>=bottom)return;
+    auto *first=static_cast<uint8_t*>(target->pixels)+top*target->pitch+left*4;
+    auto *dst=reinterpret_cast<uint32_t*>(first);
+    const auto color=[&](unsigned index){
+        auto c=devilution::Palette->colors[src[index]];c.a=255;
+        return std::bit_cast<uint32_t>(c);
+    };
+    int px=left;
+    if(zoom==2){
+        if((px-rawLeft)&1){*dst++=color((px-rawLeft)/2);++px;}
+        for(;px+1<right;px+=2){const auto c=color((px-rawLeft)/2);*dst++=c;*dst++=c;}
+        if(px<right)*dst=color((px-rawLeft)/2);
+    }else{
+        for(;px<right;++px)*dst++=color(px-rawLeft);
+    }
+    for(int row=top;row<bottom;++row){
+        if(row!=top)std::memcpy(static_cast<uint8_t*>(target->pixels)+row*target->pitch+left*4,first,size_t(right-left)*4);
+        MaskGpuSpriteOpaqueSpan(left,row,unsigned(right-left));
+    }
 }
 void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_t color,
     const uint8_t *map, const devilution::Lightmap *lightmap)
@@ -212,16 +252,50 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_
     if (!SourcePosition(dst, x, y)) return;
     const uint8_t *light = lightmap ? lightmap->getLightingAt(dst) : nullptr;
     length = std::min(length, unsigned(devilution::PalSurface->w - x));
-    for (unsigned i = 0; i < length; ++i) {
-        uint8_t index = src ? src[i] : color;
-        if (map) index = map[index];
-        if (lightmap) index = lightmap->adjustColor(index, light[i]);
-        Pixel(x + i, y, devilution::Palette->colors[index], true);
+    if(profileFrame){++drawProfile.blendSpans;drawProfile.blendPixels+=length;}
+    SDL_Surface *target=inWorld?world.get():ui.get();
+    const int zoom=inWorld?scale:1;
+    if(zoom!=1&&zoom!=2){
+        for(unsigned i=0;i<length;++i){uint8_t index=src?src[i]:color;if(map)index=map[index];if(lightmap)index=lightmap->adjustColor(index,light[i]);Pixel(x+i,y,devilution::Palette->colors[index],true);}
+        return;
+    }
+    const int rawLeft=x*zoom+(inWorld?offsetX:0),top=y*zoom;
+    const int left=std::max(rawLeft,inWorld?std::max(0,clip.x):0);
+    const int right=std::min(rawLeft+int(length)*zoom,inWorld?std::min(target->w,clip.x+clip.w):target->w);
+    const int bottom=std::min(top+zoom,inWorld?std::min(target->h,clip.h):target->h);
+    if(left>=right||top<0||top>=bottom)return;
+    const unsigned count=unsigned(right-left);
+    if(blendedColors.size()<count)blendedColors.resize(count);
+    const auto packedColor=[&](unsigned i){uint8_t index=src?src[i]:color;if(map)index=map[index];if(lightmap)index=lightmap->adjustColor(index,light[i]);auto c=devilution::Palette->colors[index];c.a=255;return std::bit_cast<uint32_t>(c);};
+    if(!src&&!lightmap){std::fill_n(blendedColors.data(),count,packedColor(0));}
+    else if(zoom==2){
+        int px=left;auto *dst=blendedColors.data();
+        if((px-rawLeft)&1){*dst++=packedColor((px-rawLeft)/2);++px;}
+        for(;px+1<right;px+=2){const auto c=packedColor((px-rawLeft)/2);*dst++=c;*dst++=c;}
+        if(px<right)*dst=packedColor((px-rawLeft)/2);
+    }else for(int px=left;px<right;++px)blendedColors[px-left]=packedColor(px-rawLeft);
+    const uint32_t alpha=std::bit_cast<uint32_t>(SDL_Color{0,0,0,255});
+    for(int py=top;py<bottom;++py){
+        auto *dst=reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(target->pixels)+py*target->pitch)+left;
+        for(int px=left;px<right;++px){
+            uint32_t old=dst[px-left];
+            if(!inWorld&&(old&alpha)==0){
+                if(px>=clip.x&&px<clip.x+clip.w&&py<clip.h)
+                    std::memcpy(&old,static_cast<const uint8_t*>(world->pixels)+py*world->pitch+px*4,4);
+                else{const auto index=*(static_cast<const uint8_t*>(devilution::PalSurface->pixels)+py*devilution::PalSurface->pitch+px);auto c=devilution::Palette->colors[index];c.a=255;old=std::bit_cast<uint32_t>(c);}
+            }
+            const uint32_t incoming=blendedColors[px-left];
+            // Per-byte floor((old+incoming)/2), without carries across channels.
+            dst[px-left]=((old&incoming)+(((old^incoming)&0xFEFEFEFEU)>>1))|alpha;
+        }
+        MaskGpuSpriteBlendedSpan(left,py,blendedColors.data(),count);
     }
 }
 void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clipHeight)
 {
     BeginGpuSpriteFrame();
+    static const bool profileEnabled=SDL_getenv("D1R_PROFILE_HD")!=nullptr;
+    profileFrame=profileEnabled;drawProfile={};
     HdCaptureActive = GetRendererSwitch().usesHdRenderer();
     ready = false; suppressed = false; cursorSaved = false;
     if (!HdCaptureActive) return;
@@ -243,6 +317,57 @@ void EndHdWorldFrame()
     inWorld = false; ready = true;
     auto *pal = devilution::PalSurface;
     beforeUi.assign(static_cast<uint8_t *>(pal->pixels), static_cast<uint8_t *>(pal->pixels) + size_t(pal->pitch) * pal->h);
+}
+bool PrepareHdHudLayer(int x, int y, int width, int height)
+{
+    if (!GetRendererSwitch().usesHdRenderer()) return false;
+    const SDL_Rect requested { x, y, width, height };
+    if (!hudIndexed || hudIndexed->w != devilution::gnScreenWidth || hudIndexed->h != devilution::gnScreenHeight) {
+        hudIndexed.reset(SDL_CreateSurface(devilution::gnScreenWidth, devilution::gnScreenHeight, SDL_PIXELFORMAT_INDEX8));
+        if (!hudIndexed) devilution::ErrSdl();
+        EnsureSurface(hudRgba);
+        hudValid = false;
+    }
+    if (!SDL_SetSurfacePalette(hudIndexed.get(), devilution::Palette.get())) devilution::ErrSdl();
+    if (!SDL_RectsEqual(&hudRect, &requested)
+        || std::memcmp(hudPalette.data(), devilution::Palette->colors, sizeof(hudPalette)) != 0) {
+        hudRect = requested;
+        std::memcpy(hudPalette.data(), devilution::Palette->colors, sizeof(hudPalette));
+        hudValid = false;
+    }
+    return hudValid;
+}
+devilution::Surface HdHudLayerTarget(const devilution::Surface &fallback)
+{
+    if (!HdCaptureActive || !hudIndexed) return fallback;
+    return devilution::Surface(hudIndexed.get());
+}
+void CommitHdHudLayer(bool changed)
+{
+    if (!HdCaptureActive || !ready || !hudIndexed) return;
+    const SDL_Rect bounds { 0, 0, hudIndexed->w, hudIndexed->h };
+    SDL_Rect area;
+    if (!SDL_GetRectIntersection(&hudRect, &bounds, &area)) return;
+    if (changed || !hudValid) {
+        // Convert only when a component changes. Raw indexed UI writers are
+        // included here, without relying on raster-span interception.
+        for (int y = area.y; y < area.y + area.h; ++y) {
+            const auto *src = static_cast<const uint8_t *>(hudIndexed->pixels) + y * hudIndexed->pitch;
+            auto *dst = reinterpret_cast<SDL_Color *>(static_cast<uint8_t *>(hudRgba->pixels) + y * hudRgba->pitch);
+            for (int x = area.x; x < area.x + area.w; ++x) {
+                dst[x] = devilution::Palette->colors[src[x]];
+                dst[x].a = 255;
+            }
+        }
+        hudValid = true;
+    }
+    for (int y = area.y; y < area.y + area.h; ++y) {
+        std::memcpy(static_cast<uint8_t *>(devilution::PalSurface->pixels) + y * devilution::PalSurface->pitch + area.x,
+            static_cast<const uint8_t *>(hudIndexed->pixels) + y * hudIndexed->pitch + area.x, area.w);
+        std::memcpy(static_cast<uint8_t *>(ui->pixels) + y * ui->pitch + area.x * 4,
+            static_cast<const uint8_t *>(hudRgba->pixels) + y * hudRgba->pitch + area.x * 4, size_t(area.w) * 4);
+        MaskGpuSpriteOpaqueSpan(area.x, y, area.w);
+    }
 }
 // Cursor-only redraws reuse the current world/UI scene. Restore the RGBA UI
 // background as well as Classic's indexed background, so old cursor coverage
@@ -295,6 +420,7 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         if(traced.emplace(source->path,true).second)devilution::Log("HD_PLAYER_DRAW source={}",source->path);
     }
     if (auto gpu = devilution::ControlMode != devilution::ControlTypes::VirtualGamepad ? LoadGpuSheet(*source) : std::shared_ptr<GpuSheet>{}) {
+        const uint64_t profileStarted=profileFrame?SDL_GetTicksNS():0;
         const auto *header=sprite.pixelData()-SheetHeaderSize;
         const unsigned group=devilution::LoadLE16(header+14), frame=devilution::LoadLE16(header+16);
         if(group>=gpu->columns || frame>=gpu->rows)return false;
@@ -324,7 +450,9 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
             for(unsigned level=0;level<16;++level){const auto color=devilution::Palette->colors[lightmap?lightmap->adjustColor(mapped,level):mapped];
                 auto *row=draw.palette.data()+((level+1)*256+index)*4;row[0]=color.r;row[1]=color.g;row[2]=color.b;row[3]=255;}
         }
-        QueueGpuSprite(std::move(draw));return true;
+        QueueGpuSprite(std::move(draw));
+        if(profileFrame){++drawProfile.sprites;drawProfile.gpuPrepareNs+=SDL_GetTicksNS()-profileStarted;}
+        return true;
     }
     return false; // Compiled resource unavailable: retain Classic pixels, never decode PNG.
 }
@@ -338,6 +466,8 @@ SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
 {
     SetGpuSpriteFrameReady(devilution::gbRunGame && HdCaptureActive && ready && GetRendererSwitch().usesHdRenderer());
     if (!devilution::gbRunGame || !HdCaptureActive || !ready || !GetRendererSwitch().usesHdRenderer()) return classic;
+    static unsigned profileFrames=0;
+    if(profileFrame&&++profileFrames%100==0)devilution::Log("HD_DRAW_PROFILE sprites={} gpu_prepare_us={} opaque_spans={} opaque_pixels={} blend_spans={} blend_pixels={}",drawProfile.sprites,drawProfile.gpuPrepareNs/1000,drawProfile.opaqueSpans,drawProfile.opaquePixels,drawProfile.blendSpans,drawProfile.blendPixels);
     // Preserve persistent HUD/panel pixels, then replace the entire world
     // viewport with the independently assembled canvas. No flattened Classic
     // world is used as an HD background.
@@ -395,6 +525,7 @@ void ResetHdAssets()
     BeginGpuSpriteFrame();
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;
+    hudIndexed.reset(); hudRgba.reset(); hudValid = false;
 }
 }
 #endif

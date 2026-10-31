@@ -23,7 +23,7 @@ else{$taskIniText=$taskIniText.TrimEnd()+"`n"+$taskAudioSection}
 @{mode='muted';sound_volume=-1600;music_volume=-1600;audio_cues_volume=-1600;config=$taskIni}|ConvertTo-Json|Set-Content (Join-Path $taskRoot ($Case+'-audio.json'))
 Write-Output ($Case+': graphics replay audio muted')
 if($ConfigureOnly){return}
-$env:D1R_TEST_AUDIO_GAIN='0.5';$env:D1R_TRACE_PLAYER_SHEETS='1'
+$env:D1R_TEST_AUDIO_GAIN='0.5';$env:D1R_TRACE_PLAYER_SHEETS='1';$env:D1R_TEST_DISPLAY='left'
 $env:D1R_PERF_LOG=Join-Path $taskRoot ($Case+'-performance.csv');$env:D1R_SHEET_LOG=Join-Path $taskRoot ($Case+'-sheets.log')
 if($DisableGpuSprites){$env:D1R_DISABLE_GPU_SPRITES='1'}else{Remove-Item Env:D1R_DISABLE_GPU_SPRITES -ErrorAction SilentlyContinue}
 if($Capture){$env:D1R_FRAME_DUMP=Join-Path $taskRoot ($Case+'-captures');New-Item -ItemType Directory -Force $env:D1R_FRAME_DUMP|Out-Null}else{Remove-Item Env:D1R_FRAME_DUMP -ErrorAction SilentlyContinue}

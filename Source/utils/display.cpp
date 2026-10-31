@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 #ifdef USE_SDL3
@@ -636,7 +637,44 @@ bool SpawnWindow(const char *lpWindowName)
 	}
 
 #ifdef USE_SDL3
-    ghMainWnd = SDL_CreateWindow(lpWindowName, windowSize.width, windowSize.height, flags);
+    // Test runs stay on the user's left-hand secondary monitor. Use creation
+    // properties so the window never flashes onto the primary display first.
+    const char *testDisplay = SDL_getenv("D1R_TEST_DISPLAY");
+    if (testDisplay != nullptr && std::string_view(testDisplay) == "left") {
+        int count = 0;
+        SDL_DisplayID *displays = SDL_GetDisplays(&count);
+        SDL_Rect primaryBounds {};
+        const auto primary = SDL_GetPrimaryDisplay();
+        if (!displays || !SDL_GetDisplayBounds(primary, &primaryBounds)) ErrSdl();
+        SDL_DisplayID selected = 0;
+        SDL_Rect selectedBounds = primaryBounds;
+        for (int i = 0; i < count; ++i) {
+            SDL_Rect bounds;
+            if (displays[i] != primary && SDL_GetDisplayBounds(displays[i], &bounds)
+                && bounds.x < selectedBounds.x) {
+                selected = displays[i]; selectedBounds = bounds;
+            }
+        }
+        SDL_free(displays);
+        if (!selected) {
+            SDL_SetError("Test display unavailable: no monitor left of the primary display");
+            ErrSdl();
+        }
+        const auto properties = SDL_CreateProperties();
+        if (!properties
+            || !SDL_SetStringProperty(properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, lpWindowName)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, windowSize.width)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, windowSize.height)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, flags)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(selected))
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(selected))) ErrSdl();
+        ghMainWnd = SDL_CreateWindowWithProperties(properties);
+        SDL_DestroyProperties(properties);
+        Log("Test display: left secondary id={} bounds={},{},{}x{}", selected,
+            selectedBounds.x, selectedBounds.y, selectedBounds.w, selectedBounds.h);
+    } else {
+        ghMainWnd = SDL_CreateWindow(lpWindowName, windowSize.width, windowSize.height, flags);
+    }
 #else
 	ghMainWnd = SDL_CreateWindow(lpWindowName, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowSize.width, windowSize.height, flags);
 #endif

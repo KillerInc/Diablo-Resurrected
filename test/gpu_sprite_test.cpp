@@ -6,6 +6,7 @@
 #include <fstream>
 #include <vector>
 #include <array>
+#include <bit>
 #include <cstdio>
 #include "reincarnated/gpu_presenter.hpp"
 #include "reincarnated/gpu_sprites.hpp"
@@ -51,9 +52,10 @@ int main(){
   for(unsigned level=0;level<17;++level)for(unsigned i=0;i<256;++i){auto *p=d.palette.data()+(level*256+i)*4;p[3]=255;if(i==1){p[0]=level>0&&mode==1?60:120;p[1]=level>0&&mode==1?30:60;p[2]=level>0&&mode==1?10:20;if(level>0&&mode==2){p[0]=p[1]=0;p[2]=200;}}}
   QueueGpuSprite(std::move(d));};
  BeginGpuSpriteFrame();draw(16,16);
- for(int y=24;y<40;++y)for(int x=24;x<40;++x){MaskGpuSpritePixel(x,y,0,200,0,128);pixel(x,y,5,110,15);}
+ const auto green=std::bit_cast<uint32_t>(SDL_Color{0,200,0,255});std::array<uint32_t,16> greenSpan;greenSpan.fill(green);
+ for(int y=24;y<40;++y){MaskGpuSpriteBlendedSpan(24,y,greenSpan.data(),greenSpan.size());for(int x=24;x<40;++x)pixel(x,y,5,110,15);}
  draw(32,32);
- for(int y=40;y<50;++y)for(int x=40;x<50;++x){MaskGpuSpritePixel(x,y,0,0,200,255);pixel(x,y,0,0,200);}
+ for(int y=40;y<50;++y){MaskGpuSpriteOpaqueSpan(40,y,10);for(int x=40;x<50;++x)pixel(x,y,0,0,200);}
  SaveGpuSpriteCursor();MaskGpuSpritePixel(20,20,0,0,0,255);RestoreGpuSpriteCursor();
  SetGpuSpriteFrameReady(true);devilution::gbRunGame=true;
  Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"D1R_FRAME_DUMP",root.string().c_str(),true),"capture path");

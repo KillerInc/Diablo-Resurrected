@@ -29,6 +29,9 @@ SDL_GPUTransferBuffer *staging=nullptr;
 unsigned stagingCapacity=0;
 std::unordered_map<std::string,std::shared_ptr<GpuSheet>> sheets;
 std::vector<GpuSpriteDraw> draws;
+constexpr unsigned CoverageTileShift=5, CoverageTileSize=1U<<CoverageTileShift;
+unsigned coverageWidth=0,coverageHeight=0,coverageColumns=0;
+std::vector<std::vector<size_t>> coverageTiles;
 struct ControlSlot { SDL_GPUTexture *mask=nullptr,*light=nullptr,*palette=nullptr;unsigned w=0,h=0; };
 std::vector<ControlSlot> controls;
 bool ready=false;
@@ -91,7 +94,13 @@ void InitializeGpuSprites(SDL_GPUDevice *target){
     else devilution::Log("GPU_SPRITES_READY backend=direct3d12 format=BC7 native_window_resolution=1");
 #endif
 }
-void BeginGpuSpriteFrame(){draws.clear();ready=false;}
+void BeginGpuSpriteFrame(){
+    draws.clear();ready=false;
+    const unsigned w=unsigned(std::max<int64_t>(0,devilution::gnScreenWidth)),h=unsigned(std::max<int64_t>(0,devilution::gnScreenHeight));
+    const unsigned columns=(w+CoverageTileSize-1)>>CoverageTileShift,rows=(h+CoverageTileSize-1)>>CoverageTileShift;
+    if(w!=coverageWidth||h!=coverageHeight){coverageTiles.clear();coverageTiles.resize(size_t(columns)*rows);coverageWidth=w;coverageHeight=h;coverageColumns=columns;}
+    else for(auto &tile:coverageTiles)tile.clear();
+}
 void ReleaseGpuPlayerSheets(){const std::lock_guard<std::mutex> lock(cacheMutex);sheets.clear();}
 void DestroyGpuSprites(){BeginGpuSpriteFrame();ReleaseGpuPlayerSheets();
     for(auto &s:controls){if(s.mask)SDL_ReleaseGPUTexture(device,s.mask);if(s.light)SDL_ReleaseGPUTexture(device,s.light);if(s.palette)SDL_ReleaseGPUTexture(device,s.palette);}controls.clear();if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);staging=nullptr;stagingCapacity=0;if(nearestBuffer)SDL_ReleaseGPUBuffer(device,nearestBuffer);nearestBuffer=nullptr;nearestPalette.clear();if(nearestPipeline)SDL_ReleaseGPUComputePipeline(device,nearestPipeline);nearestPipeline=nullptr;if(pipeline)SDL_ReleaseGPUGraphicsPipeline(device,pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);pipeline=nullptr;sampler=nullptr;device=nullptr;}
@@ -138,11 +147,57 @@ std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source){
     return sheet;
 }
 GpuSpriteStats GetGpuSpriteStats(){const std::lock_guard<std::mutex> lock(cacheMutex);GpuSpriteStats s;for(const auto &entry:sheets)if(entry.second){++s.sheets;if(entry.first.starts_with("hd/plrgfx/"))++s.playerSheets;s.bytes+=entry.second->bytes;}s.uploads=uploads;s.draws=drawCount;return s;}
-void QueueGpuSprite(GpuSpriteDraw draw){draws.push_back(std::move(draw));}
+void QueueGpuSprite(GpuSpriteDraw draw){
+    const size_t index=draws.size();draws.push_back(std::move(draw));const auto &queued=draws.back();
+    const int left=std::max(0,queued.maskX),top=std::max(0,queued.maskY);
+    const int right=std::min<int64_t>(coverageWidth,int64_t(queued.maskX)+queued.maskW);
+    const int bottom=std::min<int64_t>(coverageHeight,int64_t(queued.maskY)+queued.maskH);
+    if(left>=right||top>=bottom)return;
+    for(unsigned row=unsigned(top)>>CoverageTileShift;row<=unsigned(bottom-1)>>CoverageTileShift;++row)
+        for(unsigned column=unsigned(left)>>CoverageTileShift;column<=unsigned(right-1)>>CoverageTileShift;++column)
+            coverageTiles[size_t(row)*coverageColumns+column].push_back(index);
+}
 void MaskGpuSpritePixel(int x,int y,unsigned char r,unsigned char g,unsigned char b,unsigned alpha){
-    for(auto &draw:draws){int dx=x-draw.maskX,dy=y-draw.maskY;if(dx<0||dy<0||dx>=draw.maskW||dy>=draw.maskH)continue;
-        auto *p=draw.coverage.data()+(size_t(dy)*draw.maskW+dx)*4;
-        ApplyGpuCoverage(p,r,g,b,alpha);
+    if(draws.empty()||unsigned(x)>=coverageWidth||unsigned(y)>=coverageHeight)return;
+    const auto &tile=coverageTiles[size_t(unsigned(y)>>CoverageTileShift)*coverageColumns+(unsigned(x)>>CoverageTileShift)];
+    for(const size_t index:tile){auto &draw=draws[index];const int dx=x-draw.maskX,dy=y-draw.maskY;
+        if(dx<0||dy<0||dx>=draw.maskW||dy>=draw.maskH)continue;
+        auto *p=draw.coverage.data()+(size_t(dy)*draw.maskW+dx)*4;ApplyGpuCoverage(p,r,g,b,alpha);
+    }
+}
+void MaskGpuSpriteOpaqueSpan(int x,int y,unsigned length){
+    if(draws.empty()||unsigned(y)>=coverageHeight)return;
+    const int64_t left=std::max<int64_t>(0,x),end=std::min<int64_t>(coverageWidth,int64_t(x)+length);
+    if(left>=end)return;
+    const size_t row=size_t(unsigned(y)>>CoverageTileShift)*coverageColumns;
+    for(unsigned column=unsigned(left)>>CoverageTileShift;column<=unsigned(end-1)>>CoverageTileShift;++column){
+        const int64_t cellLeft=std::max<int64_t>(left,column*CoverageTileSize),cellRight=std::min<int64_t>(end,(column+1)*CoverageTileSize);
+        for(const size_t index:coverageTiles[row+column]){auto &draw=draws[index];const int dy=y-draw.maskY;
+            if(dy<0||dy>=draw.maskH)continue;
+            const int64_t begin=std::max<int64_t>(cellLeft,draw.maskX),finish=std::min<int64_t>(cellRight,int64_t(draw.maskX)+draw.maskW);
+            if(begin>=finish)continue;
+            auto *pixels=draw.coverage.data()+(size_t(dy)*draw.maskW+size_t(begin-draw.maskX))*4;
+            // Fully occluded pixels stay discarded through subsequent blends.
+            std::memset(pixels,0,size_t(finish-begin)*4);
+        }
+    }
+}
+void MaskGpuSpriteBlendedSpan(int x,int y,const uint32_t *colors,unsigned length){
+    if(draws.empty()||unsigned(y)>=coverageHeight)return;
+    const int64_t left=std::max<int64_t>(0,x),end=std::min<int64_t>(coverageWidth,int64_t(x)+length);
+    if(left>=end)return;
+    const size_t row=size_t(unsigned(y)>>CoverageTileShift)*coverageColumns;
+    for(unsigned column=unsigned(left)>>CoverageTileShift;column<=unsigned(end-1)>>CoverageTileShift;++column){
+        const int64_t cellLeft=std::max<int64_t>(left,column*CoverageTileSize),cellRight=std::min<int64_t>(end,(column+1)*CoverageTileSize);
+        for(const size_t index:coverageTiles[row+column]){auto &draw=draws[index];const int dy=y-draw.maskY;
+            if(dy<0||dy>=draw.maskH)continue;
+            const int64_t begin=std::max<int64_t>(cellLeft,draw.maskX),finish=std::min<int64_t>(cellRight,int64_t(draw.maskX)+draw.maskW);
+            if(begin>=finish)continue;
+            auto *pixels=draw.coverage.data()+(size_t(dy)*draw.maskW+size_t(begin-draw.maskX))*4;
+            const auto *source=reinterpret_cast<const uint8_t*>(colors+size_t(begin-x));
+            for(int64_t px=begin;px<finish;++px,pixels+=4,source+=4)
+                if(pixels[3])ApplyGpuCoverage(pixels,source[0],source[1],source[2],128);
+        }
     }
 }
 void SaveGpuSpriteCursor(){for(auto &d:draws)d.cursorCoverage=d.coverage;}
