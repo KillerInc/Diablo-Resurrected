@@ -17,5 +17,13 @@
   ],
   "source_file_modified": false,
   "installed_heavy_sheets_unchanged": true,
-  "previewed_on": "2026-10-31"
+  "previewed_on": "2026-10-31",
+  "preview_material_pass": {
+    "script": "tint_heavy_warrior.py",
+    "red_armor": "dark gray",
+    "gold_trim_preserved": true,
+    "normal_roughness_metallic_maps_unchanged": true,
+    "source_file_unchanged": true,
+    "status": "preview_not_installed"
+  }
 }
