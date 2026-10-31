@@ -45,7 +45,7 @@ def install(pack,art,baseline,game,master,mirror,archive,backup,validation,revis
    replace(saved,hd/rel,'game/'+rel);replace(saved,mirror.parent/(name+'.png'),'mirror/'+name+'.png')
    status='approved equipped Fanaticism cast; original effects; complete native motion' if revision=='equipped-casts-v1' else ('approved larger fire voids; fixed cast-start anchor; unchanged character motion' if name.endswith('fm') else 'approved staggered growing lightning; held fixed paths; unchanged character motion')
    if revision=='medium-shield-v1':status='approved medium kite shield; original character motion and installed spell effects retained'
-   if revision=='heavy-v1':status='approved silver and dark gray heavy warrior; approved native motion and equipment; southeast shadows'
+   if revision=='heavy-v1':status='approved supplied black heavy warrior; approved native motion and equipment; southeast shadows'
    updated['sheets'][name]={'source':str(saved.resolve()),'size':record['size'],'sha256':record['sha256'],'layout':record['layout'],'status':status}
   for name in assets['files']:
    assert name=='sprites.gpus' or name.endswith('.bc7')

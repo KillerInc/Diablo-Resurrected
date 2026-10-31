@@ -129,3 +129,27 @@ remain unchanged. The `medium-v1` figures above describe that earlier installed
 revision; the current class has 867 pages totaling 2.726 GiB. See
 [the equipped casting record](WARRIOR_EQUIPPED_CASTING.md) for the current
 render, grip-clearance, runtime and installation proofs.
+
+## Updated blue-gray model fitting, 2026-10-31
+
+The user requested the previous floating-cord repair on a new private export.
+Input SHA256: 922e5b2e06a135fcd5a7c5dd9c275300eefc80ecd4728aa91673e8e5adcc8ca8.
+The revised file has 19 meshes, 633 joints, 49 embedded images and no clips.
+The torso retains the audited 7,443-vertex topology and 633 vertex groups,
+but is named Mesh_10 because an extra cape mesh precedes it. In a private
+prepared scene, rename that torso to Mesh_9 and its 66-vertex trim to Mesh_10,
+after giving the old cape Mesh_9 a distinct name. Re-run
+`audit_medium_warrior_straps.py` before `fit_medium_warrior_straps.py`.
+
+The same components 1, 3, 6, 22 and 23 were fitted: 886 trim vertices.
+Cords follow the armor surface; engraved disks retain their rigid shape.
+Non-trim positions, UVs, topology and skin weights are preserved. Cape and
+skirt simulation meshes stay disabled and are excluded from the GLB export.
+The user's supplied blue-gray materials are retained without recoloring.
+
+Eight exported-model views were reviewed. The existing idle donor transfers
+with 193 animated bones matched and zero rest-matrix difference. This is a
+prepared replacement model, not a completed sheet rebuild or full animation
+clearance approval. Installed medium sheets remain unchanged. Corrected GLB,
+proof and rotating preview are kept privately beside the user assets; no art
+or model data is committed here.
