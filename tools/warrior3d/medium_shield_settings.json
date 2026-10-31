@@ -1,6 +1,6 @@
 {
   "revision": "medium-shield-v1",
-  "status": "approved_rendering",
+  "status": "approved_installed",
   "armor": "medium",
   "source_file": "shield_Medium.glb",
   "source_sha256": "a66b80d1f6baf79fa5ae8b11a16f97bfb4df9a7fd348dcf5fae9bb63e9cbc2d9",
@@ -49,5 +49,11 @@
     "installed_lightning_retained": true
   },
   "artwork_in_git": false,
-  "pose_clearance": "fit_medium_shield_clearance.py; shield-only adjustments checked across every source frame"
+  "pose_clearance": "fit_medium_shield_clearance.py; shield-only adjustments checked across every source frame",
+  "installed_on": "2026-10-30",
+  "private_archive": "Medium Warrior Shield Approved 2026-10-30",
+  "installed_sheets": 30,
+  "verified_preserved_sheets": 225,
+  "gpu_pages": 868,
+  "gpu_texture_bytes": 2923126784
 }

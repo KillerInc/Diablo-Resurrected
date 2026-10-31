@@ -31,6 +31,10 @@ for number,j in enumerate(jobs,1):
   if not (shadows/'shadow.json').exists():
    if shadow_signature in shadow_cache:linktree(shadow_cache[shadow_signature],shadows)
    else:invoke(tools/'render_paladin_shadows.py',[frames/'Paladin-town-walk-render.blend',frames/'render.json',shadows]);gc.collect()
- subprocess.run([str(python),str(tools/'assemble_paladin_canvas.py'),str(frames),str(shadows),str(frames/'render.json'),plan['calibration'],str(output)],check=True)
+ command=[str(python),str(tools/'assemble_paladin_canvas.py'),str(frames),str(shadows),str(frames/'render.json'),plan['calibration'],str(output)]
+ try:subprocess.run(command,check=True)
+ except subprocess.CalledProcessError:
+  subprocess.run([str(python),str(tools/'fit_rendered_canvas.py'),str(frames),str(shadows),str(frames/'render.json'),plan['calibration'],j['reference']],check=True)
+  subprocess.run(command,check=True)
  cache[signature]=root;shadow_cache[shadow_signature]=shadows;progress[j['sheet']]={'status':'complete','elapsed_seconds':round(time.time()-start,2),'validation':str(output/'validation.json')};progress_file.write_text(json.dumps(progress,indent=2));print('MEDIUM_COMPLETE',number,len(jobs),j['sheet'],progress[j['sheet']]['elapsed_seconds'],flush=True)
 print('MEDIUM_BATCH_DONE',len(progress),flush=True)

@@ -2,15 +2,22 @@
 import argparse,json,re,csv
 from pathlib import Path
 from install_layout_table import sha
+from gpu_index import read_index
+from hd_layouts import read_table
 p=argparse.ArgumentParser(description=__doc__)
 for key in ('plan','baseline','root','capture'):p.add_argument(key,type=Path)
 a=p.parse_args();plan=json.loads(a.plan.read_text());pack=a.plan.parent/'pack/compiled';art=json.loads((a.plan.parent/'pack/cast-art-manifest.json').read_text());after=json.loads((pack/'validated-gpu-pack.json').read_text());before=json.loads((a.baseline/'validated-gpu-pack.json').read_text());expected={f'wm{w}{action}' for w in 'dhu' for action in ('as','at','aw','bl','fm','ht','lm','qm','st','wl')};assert set(art['sheets'])==expected
 changed={f'plrgfx/warrior/{n[:3]}/{n}.png' for n in expected};assert all(after['source_png_hashes'][n]==h for n,h in before['source_png_hashes'].items() if n not in changed)
+for name,digest in before['files'].items():
+ if name=='sprites.gpus' or Path(name).name.split('.')[0] in expected:continue
+ assert after['files'][name]==digest,('Protected GPU page changed',name)
+old_index=read_index(a.baseline/'HD/sprites.gpus');new_index=read_index(pack/'HD/sprites.gpus');assert all(new_index[n]==r for n,r in old_index.items() if n not in changed)
+old_table=read_table(a.baseline/'HD/layouts.csv');new_table=read_table(pack/'HD/layouts.csv');assert all(new_table[n]==r for n,r in old_table.items() if n not in changed)
 audit=json.loads((a.plan.parent/'all-equipment-head-audit.json').read_text());assert len(audit)==30 and not any(r['head_contacts'] for r in audit)
 frames=0
 for job in plan['jobs']:
  ref=json.loads(Path(job['reference']).read_text());original=json.loads(Path(job['original_reference']).read_text());assert Path(job['model']).is_file()
- assert {k:v for k,v in ref.items() if k!='equipment'}=={k:v for k,v in original.items() if k!='equipment'}
+ assert {k:v for k,v in ref.items() if k not in ('equipment','canvas_logical','canvas_anchor','canvas_padding')}=={k:v for k,v in original.items() if k not in ('equipment','canvas_logical','canvas_anchor','canvas_padding')}
  assert [e for e in ref['equipment'] if 'shield' not in e['path'].lower()]==[e for e in original['equipment'] if 'shield' not in e['path'].lower()]
  assert sum(Path(e['path']).name=='shield_Medium.glb' for e in ref['equipment'])==1
  v=json.loads((Path(job['root'])/'output/validation.json').read_text());assert len(v['body_cells'])==len(v['shadow_cells'])==job['rows']*8;assert art['sheets'][job['sheet']]['sha256']==v['sheet_sha256'].upper();frames+=job['rows']*8

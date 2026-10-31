@@ -33,7 +33,7 @@ def archive(plan_file,archive,compiled):
  for name,digest in assets['files'].items():assert sha(compiled/'HD'/name)==digest;put(compiled/'HD'/name,archive/'GPU/HD'/name)
  put(compiled/'HD/layouts.csv',archive/'GPU/HD/layouts.csv');put(compiled/'validated-gpu-pack.json',archive/'GPU/validated-gpu-pack.json')
  revision=plan.get('revision','equipped-casts-v1')
- (archive/'README.txt').write_text(f'Warrior graphics revision {revision}: {len(plan["jobs"])} light/medium sheets. Original character motions, equipment, other actions, heavy armor, executable and user state are preserved. Source PNG density8; runtime GPU density4 with one root index/CSV. Review GIFs show South, West and Northwest; production sheets contain all eight directions. Inputs includes complete animated character models, exact compact motion donors, all equipment, references, effect settings and calibration. Keep this entire archive private; it contains proprietary artwork.\n')
+ (archive/'README.txt').write_text(f'Warrior graphics revision {revision}: {len(plan["jobs"])} light/medium sheets. Original character motions, nonselected sheets, heavy armor, executable and user state are preserved. Source PNG density8; runtime GPU density4 with one root index/CSV. Review GIFs show South, West and Northwest; production sheets contain all eight directions. Inputs includes complete animated character models, exact compact motion donors, all equipment, references, effect settings and calibration. Keep this entire archive private; it contains proprietary artwork.\n')
  print('Archived',len(plan['jobs']),'casting PNGs/reviews,',len(models),'complete models,',len(equipment),'equipment assets and verified full GPU pack')
 
 if __name__=='__main__':
