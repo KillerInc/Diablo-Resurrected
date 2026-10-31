@@ -98,3 +98,14 @@ compares it with the installed black PNG. Embedded base-color image pixels
 confirm the helmet and torso changed; gloves, legs and boots remain identical
 to the old dark textures. No additional brightness pass or installation was
 performed. Models, images and the comparison evidence remain private.
+
+
+The user requested a small brightness increase on the Colour candidate.
+`adjust_heavy_armor_brightness.py` applies +0.5 EV in linear light to the five
+armor base-color images, using explicit sRGB conversion. It appends new image
+data and redirects only those material texture references. Geometry, UVs,
+skin weights, nodes, alpha, normal maps and metallic/roughness settings are
+unchanged. Skin and equipment materials are excluded; no global render lift
+is applied. A second 80-cell mace-idle preview uses identical lighting and
+the unchanged shadow rasters. The variant remains a private preview, with
+installed heavy sheets unchanged.
