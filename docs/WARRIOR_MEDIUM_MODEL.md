@@ -153,3 +153,10 @@ prepared replacement model, not a completed sheet rebuild or full animation
 clearance approval. Installed medium sheets remain unchanged. Corrected GLB,
 proof and rotating preview are kept privately beside the user assets; no art
 or model data is committed here.
+
+The user approved this fitted export as the replacement medium body. All 85
+new bounds checks and 66 equipped head-clearance checks pass. The fresh
+medium-blue-gray-v2 build preserves the current native motions, fitted medium
+shield, approved grips, town equipment, fire bubble v2 and installed lightning
+and QM effects. Rendering is in progress; the installed identity above remains
+a baseline until the complete pack and silent live/replay checks pass.

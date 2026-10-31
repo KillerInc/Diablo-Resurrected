@@ -83,5 +83,18 @@
     "installed_spell_effects_retained": true,
     "private_archive": "Medium Warrior Shield Approved 2026-10-30",
     "installed_smoke_verified": true
+  },
+  "pending_replacement": {
+    "revision": "medium-blue-gray-v2",
+    "approved_on": "2026-10-31",
+    "source_sha256": "922E5B2E06A135FCD5A7C5DD9C275300EEFC80ECD4728AA91673E8E5ADCC8CA8",
+    "approved_model_sha256": "5531A31D65B87112782A03F201BDC9ADD2213EF940E2B0CA479866FDF24F2AB0",
+    "status": "approved_rendering",
+    "fitted_trim_vertices": 886,
+    "cape_and_skirt_disabled": true,
+    "supplied_materials_preserved": true,
+    "bounds_sequences": 85,
+    "equipped_head_clear_sequences": 66,
+    "existing_motion_equipment_effects_retained": true
   }
 }

@@ -16,6 +16,9 @@ def install(pack,art,baseline,game,master,mirror,archive,backup,validation):
  for name,digest in before_assets['files'].items():assert sha(hd/name)==digest,('Installed GPU resource changed since baseline',name)
  assert sha(hd/'layouts.csv')==before_assets['layout_sha256']
  for name,digest in assets['files'].items():assert sha(pack/'HD'/name)==digest
+ # A complete medium rebuild must preserve every non-medium pack resource.
+ assert all(assets['source_png_hashes'][n]==h for n,h in before_assets['source_png_hashes'].items() if not n.startswith('plrgfx/warrior/wm'))
+ assert all(assets['files'].get(n)==h for n,h in before_assets['files'].items() if n!='sprites.gpus' and not n.startswith('plrgfx/warrior/wm'))
  assert not backup.exists() and not archive.exists();backup.mkdir(parents=True);archive.mkdir(parents=True)
  old_master,old_mirror=master.read_bytes(),mirror.read_bytes();(backup/'previous-install-manifest.json').write_bytes(old_master);(backup/'previous-mirror-manifest.json').write_bytes(old_mirror)
  written=[];old={};temps=[]
@@ -48,7 +51,7 @@ def install(pack,art,baseline,game,master,mirror,archive,backup,validation):
   assert sha(exe)==exe_hash and all(sha(hd/n)==h for n,h in assets['files'].items())
   assert all(sha(hd/n)==h for n,h in assets['source_png_hashes'].items())
   assert sha(hd/'layouts.csv')==assets['layout_sha256'] and not list(hd.rglob('*.layout'))
-  receipt={'revision':'medium-v1','model_sha256':art['model_sha256'],'sheets':85,'custom_sheet_count':len(updated['sheets']),'gpu_sheets':assets['sheets'],'gpu_pages':assets['pages'],'gpu_texture_bytes':assets['texture_bytes'],'executable_unchanged':exe_hash,'layout_sha256':assets['layout_sha256'],'validation':proof['checks'],'archive':str(archive.resolve()),'backup':str(backup.resolve())}
+  receipt={'revision':art.get('revision','medium-v1'),'model_sha256':art['model_sha256'],'sheets':85,'custom_sheet_count':len(updated['sheets']),'gpu_sheets':assets['sheets'],'gpu_pages':assets['pages'],'gpu_texture_bytes':assets['texture_bytes'],'executable_unchanged':exe_hash,'layout_sha256':assets['layout_sha256'],'validation':proof['checks'],'archive':str(archive.resolve()),'backup':str(backup.resolve())}
   updated['medium_armor_revision']=receipt;updated['layout_table']={'path':str(hd/'layouts.csv'),'sha256':assets['layout_sha256'],'rows':len(table)}
   data=json.dumps(updated,indent=2).encode();master.write_bytes(data);mirror.write_bytes(data);(archive/'install-manifest.json').write_bytes(data);(archive/'install-receipt.json').write_text(json.dumps(receipt,indent=2));(backup/'install-receipt.json').write_text(json.dumps(receipt,indent=2));shutil.copy2(validation,backup/'validation.json')
  except BaseException:

@@ -26,6 +26,11 @@ class MediumInstallTest(unittest.TestCase):
   with tempfile.TemporaryDirectory() as temp:
    args=self.fixture(Path(temp));before=sha(args[3]/'Diablo Reincarnated.exe');install(*args)
    self.assertEqual(sha(args[3]/'Diablo Reincarnated.exe'),before);self.assertEqual(len(json.loads(args[4].read_text())['sheets']),86);self.assertFalse((args[3]/'HD/plrgfx/warrior/wmn/wmnst.p9.bc7').exists());self.assertTrue((args[7]/'files/game/plrgfx/warrior/wmn/wmnst.p9.bc7').exists())
+ def test_rejects_changed_light_art_before_writing(self):
+  with tempfile.TemporaryDirectory() as temp:
+   args=self.fixture(Path(temp));proof=args[0]/'validated-gpu-pack.json';assets=json.loads(proof.read_text());assets['source_png_hashes']['plrgfx/warrior/wln/wlnst.png']='changed';proof.write_text(json.dumps(assets));before=args[4].read_bytes()
+   with self.assertRaises(AssertionError):install(*args)
+   self.assertEqual(args[4].read_bytes(),before);self.assertFalse(args[6].exists());self.assertFalse(args[7].exists())
  def test_failure_after_page_retirement_restores_all_files(self):
   with tempfile.TemporaryDirectory() as temp:
    args=self.fixture(Path(temp));paths=[*args[3].rglob('*'),args[4],args[5]];before={p:p.read_bytes() for p in paths if p.is_file()};real=os.replace;calls=0
