@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include "performance_samples.hpp"
+#include "cpu_profile.hpp"
 #include "hd_renderer.hpp"
 #include "gpu_sprites.hpp"
 #include "sheet_memory.hpp"
@@ -23,10 +24,10 @@ struct PerformanceMonitor {
     FILE *file = nullptr;
     bool opened = false;
     ~PerformanceMonitor() { if (file) std::fclose(file); }
-    void resetWindow() { previous = windowStart = 0; samples = {}; drawMs = drawTotal = 0; }
+    void resetWindow() { previous = windowStart = 0; samples = {}; drawMs = drawTotal = 0; GetCpuProfile().reset(); }
     void record(uint64_t start, double composeMs, double presentMs, bool active) {
         if (!active || loading) { resetWindow(); return; }
-        if (!previous) { previous = windowStart = start; lastCache = GetHdCacheMetrics(); return; }
+        if (!previous) { previous = windowStart = start; lastCache = GetHdCacheMetrics(); GetCpuProfile().reset(); return; }
         drawTotal += drawMs; drawMs = 0;
         samples.add(double(start - previous) / 1000000, composeMs, presentMs);
         previous = start;
@@ -38,7 +39,7 @@ struct PerformanceMonitor {
         const double p95 = samples.p95();
         const double avg = samples.total / samples.frames;
         const char *mode = GetRendererSwitch().usesHdRenderer() ? "HD" : "Classic";
-        lines[0] = devilution::detail::format("{} | {:.1f} FPS | avg {:.1f} / p95 {:.1f} / max {:.1f} ms", mode, 1000 / avg, avg, p95, samples.maximum);
+        lines[0] = devilution::detail::format("{} | {:.1f} FPS | avg {:.1f} ms / p95 {:.1f} ms / max {:.1f} ms", mode, 1000 / avg, avg, p95, samples.maximum);
         lines[1] = devilution::detail::format("CPU draw {:.2f} compose {:.2f} present {:.2f} ms | >33ms {} >50ms {}", drawTotal / samples.frames, samples.compose / samples.frames, samples.present / samples.frames, samples.over33, samples.over50);
         lines[2] = devilution::detail::format("RAM private {:.2f} GiB | sheets {} / {:.2f} GiB | pinned {}", ram, cache.sheets, double(cache.bytes) / (1024 * 1024 * 1024), cache.pinned);
         lines[3] = devilution::detail::format("Cache hits {} misses {} decodes {} failed {} evictions {} (last interval)", cache.hits-lastCache.hits, cache.misses-lastCache.misses, cache.decodes-lastCache.decodes, cache.failures-lastCache.failures, cache.evictions-lastCache.evictions);
@@ -55,6 +56,7 @@ struct PerformanceMonitor {
             std::fprintf(file, "%.3f,%s,%zu,%.4f,%.4f,%.4f,%zu,%zu,%.4f,%.4f,%.4f,%zu,%zu,%zu,%zu,%llu,%llu,%llu,%llu,%llu,%.4f,%zu,%zu,%llu,%llu\n", double(start)/1e9, mode, samples.frames, avg, p95, samples.maximum, samples.over33, samples.over50, drawTotal/samples.frames, samples.compose/samples.frames, samples.present/samples.frames, privateBytes, cache.sheets, cache.bytes, cache.pinned, (unsigned long long)(cache.hits-lastCache.hits), (unsigned long long)(cache.misses-lastCache.misses), (unsigned long long)(cache.decodes-lastCache.decodes), (unsigned long long)(cache.failures-lastCache.failures), (unsigned long long)(cache.evictions-lastCache.evictions), double(cache.decodeNs-lastCache.decodeNs)/1e6,gpu.sheets,gpu.bytes,(unsigned long long)gpu.uploads,(unsigned long long)gpu.draws);
             std::fflush(file);
         }
+        GetCpuProfile().flush(start, samples.frames);
         lastCache = cache; samples = {}; drawTotal = 0; windowStart = start;
     }
 };

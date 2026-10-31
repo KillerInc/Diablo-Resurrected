@@ -2,6 +2,7 @@
 #include "hd_renderer.hpp"
 #include "raster_bridge.hpp"
 #include "gpu_sprites.hpp"
+#include "cpu_profile.hpp"
 #include "controls/control_mode.hpp"
 #include <algorithm>
 #include <bit>
@@ -471,19 +472,34 @@ SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
     // Preserve persistent HUD/panel pixels, then replace the entire world
     // viewport with the independently assembled canvas. No flattened Classic
     // world is used as an HD background.
-    if (!SDL_BlitSurface(classic, nullptr, composed.get(), nullptr)) devilution::ErrSdl();
-    if (!SDL_BlitSurface(world.get(), &clip, composed.get(), &clip)) devilution::ErrSdl();
+    { CpuStageScope profile(CpuStage::ClassicCopy);
+      if (!SDL_BlitSurface(classic, nullptr, composed.get(), nullptr)) devilution::ErrSdl(); }
+    { CpuStageScope profile(CpuStage::WorldCopy);
+      if (!SDL_BlitSurface(world.get(), &clip, composed.get(), &clip)) devilution::ErrSdl(); }
     auto *pal = devilution::PalSurface;
     // Raw UI writers not using raster spans are also retained. Raster coverage
     // handles equal-color writes (which this supplemental pass cannot detect).
+    CpuStageScope scanProfile(CpuStage::RawUiScan);
     for (int y = 0; y < clip.h; ++y) {
         const auto *src = static_cast<const uint8_t *>(pal->pixels) + y * pal->pitch;
-        for (int x = clip.x; x < clip.x + clip.w; ++x)
-            if (src[x] != beforeUi[y * pal->pitch + x]) {
-                const auto *coverage = static_cast<const uint8_t *>(ui->pixels) + y * ui->pitch + x * 4;
-                if (!coverage[3]) Pixel(x, y, devilution::Palette->colors[src[x]], false);
-            }
+        const auto *previous = beforeUi.data() + y * pal->pitch;
+        // Most world rows receive no UI writes. The library comparison skips
+        // those rows in bulk; changed rows retain the exact per-pixel fallback.
+        if (std::memcmp(src + clip.x, previous + clip.x, clip.w) == 0) continue;
+        // Automap strokes can touch most rows while leaving most pixels alone.
+        // Bound the scalar fallback to changed blocks, including a short tail.
+        for (int block = clip.x; block < clip.x + clip.w; block += 64) {
+            const int end = std::min(block + 64, clip.x + clip.w);
+            if (std::memcmp(src + block, previous + block, end - block) == 0) continue;
+            for (int x = block; x < end; ++x)
+                if (src[x] != previous[x]) {
+                    const auto *coverage = static_cast<const uint8_t *>(ui->pixels) + y * ui->pitch + x * 4;
+                    if (!coverage[3]) Pixel(x, y, devilution::Palette->colors[src[x]], false);
+                }
+        }
     }
+    scanProfile.finish();
+    CpuStageScope compositeProfile(CpuStage::UiComposite);
     SDL_SetSurfaceBlendMode(ui.get(), SDL_BLENDMODE_BLEND);
     if (!SDL_BlitSurface(ui.get(), nullptr, composed.get(), nullptr)) devilution::ErrSdl();
     return composed.get();

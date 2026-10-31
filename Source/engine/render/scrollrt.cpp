@@ -1286,6 +1286,9 @@ void CalcFirstTilePosition(Point &position, Displacement &offset)
  */
 void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 {
+#ifdef USE_SDL3
+	reincarnated::CpuStageScope setupProfile(reincarnated::CpuStage::WorldSetup);
+#endif
 	// Limit rendering to the view area
 	const Surface &out = !*GetOptions().Graphics.zoom
 	    ? fullOut.subregionY(0, gnViewportHeight)
@@ -1341,13 +1344,29 @@ void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 	DunRenderStats.clear();
 #endif
 
+#ifdef USE_SDL3
+	setupProfile.finish();
+	reincarnated::CpuStageScope lightProfile(reincarnated::CpuStage::Lighting);
+#endif
 	Lightmap lightmap = Lightmap::build(*GetOptions().Graphics.perPixelLighting, position, Point {} + offset,
 	    gnScreenWidth, gnViewportHeight, rows, columns,
 	    out.at(0, 0), out.pitch(), LightTables, FullyLitLightTable, FullyDarkLightTable,
 	    dLight, MicroTileLen);
 
+#ifdef USE_SDL3
+	lightProfile.finish();
+	reincarnated::CpuStageScope floorProfile(reincarnated::CpuStage::Floor);
+#endif
 	DrawFloor(out, lightmap, position, Point {} + offset, rows, columns);
+#ifdef USE_SDL3
+	floorProfile.finish();
+	reincarnated::CpuStageScope contentProfile(reincarnated::CpuStage::TileContent);
+#endif
 	DrawTileContent(out, lightmap, position, Point {} + offset, rows, columns);
+#ifdef USE_SDL3
+	contentProfile.finish();
+	reincarnated::CpuStageScope finishProfile(reincarnated::CpuStage::WorldFinish);
+#endif
 	DrawOOB(out, lightmap, position, Point {} + offset, rows, columns);
 
 	if (*GetOptions().Graphics.zoom) {
@@ -1389,6 +1408,9 @@ void DrawView(const Surface &out, Point startPosition)
 	Displacement offset = {};
 	CalcFirstTilePosition(startPosition, offset);
 	DrawGame(out, startPosition, offset);
+#ifdef USE_SDL3
+	reincarnated::CpuStageScope viewUiProfile(reincarnated::CpuStage::ViewUi);
+#endif
 	if (AutomapActive) {
 		DrawAutomap(out.subregionY(0, gnViewportHeight));
 	}
@@ -1958,6 +1980,7 @@ void DrawAndBlit()
 	DrawView(out, ViewPosition);
 #ifdef USE_SDL3
     reincarnated::GetPerformanceMonitor().drawMs = double(SDL_GetTicksNS() - perfDrawStart)/1e6;
+	reincarnated::CpuStageScope hudProfile(reincarnated::CpuStage::HudAndCursor);
 #endif
 	const Surface hudOut =
 #ifdef USE_SDL3
@@ -2022,6 +2045,10 @@ void DrawAndBlit()
 	lua::GameDrawComplete();
 
 	this_sdl_thread::yield();
+
+#ifdef USE_SDL3
+	hudProfile.finish();
+#endif
 	DrawMain(hgt, drawInfoBox, drawHealth, drawMana, drawBelt, drawControlButtons);
 
 #ifdef _DEBUG

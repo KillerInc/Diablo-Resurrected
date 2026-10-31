@@ -327,6 +327,39 @@ int main(int argc, char **argv)
             ResetHdAssets();
             Check(!PrepareHdHudLayer(2,5,4,3));
         }
+        {
+            // Bulk row rejection must still retain raw UI writes that bypass
+            // the raster bridge, including a write near the row's right edge.
+            ResetHdAssets();BeginHdWorldFrame(1,0,1,6,8);
+            for(int y=0;y<8;++y)for(int x=0;x<8;++x)out.SetPixel({x,y},129);
+            EndHdWorldFrame();
+            out[{6,2}]=130;
+            out[{1,4}]=131;
+            composed=ComposeHdFrame(classic.get());
+            Check(pixel(6,2)[0]==Palette->colors[130].r && pixel(6,2)[2]==Palette->colors[130].b);
+            Check(pixel(1,4)[0]==Palette->colors[131].r);
+            Check(pixel(3,3)[0]==Palette->colors[129].r);
+        }
+        {
+            // Exercise 64-pixel block boundaries, a short final block and
+            // clipping on a wider canvas than the basic raster fixtures.
+            ResetHdAssets();gnScreenWidth=160;
+            SDLSurfaceUniquePtr widePal(SDL_CreateSurface(160,8,SDL_PIXELFORMAT_INDEX8));
+            SDLSurfaceUniquePtr wideClassic(SDL_CreateSurface(160,8,SDL_PIXELFORMAT_RGBA32));
+            Check(widePal && wideClassic);
+            PalSurface=widePal.get();Check(SDL_SetSurfacePalette(PalSurface,Palette.get()));
+            Surface wideOut(PalSurface);
+            SDL_FillSurfaceRect(wideClassic.get(),nullptr,SDL_MapSurfaceRGBA(wideClassic.get(),0,0,0,255));
+            BeginHdWorldFrame(1,0,1,134,8);
+            for(int y=0;y<8;++y)for(int x=0;x<160;++x)wideOut.SetPixel({x,y},129);
+            EndHdWorldFrame();
+            for(int x:{0,1,63,64,65,127,128,129,134,135})wideOut[{x,3}]=130;
+            composed=ComposeHdFrame(wideClassic.get());
+            for(int x:{1,63,64,65,127,128,129,134})Check(pixel(x,3)[0]==Palette->colors[130].r);
+            Check(pixel(2,3)[0]==Palette->colors[129].r);
+            Check(pixel(0,3)[0]==0 && pixel(135,3)[0]==0);
+            ResetHdAssets();PalSurface=pal.get();gnScreenWidth=8;
+        }
         const auto perfPath = diagnosticPath.string() + ".csv";
         Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_PERF_LOG", perfPath.c_str(), true));
         {
@@ -338,6 +371,7 @@ int main(int argc, char **argv)
             }
             Check(monitor.opened && monitor.file);
             Check(monitor.lines[0].find("50.0 FPS") != std::string::npos);
+            Check(monitor.lines[0].find("avg 20.0 ms") != std::string::npos);
             Check(monitor.lines[1].find("draw 3.00 compose 1.00 present 2.00") != std::string::npos);
             monitor.loading = true;
             monitor.record(9000000000, 0, 0, true);

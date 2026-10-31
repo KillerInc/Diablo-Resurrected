@@ -1,5 +1,6 @@
 #include "gpu_presenter.hpp"
 #include "gpu_sprites.hpp"
+#include "cpu_profile.hpp"
 #ifdef USE_SDL3
 #include <algorithm>
 #include <cmath>
@@ -104,16 +105,19 @@ void PresentGpuFrame(SDL_Surface *surface)
         if (!SDL_SetGPUSwapchainParameters(device, window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode)) devilution::ErrSdl();
         presentMode = mode;
     }
+    CpuStageScope uploadProfile(CpuStage::FrameUpload);
     auto *mapped = static_cast<uint8_t *>(SDL_MapGPUTransferBuffer(device, upload, true));
     if (!mapped) devilution::ErrSdl();
     if (!SDL_ConvertPixels(surface->w, surface->h, surface->format, surface->pixels, surface->pitch,
             SDL_PIXELFORMAT_RGBA32, mapped, frameWidth * 4)) devilution::ErrSdl();
     SDL_UnmapGPUTransferBuffer(device, upload);
+    uploadProfile.finish();
     SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
     if (!cmd) devilution::ErrSdl();
     SDL_GPUTexture *swapchain;
     Uint32 w, h;
-    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchain, &w, &h)) devilution::ErrSdl();
+    { CpuStageScope profile(CpuStage::SwapchainWait);
+      if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchain, &w, &h)) devilution::ErrSdl(); }
     SDL_GPUTransferBuffer *readback = nullptr;
     static unsigned captureFrame = 0;
     const char *captureDirectory = SDL_getenv("D1R_FRAME_DUMP");
@@ -140,7 +144,8 @@ void PresentGpuFrame(SDL_Surface *surface)
             SDL_GPUBlitInfo base{};base.source.texture=frame;base.source.w=frameWidth;base.source.h=frameHeight;
             base.destination.texture=scene;base.destination.w=sceneWidth;base.destination.h=sceneHeight;
             base.load_op=SDL_GPU_LOADOP_DONT_CARE;base.filter=SDL_GPU_FILTER_NEAREST;SDL_BlitGPUTexture(cmd,&base);
-            RenderGpuSprites(cmd,scene,frameWidth,frameHeight,sceneWidth,sceneHeight);
+            { CpuStageScope profile(CpuStage::SpriteCommands);
+              RenderGpuSprites(cmd,scene,frameWidth,frameHeight,sceneWidth,sceneHeight); }
             display=scene;displayW=sceneWidth;displayH=sceneHeight;
         }
         if(capture) {
@@ -159,6 +164,7 @@ void PresentGpuFrame(SDL_Surface *surface)
             ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
         SDL_BlitGPUTexture(cmd, &blit);
     }
+    CpuStageScope submitProfile(CpuStage::GpuSubmit);
     if (readback) {
         auto *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
         if (!fence || !SDL_WaitForGPUFences(device, true, &fence, 1)) devilution::ErrSdl();
