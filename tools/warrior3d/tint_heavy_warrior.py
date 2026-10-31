@@ -1,8 +1,8 @@
-"""Blender material pass: replace red armor paint with dark gray; keep gold and detail."""
+"""Blender material pass: dark gray armor, optional dark silver trim; preserve detail."""
 import bpy,numpy as np,json,hashlib
 from pathlib import Path
 
-def apply(output):
+def apply(output,gold_to_silver=False):
  output=Path(output);output.mkdir(parents=True,exist_ok=True);records=[];seen=set()
  for obj in bpy.context.scene.objects:
   if obj.type!='MESH' or obj.hide_render:continue
@@ -16,7 +16,11 @@ def apply(output):
    red=np.clip(((r-g)/den-.20)/.18,0,1)*np.clip(((r-b)/den-.08)/.18,0,1)
    gold=(g/den>.58)&(r>b*1.15);red[gold]=0
    luminance=rgb@np.array([.2126,.7152,.0722],dtype=np.float32);gray=luminance[:,None]*np.array([.60,.63,.67],dtype=np.float32)
-   rgb[:]=np.clip(rgb*(1-red[:,None])+gray*red[:,None],0,1);assert np.array_equal(rgba[:,3],before_alpha)
+   rgb[:]=np.clip(rgb*(1-red[:,None])+gray*red[:,None],0,1)
+   if gold_to_silver:
+    silver=luminance[:,None]*np.array([.46,.49,.53],dtype=np.float32)
+    rgb[gold]=np.clip(silver[gold],0,1)
+   assert np.array_equal(rgba[:,3],before_alpha)
    image.pixels.foreach_set(pixels);image.update();image.filepath_raw=str(output/(material.name.replace('/','_')+'-dark-gray.png'));image.file_format='PNG';image.save();image.pack();node.image=image
    records.append({'material':material.name,'changed_texels':int((red>.01).sum()),'gold_texels_protected':int(gold.sum()),'alpha_unchanged':True})
- (output/'material-pass.json').write_text(json.dumps({'pass':'red armor to dark gray','materials':records,'geometry_uv_weights_modified':False,'gold_trim_protected':True,'normal_roughness_metallic_maps_unchanged':True},indent=2));return records
+ (output/'material-pass.json').write_text(json.dumps({'pass':'red armor to dark gray','materials':records,'geometry_uv_weights_modified':False,'gold_trim_protected':not gold_to_silver,'gold_to_dark_silver':gold_to_silver,'normal_roughness_metallic_maps_unchanged':True},indent=2));return records

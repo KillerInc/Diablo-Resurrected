@@ -21,9 +21,11 @@
   "preview_material_pass": {
     "script": "tint_heavy_warrior.py",
     "red_armor": "dark gray",
-    "gold_trim_preserved": true,
+    "gold_trim_preserved": false,
     "normal_roughness_metallic_maps_unchanged": true,
     "source_file_unchanged": true,
-    "status": "preview_not_installed"
+    "status": "preview_not_installed",
+    "gold_trim": "dark silver",
+    "gold_to_silver": true
   }
 }
