@@ -31,6 +31,7 @@
 #include "options.h"
 #include "reincarnated/hd_renderer.hpp"
 #include "reincarnated/gpu_presenter.hpp"
+#include "reincarnated/gpu_terrain.hpp"
 #include "utils/display.h"
 #include "utils/log.hpp"
 #include "utils/sdl_wrap.h"
@@ -193,6 +194,9 @@ void CreateBackBuffer()
 
 void BltFast(SDL_Rect *srcRect, SDL_Rect *dstRect)
 {
+#ifdef USE_SDL3
+	if (reincarnated::GpuTerrainUsesIndexedPresent()) return;
+#endif
 	if (RenderDirectlyToOutputSurface) {
 #ifndef USE_SDL1
 		// A null rect means the caller changed the entire surface.

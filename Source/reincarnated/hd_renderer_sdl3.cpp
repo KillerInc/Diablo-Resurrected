@@ -314,10 +314,11 @@ void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clip
     if (std::memcmp(matchingPalette.data(), devilution::logical_palette.data(), sizeof(matchingPalette)) != 0) {
         matchingPalette = devilution::logical_palette;
     }
-    EnsureSurface(ui); EnsureSurface(composed);
+    EnsureSurface(ui);
     scale = zoom; offsetX = xOffset;
     clip = { clipX, 0, clipWidth, clipHeight };
     const bool gpuTerrain=BeginGpuTerrainFrame(zoom,xOffset,clipX,clipWidth,clipHeight);
+    if(GpuTerrainNeedsCpuCanvas())EnsureSurface(composed);else composed.reset();
     if(gpuTerrain)world.reset();
     else{
         EnsureSurface(world);
@@ -495,7 +496,7 @@ SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
     // viewport with the independently assembled canvas. No flattened Classic
     // world is used as an HD background.
     { CpuStageScope profile(CpuStage::ClassicCopy);
-      if (!SDL_BlitSurface(classic, nullptr, composed.get(), nullptr)) devilution::ErrSdl(); }
+      if (!GpuTerrainUsesIndexedPresent() && !SDL_BlitSurface(classic, nullptr, composed.get(), nullptr)) devilution::ErrSdl(); }
     { CpuStageScope profile(CpuStage::WorldCopy);
       if (!GpuTerrainReady() && !SDL_BlitSurface(world.get(), &clip, composed.get(), &clip)) devilution::ErrSdl(); }
     auto *pal = devilution::PalSurface;
@@ -522,7 +523,7 @@ SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
     }
     scanProfile.finish();
     CpuStageScope compositeProfile(CpuStage::UiComposite);
-    if(GpuTerrainReady())return composed.get();
+    if(GpuTerrainReady())return GpuTerrainUsesIndexedPresent()?devilution::PalSurface:composed.get();
     SDL_SetSurfaceBlendMode(ui.get(), SDL_BLENDMODE_BLEND);
     if (!SDL_BlitSurface(ui.get(), nullptr, composed.get(), nullptr)) devilution::ErrSdl();
     return composed.get();

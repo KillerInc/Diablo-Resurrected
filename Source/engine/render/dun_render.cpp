@@ -1062,6 +1062,9 @@ DVL_ATTRIBUTE_HOT void RenderTileFrame(const Surface &out, const Lightmap &light
 	++DunRenderStats[DunRenderType { tile, maskType }];
 #endif
 
+#ifdef USE_SDL3
+	if (!reincarnated::QueueGpuTerrainTile(out, maskType, tbl))
+#endif
 	switch (maskType) {
 	case MaskType::Solid:
 		RenderTileDispatch</*Transparent=*/false>(tile, dst, dstPitch, src, tbl, lightmap, clip);

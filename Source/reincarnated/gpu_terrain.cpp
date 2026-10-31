@@ -1,5 +1,6 @@
 #include "gpu_terrain.hpp"
 #ifdef USE_SDL3
+#include "controls/control_mode.hpp"
 #include "engine/light_tables.hpp"
 #include "engine/load_file.hpp"
 #include "engine/render/dun_render.hpp"
@@ -30,7 +31,7 @@ SDL_GPUDevice *device = nullptr;
 SDL_GPUGraphicsPipeline *pipeline = nullptr;
 SDL_GPUComputePipeline *nearestPipeline = nullptr;
 SDL_GPUSampler *sampler = nullptr;
-SDL_GPUTexture *ownerTexture = nullptr, *indexTexture = nullptr, *headTexture = nullptr, *paletteTexture = nullptr, *uiTexture = nullptr;
+SDL_GPUTexture *ownerTexture = nullptr, *indexTexture = nullptr, *headTexture = nullptr, *paletteTexture = nullptr, *uiTexture = nullptr, *classicTexture = nullptr;
 SDL_GPUBuffer *nearest = nullptr, *commandBuffer = nullptr, *nodeBuffer = nullptr;
 SDL_GPUTransferBuffer *staging = nullptr;
 unsigned stagingCapacity = 0, commandCapacity = 0, nodeCapacity = 0, textureW = 0, textureH = 0, uiW = 0, uiH = 0;
@@ -44,14 +45,28 @@ std::string materialPath, palettePath;
 std::array<SDL_Color, 256> originalPalette {};
 std::vector<uint16_t> ownerPixels;
 std::vector<uint32_t> indexPixels;
+struct TileRun {
+	uint8_t x, length;
+};
+struct DecodedTile {
+	std::vector<uint8_t> indices, mask;
+	std::vector<std::vector<TileRun>> rows;
+};
 struct Context {
-	const std::vector<uint8_t> *original;
+	const DecodedTile *tile;
 	const devilution::Lightmap *lightmap;
 	int x, top, height, level;
+	bool directSupported;
 };
 std::vector<Context> contexts;
-std::map<std::tuple<const uint8_t *, int, int>, std::vector<uint8_t>> originals;
-bool decoding = false;
+std::map<std::tuple<const uint8_t *, int, int>, DecodedTile> originals;
+bool decoding = false, nativeCapture = false, directTiles = false, indexedPresent = false;
+bool SetGpuTerrainNativeCaptureInternal(bool value)
+{
+	const bool old = nativeCapture;
+	nativeCapture = value;
+	return old;
+}
 std::vector<uint32_t> headPixels;
 // Three uint4 records, read with ByteAddressBuffer.Load4. SDL D3D12
 // storage SRVs are raw buffers, not StructuredBuffer descriptors.
@@ -68,6 +83,7 @@ std::vector<uint32_t> maskColors;
 int nativeW = 0, nativeH = 0, zoom = 1, offsetX = 0;
 SDL_Rect clip {};
 uint16_t current = 0;
+uint32_t directTileCount = 0;
 bool active = false, ready = false, warmed = false, nativeOnly = false;
 bool Requested()
 {
@@ -91,7 +107,7 @@ void *Map(unsigned size)
 		if (staging) SDL_ReleaseGPUTransferBuffer(device, staging);
 		SDL_GPUTransferBufferCreateInfo info {};
 		info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-		info.size = std::bit_ceil(std::max(65536U,size));
+		info.size = std::bit_ceil(std::max(65536U, size));
 		staging = SDL_CreateGPUTransferBuffer(device, &info);
 		stagingCapacity = info.size;
 	}
@@ -128,7 +144,7 @@ void EnsureBuffer(SDL_GPUBuffer *&buffer, unsigned &capacity, unsigned size)
 		if (buffer) SDL_ReleaseGPUBuffer(device, buffer);
 		SDL_GPUBufferCreateInfo info {};
 		info.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
-		info.size = std::bit_ceil(std::max(65536U,size));
+		info.size = std::bit_ceil(std::max(65536U, size));
 		buffer = SDL_CreateGPUBuffer(device, &info);
 		capacity = info.size;
 	}
@@ -207,7 +223,7 @@ void InitializeGpuTerrain(SDL_GPUDevice *target)
 	sh.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
 	sh.code = TerrainFrag;
 	sh.code_size = sizeof(TerrainFrag);
-	sh.num_samplers = 13;
+	sh.num_samplers = 14;
 	sh.num_storage_buffers = 3;
 	auto *frag = SDL_CreateGPUShader(device, &sh);
 	if (vert && frag) {
@@ -252,7 +268,7 @@ void ReleaseGpuTerrainLevel()
 void DestroyGpuTerrain()
 {
 	ReleaseGpuTerrainLevel();
-	for (auto *texture : { ownerTexture, indexTexture, headTexture, paletteTexture, uiTexture })
+	for (auto *texture : { ownerTexture, indexTexture, headTexture, paletteTexture, uiTexture, classicTexture })
 		if (texture) SDL_ReleaseGPUTexture(device, texture);
 	for (auto *buffer : { nearest, commandBuffer, nodeBuffer })
 		if (buffer) SDL_ReleaseGPUBuffer(device, buffer);
@@ -260,7 +276,7 @@ void DestroyGpuTerrain()
 	if (pipeline) SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
 	if (nearestPipeline) SDL_ReleaseGPUComputePipeline(device, nearestPipeline);
 	if (sampler) SDL_ReleaseGPUSampler(device, sampler);
-	ownerTexture = indexTexture = headTexture = paletteTexture = uiTexture = nullptr;
+	ownerTexture = indexTexture = headTexture = paletteTexture = uiTexture = classicTexture = nullptr;
 	nearest = commandBuffer = nodeBuffer = nullptr;
 	staging = nullptr;
 	pipeline = nullptr;
@@ -304,8 +320,20 @@ void WarmGpuTerrain()
 bool BeginGpuTerrainFrame(int scale, int offset, int clipX, int clipWidth, int clipHeight)
 {
 	ResetGpuTerrainFrame();
-	if (scale < 1 || scale > 2 || clipWidth <= 0 || clipHeight <= 0 || !Requested() || !GetRendererSwitch().usesHdRenderer() || !Warm()) return false;
+	if (devilution::ControlMode == devilution::ControlTypes::VirtualGamepad || scale < 1 || scale > 2 || clipWidth <= 0 || clipHeight <= 0 || !Requested() || !GetRendererSwitch().usesHdRenderer() || !Warm()) return false;
 	nativeOnly = SDL_getenv("D1R_GPU_TERRAIN_NATIVE") != nullptr;
+	const char *direct = SDL_getenv("D1R_GPU_TILE_COMMANDS");
+	directTiles = !direct || std::strcmp(direct, "0") != 0;
+	const char *indexed = SDL_getenv("D1R_GPU_INDEXED_PRESENT");
+	indexedPresent = !indexed || std::strcmp(indexed, "0") != 0;
+	directTileCount = 0;
+	static int previousPath = -1;
+	const int path = int(directTiles) + int(indexedPresent) * 2;
+	if (path != previousPath) {
+		previousPath = path;
+		devilution::Log("GPU_TERRAIN_PATH direct_tiles={} indexed_present={}", directTiles, indexedPresent);
+	}
+
 	zoom = scale;
 	offsetX = offset;
 	clip = { clipX, 0, clipWidth, clipHeight };
@@ -330,6 +358,9 @@ void ResetGpuTerrainFrame()
 }
 bool GpuTerrainActive() { return active; }
 bool GpuTerrainReady() { return ready && active; }
+bool GpuTerrainUsesIndexedPresent() { return GpuTerrainReady() && indexedPresent; }
+bool GpuTerrainNeedsCpuCanvas() { return !active || !indexedPresent; }
+bool GpuTerrainSkipsNativePainting() { return active && directTiles && !nativeCapture; }
 uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilution::TileType type, int height, const devilution::Lightmap &lightmap, const uint8_t *table)
 {
 	const auto previous = current;
@@ -355,28 +386,56 @@ uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilutio
 				row[i] = uint8_t(i);
 		std::vector<uint8_t> lights(size_t(surface->pitch) * height, 0);
 		devilution::Lightmap unlit(static_cast<const uint8_t *>(surface->pixels), lights, surface->pitch, tables, tables[0].data(), tables.back().data());
-		SDL_FillSurfaceRect(surface, nullptr, 0);
+		it->second.indices.resize(32 * height);
+		it->second.mask.resize(32 * height);
 		decoding = true;
-		devilution::RenderTileFrame(devilution::Surface(surface), unlit, { 0, height - 1 }, type, source, height, devilution::MaskType::Solid, tables[0].data());
+		for (unsigned pass = 0; pass < 2; ++pass) {
+			SDL_FillSurfaceRect(surface, nullptr, pass ? 252 : 251);
+			devilution::RenderTileFrame(devilution::Surface(surface), unlit, { 0, height - 1 }, type, source, height, devilution::MaskType::Solid, tables[0].data());
+			for (int row = 0; row < height; ++row) {
+				const auto *src = static_cast<const uint8_t *>(surface->pixels) + row * surface->pitch;
+				for (unsigned x = 0; x < 32; ++x) {
+					const size_t i = row * 32 + x;
+					if (pass == 0)
+						it->second.indices[i] = src[x];
+					else
+						it->second.mask[i] = it->second.indices[i] == src[x];
+				}
+			}
+		}
 		decoding = false;
-		it->second.resize(32 * height);
-		for (int row = 0; row < height; ++row)
-			std::memcpy(it->second.data() + row * 32, static_cast<uint8_t *>(surface->pixels) + row * surface->pitch, 32);
+		it->second.rows.resize(height);
+		for (int row = 0; row < height; ++row) {
+			int x = 0;
+			while (x < 32) {
+				if (!it->second.mask[row * 32 + x]) {
+					++x;
+					continue;
+				}
+				const int left = x;
+				while (x < 32 && it->second.mask[row * 32 + x])
+					++x;
+				it->second.rows[row].push_back({ uint8_t(left), uint8_t(x - left) });
+			}
+		}
+
 		SDL_DestroySurface(surface);
 	}
 	int level = 0;
+	bool supported = *devilution::GetOptions().Graphics.perPixelLighting || lightmap.isFullyDarkLightTable(table) || lightmap.isFullyLitLightTable(table);
 	if (!*devilution::GetOptions().Graphics.perPixelLighting) {
 		if (lightmap.isFullyDarkLightTable(table))
 			level = 15;
 		else if (!lightmap.isFullyLitLightTable(table))
 			for (int i = 0; i < 16; ++i)
 				if (table == devilution::LightTables[i].data()) {
+					supported = true;
 					level = i;
 					break;
 				}
 	} else
 		level = -1;
-	contexts.push_back({ &it->second, &lightmap, x, bottom - height + 1, height, level });
+	contexts.push_back({ &it->second, &lightmap, x, bottom - height + 1, height, level, supported && lightmap.getLightTable(0) == devilution::LightTables[0].data() });
 	current = uint16_t(commands.size());
 	return previous;
 }
@@ -393,7 +452,7 @@ IndexSpan GetIndexSpan(int x, int y)
 	const int localX = x - context.x, localY = y - context.top;
 	if (localX < 0 || localX >= 32 || localY < 0 || localY >= context.height) return {};
 	IndexSpan result;
-	result.original = context.original->data() + localY * 32 + localX;
+	result.original = context.tile->indices.data() + localY * 32 + localX;
 	if (context.level < 0) {
 		const auto *pixel = static_cast<const uint8_t *>(devilution::PalSurface->pixels) + y * devilution::PalSurface->pitch + x;
 		result.light = context.lightmap->getLightingAt(pixel);
@@ -437,18 +496,82 @@ void CaptureGpuTerrainBlend(int x, int y, const uint8_t *indices, unsigned lengt
 		for (int py = y * zoom; py < std::min((y + 1) * zoom, clip.h); ++py)
 			MaskGpuSpriteBlendedSpan(left, py, maskColors.data() + left - rawLeft, right - left);
 }
+bool SetGpuTerrainNativeCapture(bool value) { return SetGpuTerrainNativeCaptureInternal(value); }
+bool QueueGpuTerrainTile(const devilution::Surface &out, devilution::MaskType mask, const uint8_t *table)
+{
+	if (!active || !directTiles || nativeCapture || decoding || !current || out.surface != devilution::PalSurface) return false;
+	const auto &context = contexts[current - 1];
+	if (!context.directSupported) return false;
+	const int y0 = std::max({ context.top, out.region.y, 0 }), y1 = std::min({ context.top + context.height, out.region.y + out.region.h, nativeH });
+	const int x0 = std::max({ context.x, out.region.x, 0 }), x1 = std::min({ context.x + 32, out.region.x + out.region.w, nativeW });
+	const bool masks = HasQueuedGpuSprites();
+	for (int y = y0; y < y1; ++y) {
+		const int row = y - context.top, fromBottom = context.height - 1 - row;
+		const int prefix = mask == devilution::MaskType::Left ? -32 + fromBottom * 2 : 64 - fromBottom * 2;
+		const auto transparent = [&](int x) { return mask == devilution::MaskType::Transparent || (mask == devilution::MaskType::Left && x - context.x < prefix) || (mask == devilution::MaskType::Right && x - context.x >= prefix); };
+		for (const auto run : context.tile->rows[row]) {
+			int x = std::max(x0, context.x + int(run.x));
+			const int end = std::min(x1, context.x + int(run.x) + int(run.length));
+			while (x < end) {
+				const int left = x;
+				const bool blend = transparent(x);
+				x = end;
+				const int split = context.x + prefix;
+				if ((mask == devilution::MaskType::Left || mask == devilution::MaskType::Right) && split > left && split < end) x = split;
+				const unsigned length = x - left;
+				const size_t at = size_t(y) * nativeW + left;
+				const auto span = GetIndexSpan(left, y);
+				if (blend) {
+					if (masks) maskColors.resize(length * zoom);
+					for (unsigned i = 0; i < length; ++i) {
+						const uint32_t packed = span.pack(i, 0) | 0x01000000U;
+						nodes.push_back({ headPixels[at + i], current, packed, 0 });
+						headPixels[at + i] = uint32_t(nodes.size() - 1);
+						if (masks) {
+							const unsigned light = span.light ? std::min<unsigned>(15, span.light[i]) : span.level;
+							const uint8_t index = span.light ? context.lightmap->adjustColor(span.original[i], light) : table[span.original[i]];
+							auto color = devilution::Palette->colors[index];
+							color.a = 255;
+							uint32_t rgb;
+							std::memcpy(&rgb, &color, 4);
+							for (int dx = 0; dx < zoom; ++dx)
+								maskColors[i * zoom + dx] = rgb;
+						}
+					}
+					const int rawLeft = left * zoom + offsetX, l = std::max(rawLeft, clip.x), r = std::min(rawLeft + int(length) * zoom, clip.x + clip.w);
+					if (masks && l < r)
+						for (int py = y * zoom; py < std::min((y + 1) * zoom, clip.h); ++py)
+							MaskGpuSpriteBlendedSpan(l, py, maskColors.data() + l - rawLeft, r - l);
+				} else {
+					for (unsigned i = 0; i < length; ++i)
+						indexPixels[at + i] = span.pack(i, 0) | 0x01000000U;
+					std::fill_n(ownerPixels.data() + at, length, current);
+					std::fill_n(headPixels.data() + at, length, 0);
+					MaskOpaque(left, y, length);
+				}
+			}
+		}
+	}
+	++directTileCount;
+	return true;
+}
+SDL_Color NativePackedColor(uint32_t packed)
+{
+	const unsigned index = (packed >> 24) ? devilution::LightTables[(packed >> 16) & 15][(packed >> 8) & 255] : packed & 255;
+	return devilution::Palette->colors[index];
+}
 SDL_Color GpuTerrainBackground(int x, int y)
 {
 	x = (x - offsetX) / zoom;
 	y /= zoom;
 	if (x < 0 || y < 0 || x >= nativeW || y >= nativeH) return { 0, 0, 0, 255 };
 	const size_t at = size_t(y) * nativeW + x;
-	SDL_Color result = devilution::Palette->colors[indexPixels[at] & 255];
+	SDL_Color result = NativePackedColor(indexPixels[at]);
 	std::vector<uint32_t> chain;
 	for (auto node = headPixels[at]; node; node = nodes[node].previous)
 		chain.push_back(node);
 	for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
-		const auto c = devilution::Palette->colors[nodes[*it].index & 255];
+		const auto c = NativePackedColor(nodes[*it].index);
 		result.r = (unsigned(result.r) + c.r) / 2;
 		result.g = (unsigned(result.g) + c.g) / 2;
 		result.b = (unsigned(result.b) + c.b) / 2;
@@ -456,7 +579,7 @@ SDL_Color GpuTerrainBackground(int x, int y)
 	result.a = 255;
 	return result;
 }
-void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Surface *ui, int width, int height, int pixelWidth, int pixelHeight)
+void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Surface *ui, SDL_Surface *classic, int width, int height, int pixelWidth, int pixelHeight)
 {
 	if (!GpuTerrainReady()) return;
 	if (textureW != unsigned(nativeW) || textureH != unsigned(nativeH)) {
@@ -470,12 +593,15 @@ void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Sur
 	}
 	if (uiW != unsigned(width) || uiH != unsigned(height)) {
 		if (uiTexture) SDL_ReleaseGPUTexture(device, uiTexture);
+		if (classicTexture) SDL_ReleaseGPUTexture(device, classicTexture);
+		classicTexture = nullptr;
 		uiW = width;
 		uiH = height;
 		uiTexture = Texture(width, height, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);
 	}
+	if (indexedPresent && !classicTexture) classicTexture = Texture(width, height, SDL_GPU_TEXTUREFORMAT_R8_UNORM);
 	if (!paletteTexture) paletteTexture = Texture(256, 18, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);
-	if (!ownerTexture || !indexTexture || !headTexture || !uiTexture || !paletteTexture) devilution::ErrSdl();
+	if (!ownerTexture || !indexTexture || !headTexture || !uiTexture || !paletteTexture || (indexedPresent && !classicTexture)) devilution::ErrSdl();
 	std::array<SDL_Color, 256 * 18> palettes;
 	std::copy(originalPalette.begin(), originalPalette.end(), palettes.begin());
 	for (unsigned level = 0; level < 16; ++level)
@@ -491,11 +617,12 @@ void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Sur
 		const void *source;
 		unsigned w, h, bytes, pitch, offset = 0;
 	};
-	std::array<ImageUpload, 5> images { { { ownerTexture, ownerPixels.data(), unsigned(nativeW), unsigned(nativeH), 2, unsigned(nativeW) * 2 },
+	std::vector<ImageUpload> images { { ownerTexture, ownerPixels.data(), unsigned(nativeW), unsigned(nativeH), 2, unsigned(nativeW) * 2 },
 		{ indexTexture, indexPixels.data(), unsigned(nativeW), unsigned(nativeH), 4, unsigned(nativeW) * 4 },
 		{ headTexture, headPixels.data(), unsigned(nativeW), unsigned(nativeH), 4, unsigned(nativeW) * 4 },
 		{ paletteTexture, palettes.data(), 256, 18, 4, 256 * 4 },
-		{ uiTexture, ui->pixels, unsigned(width), unsigned(height), 4, unsigned(ui->pitch) } } };
+		{ uiTexture, ui->pixels, unsigned(width), unsigned(height), 4, unsigned(ui->pitch) } };
+	if (indexedPresent) images.push_back({ classicTexture, classic->pixels, unsigned(width), unsigned(height), 1, unsigned(classic->pitch) });
 	unsigned total = 0;
 	for (auto &image : images) {
 		image.offset = total;
@@ -532,13 +659,13 @@ void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Sur
 	SDL_EndGPUCopyPass(copy);
 	SDL_GPUColorTargetInfo color {};
 	color.texture = target;
-	color.load_op = SDL_GPU_LOADOP_LOAD;
+	color.load_op = indexedPresent ? SDL_GPU_LOADOP_CLEAR : SDL_GPU_LOADOP_LOAD;
 	color.store_op = SDL_GPU_STOREOP_STORE;
 	auto *pass = SDL_BeginGPURenderPass(cmd, &color, 1, nullptr);
 	SDL_BindGPUGraphicsPipeline(pass, pipeline);
 	SDL_GPUViewport viewport { 0, 0, float(pixelWidth), float(pixelHeight), 0, 1 };
 	SDL_SetGPUViewport(pass, &viewport);
-	SDL_GPUTextureSamplerBinding bindings[13];
+	SDL_GPUTextureSamplerBinding bindings[14];
 	for (unsigned i = 0; i < 8; ++i)
 		bindings[i] = { material->pages[std::min(i, unsigned(material->pages.size() - 1))].texture, sampler };
 	bindings[8] = { ownerTexture, sampler };
@@ -546,17 +673,18 @@ void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Sur
 	bindings[10] = { headTexture, sampler };
 	bindings[11] = { paletteTexture, sampler };
 	bindings[12] = { uiTexture, sampler };
-	SDL_BindGPUFragmentSamplers(pass, 0, bindings, 13);
+	bindings[13] = { indexedPresent ? classicTexture : indexTexture, sampler };
+	SDL_BindGPUFragmentSamplers(pass, 0, bindings, 14);
 	SDL_GPUBuffer *buffers[] { nearest, commandBuffer, nodeBuffer };
 	SDL_BindGPUFragmentStorageBuffers(pass, 0, buffers, 3);
 	const float vertex[] { 0, 0, float(width), float(height), 0, 0, 1, 1, float(width), float(height), 0, 0 };
-	const float fragment[] { float(nativeW), float(nativeH), float(zoom), float(offsetX), float(clip.x), float(clip.y), float(clip.w), float(clip.h) };
+	const float fragment[] { float(nativeW), float(nativeH), float(zoom), float(offsetX), float(clip.x), float(clip.y), float(clip.w), float(clip.h), indexedPresent ? 1.0f : 0.0f, 0, 0, 0 };
 	SDL_PushGPUVertexUniformData(cmd, 0, vertex, sizeof(vertex));
 	SDL_PushGPUFragmentUniformData(cmd, 0, fragment, sizeof(fragment));
 	SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
 	SDL_EndGPURenderPass(pass);
 	static unsigned frames = 0;
-	if (SDL_getenv("D1R_PROFILE_HD") && ++frames % 100 == 0) devilution::Log("GPU_TERRAIN_FRAME tiles={} blend_nodes={}", commands.size(), nodes.size() - 1);
+	if (SDL_getenv("D1R_PROFILE_HD") && ++frames % 100 == 0) devilution::Log("GPU_TERRAIN_FRAME tiles={} blend_nodes={} cpu_tile_draws_skipped={} indexed_present={}", commands.size(), nodes.size() - 1, directTileCount, indexedPresent);
 }
 } // namespace reincarnated
 #endif

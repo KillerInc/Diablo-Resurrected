@@ -2,6 +2,7 @@
 #include "gpu_coverage.hpp"
 #ifdef USE_SDL3
 #include <algorithm>
+#include <bit>
 #include <cstring>
 #include <mutex>
 #include <sstream>
@@ -25,8 +26,8 @@ SDL_GPUBuffer *nearestBuffer=nullptr;
 std::vector<uint8_t> nearestPalette;
 std::mutex cacheMutex;
 std::mutex stagingMutex;
-SDL_GPUTransferBuffer *staging=nullptr;
-unsigned stagingCapacity=0;
+SDL_GPUTransferBuffer *staging=nullptr,*pageStaging=nullptr;
+unsigned stagingCapacity=0,pageStagingCapacity=0;
 std::unordered_map<std::string,std::shared_ptr<GpuSheet>> sheets;
 std::vector<GpuSpriteDraw> draws;
 constexpr unsigned CoverageTileShift=5, CoverageTileSize=1U<<CoverageTileShift;
@@ -48,11 +49,12 @@ bool Upload(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *texture,const unsigned cha
     const unsigned pitch=(sourcePitch+255)&~255U;
     SDL_GPUTransferBufferCreateInfo info{};info.usage=SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;info.size=pitch*rows;
     const std::lock_guard<std::mutex> stageLock(stagingMutex);
-    if(!staging || stagingCapacity<info.size){
-        if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);
-        staging=SDL_CreateGPUTransferBuffer(device,&info);stagingCapacity=info.size;
+    auto *&pool=bc7?pageStaging:staging;auto &capacity=bc7?pageStagingCapacity:stagingCapacity;
+    if(!pool || capacity<info.size){
+        if(pool)SDL_ReleaseGPUTransferBuffer(device,pool);
+        pool=SDL_CreateGPUTransferBuffer(device,&info);capacity=info.size;
     }
-    auto *transfer=staging;if(!transfer)return false;
+    auto *transfer=pool;if(!transfer)return false;
     auto *mapped=static_cast<unsigned char*>(SDL_MapGPUTransferBuffer(device,transfer,true));
     if(!mapped)return false;
     for(unsigned row=0;row<rows;++row)std::memcpy(mapped+row*pitch,data+row*sourcePitch,sourcePitch);
@@ -103,7 +105,7 @@ void BeginGpuSpriteFrame(){
 }
 void ReleaseGpuPlayerSheets(){const std::lock_guard<std::mutex> lock(cacheMutex);sheets.clear();}
 void DestroyGpuSprites(){BeginGpuSpriteFrame();ReleaseGpuPlayerSheets();
-    for(auto &s:controls){if(s.mask)SDL_ReleaseGPUTexture(device,s.mask);if(s.light)SDL_ReleaseGPUTexture(device,s.light);if(s.palette)SDL_ReleaseGPUTexture(device,s.palette);}controls.clear();if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);staging=nullptr;stagingCapacity=0;if(nearestBuffer)SDL_ReleaseGPUBuffer(device,nearestBuffer);nearestBuffer=nullptr;nearestPalette.clear();if(nearestPipeline)SDL_ReleaseGPUComputePipeline(device,nearestPipeline);nearestPipeline=nullptr;if(pipeline)SDL_ReleaseGPUGraphicsPipeline(device,pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);pipeline=nullptr;sampler=nullptr;device=nullptr;}
+    for(auto &s:controls){if(s.mask)SDL_ReleaseGPUTexture(device,s.mask);if(s.light)SDL_ReleaseGPUTexture(device,s.light);if(s.palette)SDL_ReleaseGPUTexture(device,s.palette);}controls.clear();if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);staging=nullptr;stagingCapacity=0;if(pageStaging)SDL_ReleaseGPUTransferBuffer(device,pageStaging);pageStaging=nullptr;pageStagingCapacity=0;if(nearestBuffer)SDL_ReleaseGPUBuffer(device,nearestBuffer);nearestBuffer=nullptr;nearestPalette.clear();if(nearestPipeline)SDL_ReleaseGPUComputePipeline(device,nearestPipeline);nearestPipeline=nullptr;if(pipeline)SDL_ReleaseGPUGraphicsPipeline(device,pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);pipeline=nullptr;sampler=nullptr;device=nullptr;}
 std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source){
     if(!pipeline||!sampler||!nearestPipeline)return {};
     const std::lock_guard<std::mutex> lock(cacheMutex);
@@ -235,6 +237,10 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
     EnsureGpuPalette(cmd,draws.front().palette.data());
     static bool reported=false;
     if(!reported){devilution::Log("GPU_SPRITE_DRAW physical={}x{} logical={}x{} actors={} shader_lighting=1",pixelW,pixelH,logicalW,logicalH,draws.size());reported=true;}
+    // Page uploads and per-frame controls use separate transfer pools. A large
+    // BC7 page must not set the allocation size for every tiny mask/palette.
+    struct ControlUpload{SDL_GPUTexture *texture;const uint8_t *data;unsigned w,h,bytes,offset=0;};
+    std::vector<ControlUpload> jobs;jobs.reserve(draws.size()*3);
     for(const auto &draw:draws){
         auto &slot=controls[slotIndex++];
         if(slot.w<unsigned(draw.maskW)||slot.h<unsigned(draw.maskH)){
@@ -243,9 +249,26 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
             slot.mask=Texture(slot.w,slot.h,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);slot.light=Texture(slot.w,slot.h,SDL_GPU_TEXTUREFORMAT_R8_UNORM);
         }
         if(!slot.palette)slot.palette=Texture(256,17,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);
-        auto *mask=slot.mask,*light=slot.light,*pal=slot.palette;
-        if(!mask||!light||!pal)devilution::ErrSdl();
-        if(!Upload(cmd,mask,draw.coverage.data(),draw.maskW,draw.maskH,4)||!Upload(cmd,light,draw.lighting.data(),draw.maskW,draw.maskH,1)||!Upload(cmd,pal,draw.palette.data(),256,17,4))devilution::ErrSdl();
+        if(!slot.mask||!slot.light||!slot.palette)devilution::ErrSdl();
+        jobs.push_back({slot.mask,draw.coverage.data(),unsigned(draw.maskW),unsigned(draw.maskH),4});
+        jobs.push_back({slot.light,draw.lighting.data(),unsigned(draw.maskW),unsigned(draw.maskH),1});
+        jobs.push_back({slot.palette,draw.palette.data(),256,17,4});
+    }
+    unsigned total=0;for(auto &job:jobs){job.offset=total;total+=((job.w*job.bytes+255)&~255U)*job.h;}
+    {
+        const std::lock_guard<std::mutex> stageLock(stagingMutex);
+        if(!staging||stagingCapacity<total){if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);
+            SDL_GPUTransferBufferCreateInfo info{};info.usage=SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;info.size=std::bit_ceil(std::max(65536U,total));
+            staging=SDL_CreateGPUTransferBuffer(device,&info);stagingCapacity=info.size;}
+        if(!staging)devilution::ErrSdl();auto *mapped=static_cast<uint8_t*>(SDL_MapGPUTransferBuffer(device,staging,true));if(!mapped)devilution::ErrSdl();
+        for(const auto &job:jobs){const unsigned pitch=(job.w*job.bytes+255)&~255U;for(unsigned y=0;y<job.h;++y)std::memcpy(mapped+job.offset+y*pitch,job.data+y*job.w*job.bytes,job.w*job.bytes);}
+        SDL_UnmapGPUTransferBuffer(device,staging);auto *copy=SDL_BeginGPUCopyPass(cmd);
+        for(const auto &job:jobs){SDL_GPUTextureTransferInfo src{};src.transfer_buffer=staging;src.offset=job.offset;src.pixels_per_row=((job.w*job.bytes+255)&~255U)/job.bytes;src.rows_per_layer=job.h;
+            SDL_GPUTextureRegion dst{};dst.texture=job.texture;dst.w=job.w;dst.h=job.h;dst.d=1;SDL_UploadToGPUTexture(copy,&src,&dst,true);}
+        SDL_EndGPUCopyPass(copy);
+    }
+    slotIndex=0;
+    for(const auto &draw:draws){const auto &slot=controls[slotIndex++];auto *mask=slot.mask,*light=slot.light,*pal=slot.palette;
         SDL_GPUColorTargetInfo color{};color.texture=target;color.load_op=SDL_GPU_LOADOP_LOAD;color.store_op=SDL_GPU_STOREOP_STORE;
         auto *pass=SDL_BeginGPURenderPass(cmd,&color,1,nullptr);SDL_BindGPUGraphicsPipeline(pass,pipeline);
         SDL_GPUViewport viewport{0,0,float(pixelW),float(pixelH),0,1};SDL_SetGPUViewport(pass,&viewport);

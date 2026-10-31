@@ -21,10 +21,25 @@ void EndGpuTerrainFrame();
 void ResetGpuTerrainFrame();
 bool GpuTerrainActive();
 bool GpuTerrainReady();
+bool GpuTerrainUsesIndexedPresent();
+bool GpuTerrainNeedsCpuCanvas();
+bool GpuTerrainSkipsNativePainting();
+bool QueueGpuTerrainTile(const devilution::Surface &out, devilution::MaskType mask, const uint8_t *table);
+bool SetGpuTerrainNativeCapture(bool value);
+class GpuTerrainNativeCaptureScope {
+	bool previous;
+
+public:
+	GpuTerrainNativeCaptureScope()
+	    : previous(SetGpuTerrainNativeCapture(true))
+	{
+	}
+	~GpuTerrainNativeCaptureScope() { SetGpuTerrainNativeCapture(previous); }
+};
 void CaptureGpuTerrainOpaque(int x, int y, const uint8_t *pixels, unsigned length);
 void CaptureGpuTerrainBlend(int x, int y, const uint8_t *indices, unsigned length);
 SDL_Color GpuTerrainBackground(int x, int y);
-void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Surface *ui, int width, int height, int pixelWidth, int pixelHeight);
+void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Surface *ui, SDL_Surface *classic, int width, int height, int pixelWidth, int pixelHeight);
 uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilution::TileType type, int height, const devilution::Lightmap &lightmap, const uint8_t *table);
 void LeaveGpuTerrainTile(uint16_t previous);
 class GpuTerrainTileScope {

@@ -26,7 +26,7 @@ SDL_GPUTexture *frame;
 SDL_GPUTexture *scene;
 int sceneWidth=0,sceneHeight=0;
 SDL_GPUTransferBuffer *upload;
-int frameWidth, frameHeight;
+int frameWidth, frameHeight, uploadPitch;
 SDL_GPUPresentMode presentMode = SDL_GPU_PRESENTMODE_VSYNC;
 struct View { int x, y, w, h; };
 View Viewport(int width, int height)
@@ -86,9 +86,11 @@ void GpuWindowToLogical(float &x, float &y, bool inverse)
 }
 void PresentGpuFrame(SDL_Surface *surface)
 {
-    if (!frame || frameWidth != surface->w || frameHeight != surface->h) {
-        ReleaseFrame();
-        frameWidth = surface->w; frameHeight = surface->h;
+    const bool indexed=GpuTerrainUsesIndexedPresent()&&surface->format==SDL_PIXELFORMAT_INDEX8;
+    if(frameWidth!=surface->w||frameHeight!=surface->h)ReleaseFrame();
+    frameWidth=surface->w;frameHeight=surface->h;
+    if(indexed&&frame){SDL_ReleaseGPUTexture(device,frame);SDL_ReleaseGPUTransferBuffer(device,upload);frame=nullptr;upload=nullptr;}
+    if (!indexed&&!frame) {
         SDL_GPUTextureCreateInfo info {};
         info.type = SDL_GPU_TEXTURETYPE_2D;
         info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -98,7 +100,8 @@ void PresentGpuFrame(SDL_Surface *surface)
         frame = SDL_CreateGPUTexture(device, &info);
         SDL_GPUTransferBufferCreateInfo transfer {};
         transfer.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-        transfer.size = frameWidth * frameHeight * 4;
+        uploadPitch=(frameWidth*4+255)&~255;
+        transfer.size = uploadPitch * frameHeight;
         upload = SDL_CreateGPUTransferBuffer(device, &transfer);
         if (!frame || !upload) devilution::ErrSdl();
     }
@@ -109,11 +112,13 @@ void PresentGpuFrame(SDL_Surface *surface)
         presentMode = mode;
     }
     CpuStageScope uploadProfile(CpuStage::FrameUpload);
+    if(!indexed){
     auto *mapped = static_cast<uint8_t *>(SDL_MapGPUTransferBuffer(device, upload, true));
     if (!mapped) devilution::ErrSdl();
     if (!SDL_ConvertPixels(surface->w, surface->h, surface->format, surface->pixels, surface->pitch,
-            SDL_PIXELFORMAT_RGBA32, mapped, frameWidth * 4)) devilution::ErrSdl();
+            SDL_PIXELFORMAT_RGBA32, mapped, uploadPitch)) devilution::ErrSdl();
     SDL_UnmapGPUTransferBuffer(device, upload);
+    }
     uploadProfile.finish();
     SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(device);
     if (!cmd) devilution::ErrSdl();
@@ -122,17 +127,20 @@ void PresentGpuFrame(SDL_Surface *surface)
     { CpuStageScope profile(CpuStage::SwapchainWait);
       if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, window, &swapchain, &w, &h)) devilution::ErrSdl(); }
     SDL_GPUTransferBuffer *readback = nullptr;
+    int readbackPitch=0;
     static unsigned captureFrame = 0;
     const char *captureDirectory = SDL_getenv("D1R_FRAME_DUMP");
     const bool capture = captureDirectory && devilution::gbRunGame && (++captureFrame % 100 == 50);
     if (swapchain) {
+        if(!indexed){
         auto *copy = SDL_BeginGPUCopyPass(cmd);
         SDL_GPUTextureTransferInfo src {};
-        src.transfer_buffer = upload;
+        src.transfer_buffer = upload;src.pixels_per_row=uploadPitch/4;src.rows_per_layer=frameHeight;
         SDL_GPUTextureRegion dst {};
         dst.texture = frame; dst.w = frameWidth; dst.h = frameHeight; dst.d = 1;
         SDL_UploadToGPUTexture(copy, &src, &dst, true);
         SDL_EndGPUCopyPass(copy);
+        }
         const View v = Viewport(w, h);
         SDL_GPUTexture *display=frame;
         int displayW=frameWidth,displayH=frameHeight;
@@ -144,19 +152,21 @@ void PresentGpuFrame(SDL_Surface *surface)
                 scene=SDL_CreateGPUTexture(device,&info);sceneWidth=v.w;sceneHeight=v.h;
                 if(!scene)devilution::ErrSdl();
             }
+            if(!indexed){
             SDL_GPUBlitInfo base{};base.source.texture=frame;base.source.w=frameWidth;base.source.h=frameHeight;
             base.destination.texture=scene;base.destination.w=sceneWidth;base.destination.h=sceneHeight;
             base.load_op=SDL_GPU_LOADOP_DONT_CARE;base.filter=SDL_GPU_FILTER_NEAREST;SDL_BlitGPUTexture(cmd,&base);
+            }
             { CpuStageScope profile(CpuStage::SpriteCommands);
-              RenderGpuTerrain(cmd,scene,GetHdUiSurface(),frameWidth,frameHeight,sceneWidth,sceneHeight);
+              RenderGpuTerrain(cmd,scene,GetHdUiSurface(),surface,frameWidth,frameHeight,sceneWidth,sceneHeight);
               RenderGpuSprites(cmd,scene,frameWidth,frameHeight,sceneWidth,sceneHeight); }
             display=scene;displayW=sceneWidth;displayH=sceneHeight;
         }
         if(capture) {
-            SDL_GPUTransferBufferCreateInfo readInfo{};readInfo.usage=SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;readInfo.size=displayW*displayH*4;
+            SDL_GPUTransferBufferCreateInfo readInfo{};readInfo.usage=SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;readbackPitch=(displayW*4+255)&~255;readInfo.size=readbackPitch*displayH;
             readback=SDL_CreateGPUTransferBuffer(device,&readInfo);if(!readback)devilution::ErrSdl();
             auto *readCopy=SDL_BeginGPUCopyPass(cmd);SDL_GPUTextureRegion from{};from.texture=display;from.w=displayW;from.h=displayH;from.d=1;
-            SDL_GPUTextureTransferInfo to{};to.transfer_buffer=readback;SDL_DownloadFromGPUTexture(readCopy,&from,&to);SDL_EndGPUCopyPass(readCopy);
+            SDL_GPUTextureTransferInfo to{};to.transfer_buffer=readback;to.pixels_per_row=readbackPitch/4;to.rows_per_layer=displayH;SDL_DownloadFromGPUTexture(readCopy,&from,&to);SDL_EndGPUCopyPass(readCopy);
         }
         SDL_GPUBlitInfo blit {};
         blit.source.texture = display; blit.source.w = displayW; blit.source.h = displayH;
@@ -176,7 +186,7 @@ void PresentGpuFrame(SDL_Surface *surface)
         if (!pixels) devilution::ErrSdl();
         const bool high=GpuSpriteFrameReady() || GpuTerrainReady();
         const int dw=high?sceneWidth:frameWidth,dh=high?sceneHeight:frameHeight;
-        auto *dump = SDL_CreateSurfaceFrom(dw, dh, SDL_PIXELFORMAT_RGBA32, pixels, dw * 4);
+        auto *dump = SDL_CreateSurfaceFrom(dw, dh, SDL_PIXELFORMAT_RGBA32, pixels, readbackPitch);
         if (!dump) devilution::ErrSdl();
         const std::string name = std::string(captureDirectory) + "/gpu-" + std::to_string(captureFrame)
             + (GetRendererSwitch().usesHdRenderer() ? "-HD" : "-Classic")

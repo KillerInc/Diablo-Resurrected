@@ -55,6 +55,7 @@
 #include "nthread.h"
 #include "options.h"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_terrain.hpp"
 #include "panels/charpanel.hpp"
 #include "panels/console.hpp"
 #include "panels/partypanel.hpp"
@@ -1369,7 +1370,11 @@ void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 #endif
 	DrawOOB(out, lightmap, position, Point {} + offset, rows, columns);
 
-	if (*GetOptions().Graphics.zoom) {
+	if (*GetOptions().Graphics.zoom
+#ifdef USE_SDL3
+	    && !reincarnated::GpuTerrainSkipsNativePainting()
+#endif
+	) {
 		Zoom(fullOut.subregionY(0, gnViewportHeight));
 	}
 #ifdef USE_SDL3
