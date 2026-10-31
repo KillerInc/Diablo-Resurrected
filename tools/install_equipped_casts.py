@@ -72,7 +72,7 @@ def install(pack,art,baseline,game,master,mirror,archive,backup,validation,revis
   master.write_bytes(old_master);mirror.write_bytes(old_mirror);raise
  finally:
   for temp in temps:temp.unlink(missing_ok=True)
- print('Installed',len(expected),revision,'sheets; character motions, other actions, heavy assets, saves and executable preserved')
+ print('Installed',len(expected),revision,'sheets; character motions, nonselected sheets, saves and executable preserved')
 
 if __name__=='__main__':
  p=argparse.ArgumentParser(description=__doc__)

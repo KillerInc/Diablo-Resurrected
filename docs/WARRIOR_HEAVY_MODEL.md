@@ -132,3 +132,25 @@ light/medium sheets, their pages, index records and layouts must stay unchanged.
 The revision-aware transaction and rollback suite passes twelve tests.
 Installation still requires completed bounds, head-clearance, image and silent
 GPU replay proofs. The installed identity remains unchanged until then.
+
+
+## Installed Colour +1.0 EV revision, 2026-10-31
+
+All 85 heavy sheets now use the approved Colour model with +1.0 EV armor
+base-color exposure. Earlier pending or preview-only notes above describe
+prior stages. All 85 bounds audits, 66 equipped head-clearance sequences,
+complete body/shadow cell checks and all-sheet visual review passed. Two
+reference gameplay replays, UI/F10/F11, preload/performance tests, a captured
+actual heavy draw and the installed-game reference replay passed.
+
+All 170 light/medium PNGs, GPU pages, index records and layouts are preserved.
+Motions, native frame grids, equipment fits, character scale, southeast shadows
+and installed effects are retained. Normal settings, saves and engine 0.4.7-pre
+are unchanged. The class has 897 pages and 3,024,617,472 texture bytes,
+with zero CPU player PNG decodes and zero warm GPU uploads. The single root
+index and layout CSV remain process-cached; restart the game to load the pack.
+
+The complete reproducible inputs, raw supplied Colour source, pre-brightness
+base, brightness proof, exact motions, equipment and final GPU resources are
+archived privately. The refreshed three-armor mace GIFs use installed PNGs.
+No proprietary model, sprite, capture or save is included in Git.
