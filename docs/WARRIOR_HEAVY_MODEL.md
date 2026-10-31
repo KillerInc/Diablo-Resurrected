@@ -64,3 +64,21 @@ GIFs, five combined overviews and five eight-direction idle rotations. It reads
 actual installed PNGs and the vanilla NN-x8 reference using the runtime index's
 native row counts. Individual action comparisons show South. Generated media is
 kept in the private T-Pose Images directory, never in Git.
+
+
+## Installed black build, 2026-10-31
+
+The approved supplied black body is now installed across all 85 heavy sheets.
+The preceding pending/selection notes describe older stages. All 170 light and
+medium PNGs, GPU pages, index records and layout rows were preserved. All 85
+bounds checks and 66 equipped head-clearance sequences passed. Full body/shadow
+cell validation, all-sheet visual review, two matching reference replays, UI,
+preload/performance checks and a captured actual heavy GPU draw passed. The
+installed-executable smoke replay also matched the reference save outcome.
+
+The complete warrior class has 255 sheets, 921 pages and 3,112,509,440 BC7
+texture bytes. There are zero CPU player PNG decodes and zero warm GPU uploads.
+One root index and one layout CSV remain process-cached. Engine 0.4.7-pre,
+normal user settings and saves were verified unchanged. All graphics tests
+muted their isolated audio settings. Artwork and reproducible inputs are
+private; Git contains source, tests and identity/validation metadata only.

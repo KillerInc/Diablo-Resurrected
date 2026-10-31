@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "armor": "heavy",
-  "status": "approved_rendering",
+  "status": "approved_installed",
   "source_file": "D1 Warrior Heavy black.glb",
   "source_sha256": "0cf8fc155da79f91b2225e7475e735a41bae9f7b9cbb4e7a261b81937d3debcc",
   "has_embedded_textures": true,
@@ -73,5 +73,33 @@
   "planned_sheet_count": 85,
   "prepared_motion_models": 39,
   "equipped_sequences_head_clear": 66,
-  "supplied_materials_preserved": true
+  "supplied_materials_preserved": true,
+  "installed_on": "2026-10-31",
+  "replacement_sheets_installed": true,
+  "graphics_revision": "heavy-v1",
+  "heavy_sheet_count": 85,
+  "runtime": {
+    "engine_version": "0.4.7-pre",
+    "executable_unchanged": true,
+    "gpu_density": 4,
+    "class_sheet_count": 255,
+    "class_gpu_pages": 921,
+    "class_gpu_texture_bytes": 3112509440
+  },
+  "installation_validation": {
+    "installed_sheets": 85,
+    "preserved_sheets": 170,
+    "all_gpu_hashes_verified": true,
+    "all_png_hashes_verified": true,
+    "user_state_unchanged": true,
+    "executable_unchanged": true,
+    "reference_outcome_same": true,
+    "gpu_sheets": 255,
+    "gpu_pages": 921,
+    "gpu_texture_bytes": 3112509440,
+    "cpu_player_png_decodes": 0,
+    "warm_gpu_uploads": 0,
+    "runtime_indexes": 1,
+    "individual_layouts": 0
+  }
 }
