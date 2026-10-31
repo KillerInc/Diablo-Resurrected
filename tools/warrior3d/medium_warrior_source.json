@@ -3,24 +3,25 @@
   "character": "warrior",
   "armor": "medium",
   "status": "approved_installed",
-  "approved_on": "2026-10-29",
-  "model_file": "D1 Warrior Medium - blue gray.glb",
-  "sha256": "E540EF6707A8CD7B9843F4ECDA5FDF422A3A93EF38CE478BCCFEAD4EF45AB52B",
+  "approved_on": "2026-10-31",
+  "model_file": "D1 Warrior Medium - blue gray - fitted.glb",
+  "sha256": "5531A31D65B87112782A03F201BDC9ADD2213EF940E2B0CA479866FDF24F2AB0",
   "appearance": {
     "cape_enabled": false,
     "skirt_enabled": false,
     "fitted_straps": true,
     "blue_mail_and_lower_outfit": true,
     "dark_gray_helmet": true,
-    "gold_accents_preserved": true
+    "gold_accents_preserved": true,
+    "supplied_materials_preserved": true
   },
   "animation_clearance": "passed",
   "replacement_sheets_installed": true,
-  "graphics_revision": "medium-v1",
-  "installed_on": "2026-10-30",
+  "graphics_revision": "medium-blue-gray-v2",
+  "installed_on": "2026-10-31",
   "medium_sheet_count": 85,
   "animation_validation": {
-    "motion_donors": 41,
+    "motion_donors": 39,
     "rest_matrix_max_error": 0,
     "equipped_pose_sequences_head_clear": 66,
     "directional_frames": 9408,
@@ -35,8 +36,9 @@
     "executable_unchanged": true,
     "gpu_density": 4,
     "class_sheet_count": 255,
-    "class_gpu_pages": 868,
-    "class_gpu_texture_bytes": 2923126784
+    "class_gpu_pages": 897,
+    "class_gpu_texture_bytes": 3024617472,
+    "class_pack_revision": "medium-blue-gray-v2"
   },
   "equipped_casting_revision": {
     "revision": "equipped-casts-v1",
@@ -84,17 +86,46 @@
     "private_archive": "Medium Warrior Shield Approved 2026-10-30",
     "installed_smoke_verified": true
   },
-  "pending_replacement": {
+  "previous_model_sha256": "E540EF6707A8CD7B9843F4ECDA5FDF422A3A93EF38CE478BCCFEAD4EF45AB52B",
+  "approved_model_sha256": "5531A31D65B87112782A03F201BDC9ADD2213EF940E2B0CA479866FDF24F2AB0",
+  "original_source_sha256": "922E5B2E06A135FCD5A7C5DD9C275300EEFC80ECD4728AA91673E8E5ADCC8CA8",
+  "approved_replacement": {
     "revision": "medium-blue-gray-v2",
     "approved_on": "2026-10-31",
     "source_sha256": "922E5B2E06A135FCD5A7C5DD9C275300EEFC80ECD4728AA91673E8E5ADCC8CA8",
     "approved_model_sha256": "5531A31D65B87112782A03F201BDC9ADD2213EF940E2B0CA479866FDF24F2AB0",
-    "status": "approved_rendering",
+    "status": "approved_installed",
     "fitted_trim_vertices": 886,
     "cape_and_skirt_disabled": true,
     "supplied_materials_preserved": true,
     "bounds_sequences": 85,
     "equipped_head_clear_sequences": 66,
     "existing_motion_equipment_effects_retained": true
-  }
+  },
+  "installation_validation": {
+    "installed_sheets": 85,
+    "preserved_sheets": 170,
+    "all_gpu_hashes_verified": true,
+    "all_png_hashes_verified": true,
+    "user_state_unchanged": true,
+    "executable_unchanged": true,
+    "reference_outcome_same": true,
+    "gpu_sheets": 255,
+    "gpu_pages": 897,
+    "gpu_texture_bytes": 3024617472,
+    "cpu_player_png_decodes": 0,
+    "warm_gpu_uploads": 0,
+    "runtime_indexes": 1,
+    "individual_layouts": 0
+  },
+  "shadow_material_tokens": [
+    "P00_HED",
+    "HLM",
+    "base06_TRS",
+    "base06_GLV",
+    "base06_LEG_mat",
+    "base06_LEG_belt_sim",
+    "base06_BTS"
+  ],
+  "shadow_anatomy_count": 9
 }

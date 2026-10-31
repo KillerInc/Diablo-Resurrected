@@ -160,3 +160,25 @@ medium-blue-gray-v2 build preserves the current native motions, fitted medium
 shield, approved grips, town equipment, fire bubble v2 and installed lightning
 and QM effects. Rendering is in progress; the installed identity above remains
 a baseline until the complete pack and silent live/replay checks pass.
+
+
+## Installed replacement, 2026-10-31
+
+The approved fitted blue-gray model now supplies all 85 medium sheets. Earlier
+pending-build notes above describe the preparation stage. Its supplied materials
+are retained without recoloring, the five trim groups are fitted, and cape/skirt
+meshes are disabled. All current motions, grips, medium shield fit, town gear
+and installed fire/lightning/magic effects are retained. Native frame grids,
+character scale and southeast shadows are preserved; canvases may be padded.
+
+All 85 bounds audits, 66 equipped head-clearance sequences and 9,408 directional
+body/shadow cells passed. All-sheet visual review, two reference gameplay replays,
+UI/F10/F11, preload/performance checks, a captured live draw and the installed-game
+reference replay passed. The 170 light/heavy PNGs, GPU pages, index records and
+CSV rows are unchanged. Saves, normal settings and engine 0.4.7-pre are unchanged.
+
+The combined class has 897 GPU pages and 3,024,617,472 texture bytes, with zero CPU player
+PNG decodes and zero warm GPU uploads. One root GPU index and one layout CSV
+remain cached until exit. Restart the game to load this artwork revision.
+Exact base models, compact motion donors, equipment and references are archived
+privately; the archived render plan and motion catalog use archive-local paths.

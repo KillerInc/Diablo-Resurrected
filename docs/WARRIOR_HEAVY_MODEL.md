@@ -76,7 +76,7 @@ cell validation, all-sheet visual review, two matching reference replays, UI,
 preload/performance checks and a captured actual heavy GPU draw passed. The
 installed-executable smoke replay also matched the reference save outcome.
 
-The complete warrior class has 255 sheets, 921 pages and 3,112,509,440 BC7
+At heavy installation, the warrior class had 255 sheets, 921 pages and 3,112,509,440 BC7
 texture bytes. There are zero CPU player PNG decodes and zero warm GPU uploads.
 One root index and one layout CSV remain process-cached. Engine 0.4.7-pre,
 normal user settings and saves were verified unchanged. All graphics tests

@@ -83,8 +83,9 @@
     "executable_unchanged": true,
     "gpu_density": 4,
     "class_sheet_count": 255,
-    "class_gpu_pages": 921,
-    "class_gpu_texture_bytes": 3112509440
+    "class_gpu_pages": 897,
+    "class_gpu_texture_bytes": 3024617472,
+    "class_pack_revision": "medium-blue-gray-v2"
   },
   "installation_validation": {
     "installed_sheets": 85,

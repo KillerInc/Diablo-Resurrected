@@ -41,7 +41,7 @@ def prepare(model,catalog,manifest,gpu_proof,work,calibration=None,armor="m",reg
     values=np.asarray(ref[field]);ref[field]=[[float(np.interp(i,np.linspace(0,rows-1,len(values)),values[:,a])) for a in range(values.shape[1])] for i in range(rows)]
   ref.pop('render_rows',None);ref.pop('direction_pose_offsets',None) if light=='wlndt' else None
   ref.update(sheet=name+'.png',rows=rows,source_frames=frames,columns=['S','SW','W','NW','N','NE','E','SE'],render_directions=list(range(8)),preview_prefix=name,preview_caption=('Heavy' if armor=='h' else 'Medium')+' Warrior | approved motion | southeast shadows',shadow_overscan=512,shadow_material_tokens=['P00_HED','Helmet dark gray metal','base06_TRS','base06_GLV','base06_LEG_mat','base06_LEG_belt_sim','base06_BTS'],shadow_anatomy_count=9)
-  if armor=='h':ref.update(shadow_material_tokens=registry['shadow_material_tokens'],shadow_anatomy_count=registry['shadow_anatomy_count'])
+  if registry.get('shadow_material_tokens'):ref.update(shadow_material_tokens=registry['shadow_material_tokens'],shadow_anatomy_count=registry['shadow_anatomy_count'])
   # Final canvas and anchor follow the installed, approved padded light sheet.
   record=installed['sheets'][light];width=record['size'][0]//64
   lightrows=grids[f'plrgfx/warrior/{light[:3]}/{light}.png']['rows'];height=record['size'][1]//(lightrows*8)
