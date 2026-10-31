@@ -29,6 +29,8 @@
     "normal_maps_unchanged": true,
     "trim_metallic": 0.95,
     "trim_roughness": 0.28,
-    "trim_color": "brighter cool silver with metallic reflections"
+    "trim_color": "brighter cool silver with metallic reflections",
+    "helm_to_silver": true,
+    "helm_finish": "same metallic silver as trim"
   }
 }
