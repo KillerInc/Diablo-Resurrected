@@ -11,6 +11,7 @@
 // #define DEBUG_RENDER_OFFSET_Y 5
 
 #include "engine/render/dun_render.hpp"
+#include "reincarnated/gpu_terrain.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -1042,6 +1043,9 @@ std::string_view MaskTypeToString(MaskType maskType)
 DVL_ATTRIBUTE_HOT void RenderTileFrame(const Surface &out, const Lightmap &lightmap, const Point &position, TileType tile, const uint8_t *src, int_fast16_t height,
     MaskType maskType, const uint8_t *tbl)
 {
+#ifdef USE_SDL3
+	reincarnated::GpuTerrainTileScope terrain(src, position.x + out.region.x, position.y + out.region.y, tile, height, lightmap, tbl);
+#endif
 #ifdef DEBUG_RENDER_OFFSET_X
 	position.x += DEBUG_RENDER_OFFSET_X;
 #endif

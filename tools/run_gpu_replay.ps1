@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Root,[string]$Case='ui',[int]$Demo=1,[switch]$Capture,[switch]$NormalSpeed,[switch]$DisableGpuSprites,[string]$Executable,[switch]$ConfigureOnly,[ValidateRange(1,3600)][int]$TimeoutSeconds=360,[string]$DataDirectory='D:\Games\Diablo')
+param([Parameter(Mandatory=$true)][string]$Root,[string]$Case='ui',[int]$Demo=1,[switch]$Capture,[switch]$NormalSpeed,[switch]$DisableGpuSprites,[string]$Executable,[switch]$ConfigureOnly,[switch]$Shareware,[ValidateRange(1,3600)][int]$TimeoutSeconds=360,[string]$DataDirectory='D:\Games\Diablo')
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path -LiteralPath $Root).Path
 $taskPackage=Join-Path $taskRoot 'package';$taskSave=Join-Path $taskRoot $Case
@@ -28,7 +28,8 @@ $env:D1R_PERF_LOG=Join-Path $taskRoot ($Case+'-performance.csv');$env:D1R_SHEET_
 if($DisableGpuSprites){$env:D1R_DISABLE_GPU_SPRITES='1'}else{Remove-Item Env:D1R_DISABLE_GPU_SPRITES -ErrorAction SilentlyContinue}
 if($Capture){$env:D1R_FRAME_DUMP=Join-Path $taskRoot ($Case+'-captures');New-Item -ItemType Directory -Force $env:D1R_FRAME_DUMP|Out-Null}else{Remove-Item Env:D1R_FRAME_DUMP -ErrorAction SilentlyContinue}
 $taskTimed=if($NormalSpeed){''}else{' --timedemo'}
-$taskArgs='--spawn --diablo --demo '+$Demo+$taskTimed+' --save-dir "'+$taskSave+'" --config-dir "'+$taskSave+'" --data-dir "'+$DataDirectory+'" --verbose --log-to-file "'+(Join-Path $taskRoot ($Case+'.log'))+'" -n'
+$taskMode=if($Shareware){'--spawn '}else{''}
+$taskArgs=$taskMode+'--diablo --demo '+$Demo+$taskTimed+' --save-dir "'+$taskSave+'" --config-dir "'+$taskSave+'" --data-dir "'+$DataDirectory+'" --verbose --log-to-file "'+(Join-Path $taskRoot ($Case+'.log'))+'" -n'
 $taskExecutableHash=(Get-FileHash -LiteralPath $taskExecutable -Algorithm SHA256).Hash
 $taskClock=[Diagnostics.Stopwatch]::StartNew()
 $taskProcess=Start-Process -FilePath $taskExecutable -ArgumentList $taskArgs -WorkingDirectory $taskPackage -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $taskRoot ($Case+'-stdout.log')) -RedirectStandardError (Join-Path $taskRoot ($Case+'-stderr.log'))

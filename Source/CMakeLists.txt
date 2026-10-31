@@ -84,6 +84,7 @@ set(libdevilutionx_SRCS
   reincarnated/hd_renderer_sdl3.cpp
   reincarnated/gpu_presenter.cpp
   reincarnated/gpu_sprites.cpp
+  reincarnated/gpu_terrain.cpp
   engine/palette.cpp
   engine/sound_position.cpp
   engine/trn.cpp
@@ -1191,6 +1192,8 @@ elseif(USE_SDL3)
     target_compile_options(reincarnated_verify_tile_export PRIVATE /EHsc)
     target_compile_options(reincarnated_verify_cel_export PRIVATE /EHsc)
   endif()
+  add_executable(reincarnated_gpu_terrain_test EXCLUDE_FROM_ALL ../test/gpu_terrain_test.cpp)
+  target_link_dependencies(reincarnated_gpu_terrain_test PRIVATE libdevilutionx)
   add_executable(reincarnated_gpu_sprite_test EXCLUDE_FROM_ALL ../test/gpu_sprite_test.cpp)
   target_link_dependencies(reincarnated_gpu_sprite_test PRIVATE libdevilutionx)
   add_executable(reincarnated_gpu_pack_upload_test EXCLUDE_FROM_ALL ../test/gpu_pack_upload_test.cpp)

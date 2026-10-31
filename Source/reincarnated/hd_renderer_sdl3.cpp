@@ -2,6 +2,7 @@
 #include "hd_renderer.hpp"
 #include "raster_bridge.hpp"
 #include "gpu_sprites.hpp"
+#include "gpu_terrain.hpp"
 #include "cpu_profile.hpp"
 #include "controls/control_mode.hpp"
 #include <algorithm>
@@ -56,6 +57,7 @@ struct DrawProfile { uint64_t opaqueSpans=0,opaquePixels=0,blendSpans=0,blendPix
 DrawProfile drawProfile;
 bool profileFrame=false;
 std::vector<uint32_t> blendedColors;
+std::vector<uint8_t> terrainBlend;
 
 
 void EnsureSurface(devilution::SDLSurfaceUniquePtr &surface)
@@ -94,7 +96,7 @@ void Pixel(int x, int y, SDL_Color color, bool blend)
             if (blend) {
                 // Classic's transparent masks use 50% source blending. Blend
                 // against the HD canvas, not against the indexed actor behind it.
-                if (!inWorld && dst[3] == 0) {
+                if (!inWorld && !GpuTerrainActive() && dst[3] == 0) {
                     // UI transparency is composited over the independently built world.
                     if (px >= clip.x && px < clip.x + clip.w && py < clip.h) {
                         const auto *background = static_cast<const uint8_t *>(world->pixels) + py * world->pitch + px * 4;
@@ -111,7 +113,7 @@ void Pixel(int x, int y, SDL_Color color, bool blend)
             } else {
                 dst[0] = color.r; dst[1] = color.g; dst[2] = color.b;
             }
-            dst[3] = 255;
+            dst[3] = GpuTerrainActive() && !inWorld ? (blend ? dst[3]/2 : 0) : 255;
         }
     }
 }
@@ -154,7 +156,7 @@ Asset *Load(const std::string &path)
 }
 bool Draw(const std::string &path, int left, int bottom, int nominalW, int nominalH)
 {
-    if (!HdCaptureActive || !inWorld || nominalW <= 0 || nominalH <= 0) return false;
+    if (!HdCaptureActive || !inWorld || GpuTerrainActive() || nominalW <= 0 || nominalH <= 0) return false;
     Asset *image = Load(path);
     if (!image) return false;
     const float w = image->layout ? image->w : float(nominalW);
@@ -167,7 +169,7 @@ bool Draw(const std::string &path, int left, int bottom, int nominalW, int nomin
     if (!SDL_BlitSurfaceScaled(image->surface.get(), nullptr, world.get(), &dst, SDL_SCALEMODE_NEAREST)) devilution::ErrSdl();
     if(HasQueuedGpuSprites() && dst.w>0 && dst.h>0) {
         const int x0=std::max({dst.x,clip.x,0}),y0=std::max(dst.y,0);
-        const int x1=std::min({dst.x+dst.w,clip.x+clip.w,world->w}),y1=std::min({dst.y+dst.h,clip.h,world->h});
+        const int x1=std::min({dst.x+dst.w,clip.x+clip.w,world->w}),y1=std::min({dst.y+dst.h,clip.h,int(devilution::gnScreenHeight)});
         for(int py=y0;py<y1;++py)for(int px=x0;px<x1;++px) {
             const int sx=int64_t(px-dst.x)*image->surface->w/dst.w,sy=int64_t(py-dst.y)*image->surface->h/dst.h;
             const auto *rgba=static_cast<const uint8_t*>(image->surface->pixels)+sy*image->surface->pitch+sx*4;
@@ -216,6 +218,7 @@ void MirrorOpaque(const uint8_t *src, unsigned length)
     if (!SourcePosition(src, x, y)) return;
     length = std::min(length, unsigned(devilution::PalSurface->w - x));
     if(profileFrame){++drawProfile.opaqueSpans;drawProfile.opaquePixels+=length;}
+    if(inWorld&&GpuTerrainActive()){CaptureGpuTerrainOpaque(x,y,src,length);return;}
     SDL_Surface *target = inWorld ? world.get() : ui.get();
     const int zoom = inWorld ? scale : 1;
     if (zoom != 1 && zoom != 2) {
@@ -230,7 +233,7 @@ void MirrorOpaque(const uint8_t *src, unsigned length)
     auto *first=static_cast<uint8_t*>(target->pixels)+top*target->pitch+left*4;
     auto *dst=reinterpret_cast<uint32_t*>(first);
     const auto color=[&](unsigned index){
-        auto c=devilution::Palette->colors[src[index]];c.a=255;
+        auto c=devilution::Palette->colors[src[index]];c.a=GpuTerrainActive()&&!inWorld?0:255;
         return std::bit_cast<uint32_t>(c);
     };
     int px=left;
@@ -254,6 +257,11 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_
     const uint8_t *light = lightmap ? lightmap->getLightingAt(dst) : nullptr;
     length = std::min(length, unsigned(devilution::PalSurface->w - x));
     if(profileFrame){++drawProfile.blendSpans;drawProfile.blendPixels+=length;}
+    if(inWorld&&GpuTerrainActive()){
+        terrainBlend.resize(length);
+        for(unsigned i=0;i<length;++i){uint8_t index=src?src[i]:color;if(map)index=map[index];if(lightmap)index=lightmap->adjustColor(index,light[i]);terrainBlend[i]=index;}
+        CaptureGpuTerrainBlend(x,y,terrainBlend.data(),length);return;
+    }
     SDL_Surface *target=inWorld?world.get():ui.get();
     const int zoom=inWorld?scale:1;
     if(zoom!=1&&zoom!=2){
@@ -280,14 +288,17 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_
         auto *dst=reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(target->pixels)+py*target->pitch)+left;
         for(int px=left;px<right;++px){
             uint32_t old=dst[px-left];
-            if(!inWorld&&(old&alpha)==0){
+            if(!inWorld&&!GpuTerrainActive()&&(old&alpha)==0){
                 if(px>=clip.x&&px<clip.x+clip.w&&py<clip.h)
                     std::memcpy(&old,static_cast<const uint8_t*>(world->pixels)+py*world->pitch+px*4,4);
                 else{const auto index=*(static_cast<const uint8_t*>(devilution::PalSurface->pixels)+py*devilution::PalSurface->pitch+px);auto c=devilution::Palette->colors[index];c.a=255;old=std::bit_cast<uint32_t>(c);}
             }
             const uint32_t incoming=blendedColors[px-left];
             // Per-byte floor((old+incoming)/2), without carries across channels.
-            dst[px-left]=((old&incoming)+(((old^incoming)&0xFEFEFEFEU)>>1))|alpha;
+            const uint32_t average=(old&incoming)+(((old^incoming)&0xFEFEFEFEU)>>1);
+            if(!inWorld&&GpuTerrainActive()){
+                auto result=std::bit_cast<SDL_Color>(average);result.a=std::bit_cast<SDL_Color>(old).a/2;dst[px-left]=std::bit_cast<uint32_t>(result);
+            }else dst[px-left]=average|alpha;
         }
         MaskGpuSpriteBlendedSpan(left,py,blendedColors.data(),count);
     }
@@ -299,23 +310,29 @@ void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clip
     profileFrame=profileEnabled;drawProfile={};
     HdCaptureActive = GetRendererSwitch().usesHdRenderer();
     ready = false; suppressed = false; cursorSaved = false;
-    if (!HdCaptureActive) return;
+    if (!HdCaptureActive){ResetGpuTerrainFrame();return;}
     if (std::memcmp(matchingPalette.data(), devilution::logical_palette.data(), sizeof(matchingPalette)) != 0) {
         matchingPalette = devilution::logical_palette;
     }
-    EnsureSurface(world); EnsureSurface(ui); EnsureSurface(composed);
+    EnsureSurface(ui); EnsureSurface(composed);
     scale = zoom; offsetX = xOffset;
     clip = { clipX, 0, clipWidth, clipHeight };
-    SDL_SetSurfaceClipRect(world.get(), nullptr);
-    SDL_FillSurfaceRect(world.get(), nullptr, SDL_MapSurfaceRGBA(world.get(), 0, 0, 0, 255));
-    SDL_SetSurfaceClipRect(world.get(), &clip);
-    SDL_FillSurfaceRect(ui.get(), nullptr, 0);
+    const bool gpuTerrain=BeginGpuTerrainFrame(zoom,xOffset,clipX,clipWidth,clipHeight);
+    if(gpuTerrain)world.reset();
+    else{
+        EnsureSurface(world);
+        SDL_SetSurfaceClipRect(world.get(), nullptr);
+        SDL_FillSurfaceRect(world.get(), nullptr, SDL_MapSurfaceRGBA(world.get(), 0, 0, 0, 255));
+        SDL_SetSurfaceClipRect(world.get(), &clip);
+    }
+    SDL_FillSurfaceRect(ui.get(), nullptr, gpuTerrain?SDL_MapSurfaceRGBA(ui.get(),0,0,0,255):0);
     inWorld = true;
 }
 void EndHdWorldFrame()
 {
     if (!HdCaptureActive) return;
     inWorld = false; ready = true;
+    EndGpuTerrainFrame();
     auto *pal = devilution::PalSurface;
     beforeUi.assign(static_cast<uint8_t *>(pal->pixels), static_cast<uint8_t *>(pal->pixels) + size_t(pal->pitch) * pal->h);
 }
@@ -367,6 +384,10 @@ void CommitHdHudLayer(bool changed)
             static_cast<const uint8_t *>(hudIndexed->pixels) + y * hudIndexed->pitch + area.x, area.w);
         std::memcpy(static_cast<uint8_t *>(ui->pixels) + y * ui->pitch + area.x * 4,
             static_cast<const uint8_t *>(hudRgba->pixels) + y * hudRgba->pitch + area.x * 4, size_t(area.w) * 4);
+        if(GpuTerrainActive()){
+            auto *pixels=reinterpret_cast<SDL_Color*>(static_cast<uint8_t*>(ui->pixels)+y*ui->pitch);
+            for(int x=area.x;x<area.x+area.w;++x)pixels[x].a=0;
+        }
         MaskGpuSpriteOpaqueSpan(area.x, y, area.w);
     }
 }
@@ -434,8 +455,8 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         draw.w=double(packed.w)*scale/gpu->density;draw.h=double(packed.h)*scale/gpu->density;draw.alpha=blend?0.5f:1.0f;
         draw.maskX=std::max({int(std::floor(draw.x)),clip.x,out.region.x*scale+offsetX,0});
         draw.maskY=std::max({int(std::floor(draw.y)),out.region.y*scale,0});
-        const int right=std::min({int(std::ceil(draw.x+draw.w)),clip.x+clip.w,(out.region.x+out.w())*scale+offsetX,world->w});
-        const int bottom=std::min({int(std::ceil(draw.y+draw.h)),clip.h,(out.region.y+out.h())*scale,world->h});
+        const int right=std::min({int(std::ceil(draw.x+draw.w)),clip.x+clip.w,(out.region.x+out.w())*scale+offsetX,int(devilution::gnScreenWidth)});
+        const int bottom=std::min({int(std::ceil(draw.y+draw.h)),clip.h,(out.region.y+out.h())*scale,int(devilution::gnScreenHeight)});
         draw.maskW=right-draw.maskX;draw.maskH=bottom-draw.maskY;
         if(draw.maskW<=0 || draw.maskH<=0)return true;
         draw.coverage.assign(size_t(draw.maskW)*draw.maskH*4,0);draw.lighting.assign(size_t(draw.maskW)*draw.maskH,0);
@@ -463,6 +484,7 @@ bool QueueHdTile(int type, unsigned piece, int left, int bottom, int w, int h, i
     const auto base = "hd/tiles/" + std::to_string(type) + "/" + std::to_string(piece);
     return Draw(base + ".png", left, bottom, w, h) || Draw(base + ".dds", left, bottom, w, h);
 }
+SDL_Surface *GetHdUiSurface(){return ui.get();}
 SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
 {
     SetGpuSpriteFrameReady(devilution::gbRunGame && HdCaptureActive && ready && GetRendererSwitch().usesHdRenderer());
@@ -475,7 +497,7 @@ SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
     { CpuStageScope profile(CpuStage::ClassicCopy);
       if (!SDL_BlitSurface(classic, nullptr, composed.get(), nullptr)) devilution::ErrSdl(); }
     { CpuStageScope profile(CpuStage::WorldCopy);
-      if (!SDL_BlitSurface(world.get(), &clip, composed.get(), &clip)) devilution::ErrSdl(); }
+      if (!GpuTerrainReady() && !SDL_BlitSurface(world.get(), &clip, composed.get(), &clip)) devilution::ErrSdl(); }
     auto *pal = devilution::PalSurface;
     // Raw UI writers not using raster spans are also retained. Raster coverage
     // handles equal-color writes (which this supplemental pass cannot detect).
@@ -494,12 +516,13 @@ SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
             for (int x = block; x < end; ++x)
                 if (src[x] != previous[x]) {
                     const auto *coverage = static_cast<const uint8_t *>(ui->pixels) + y * ui->pitch + x * 4;
-                    if (!coverage[3]) Pixel(x, y, devilution::Palette->colors[src[x]], false);
+                    if (GpuTerrainReady()?coverage[3]==255:coverage[3]==0) Pixel(x, y, devilution::Palette->colors[src[x]], false);
                 }
         }
     }
     scanProfile.finish();
     CpuStageScope compositeProfile(CpuStage::UiComposite);
+    if(GpuTerrainReady())return composed.get();
     SDL_SetSurfaceBlendMode(ui.get(), SDL_BLENDMODE_BLEND);
     if (!SDL_BlitSurface(ui.get(), nullptr, composed.get(), nullptr)) devilution::ErrSdl();
     return composed.get();
@@ -529,6 +552,7 @@ HdPlayerCacheStats GetHdPlayerCacheStats()
 void ReleaseHdPlayerSheets()
 {
     BeginGpuSpriteFrame();
+    ReleaseGpuTerrainLevel();
     ReleaseGpuPlayerSheets();
     {
         const std::lock_guard<std::mutex> lock(sheetMutex);
@@ -538,6 +562,7 @@ void ReleaseHdPlayerSheets()
 }
 void ResetHdAssets()
 {
+    ResetGpuTerrainFrame();
     BeginGpuSpriteFrame();
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;

@@ -43,6 +43,7 @@ void CommitHdHudLayer(bool changed);
 void SaveHdCursorBackground(int x, int y, int width, int height);
 void RestoreHdCursorBackground();
 SDL_Surface *ComposeHdFrame(SDL_Surface *classic);
+SDL_Surface *GetHdUiSurface();
 #endif
 #endif
 } // namespace reincarnated

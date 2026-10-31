@@ -1,5 +1,6 @@
 #include "gpu_presenter.hpp"
 #include "gpu_sprites.hpp"
+#include "gpu_terrain.hpp"
 #include "cpu_profile.hpp"
 #ifdef USE_SDL3
 #include <algorithm>
@@ -56,6 +57,7 @@ void InitializeGpuPresenter(SDL_Window *target)
     if (!SDL_ClaimWindowForGPUDevice(device, target)) devilution::ErrSdl();
     window = target;
     InitializeGpuSprites(device);
+    InitializeGpuTerrain(device);
     devilution::Log("SDL_GPU shared presenter: {}", SDL_GetGPUDeviceDriver(device));
 }
 void DestroyGpuPresenter()
@@ -63,6 +65,7 @@ void DestroyGpuPresenter()
     if (!device) return;
     SDL_WaitForGPUIdle(device);
     ReleaseFrame();
+    DestroyGpuTerrain();
     DestroyGpuSprites();
     SDL_ReleaseWindowFromGPUDevice(device, window);
     SDL_DestroyGPUDevice(device);
@@ -133,7 +136,7 @@ void PresentGpuFrame(SDL_Surface *surface)
         const View v = Viewport(w, h);
         SDL_GPUTexture *display=frame;
         int displayW=frameWidth,displayH=frameHeight;
-        if(GpuSpriteFrameReady()) {
+        if(GpuSpriteFrameReady() || GpuTerrainReady()) {
             if(!scene || sceneWidth!=v.w || sceneHeight!=v.h) {
                 if(scene)SDL_ReleaseGPUTexture(device,scene);
                 SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D;info.format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -145,6 +148,7 @@ void PresentGpuFrame(SDL_Surface *surface)
             base.destination.texture=scene;base.destination.w=sceneWidth;base.destination.h=sceneHeight;
             base.load_op=SDL_GPU_LOADOP_DONT_CARE;base.filter=SDL_GPU_FILTER_NEAREST;SDL_BlitGPUTexture(cmd,&base);
             { CpuStageScope profile(CpuStage::SpriteCommands);
+              RenderGpuTerrain(cmd,scene,GetHdUiSurface(),frameWidth,frameHeight,sceneWidth,sceneHeight);
               RenderGpuSprites(cmd,scene,frameWidth,frameHeight,sceneWidth,sceneHeight); }
             display=scene;displayW=sceneWidth;displayH=sceneHeight;
         }
@@ -170,7 +174,7 @@ void PresentGpuFrame(SDL_Surface *surface)
         if (!fence || !SDL_WaitForGPUFences(device, true, &fence, 1)) devilution::ErrSdl();
         void *pixels = SDL_MapGPUTransferBuffer(device, readback, false);
         if (!pixels) devilution::ErrSdl();
-        const bool high=GpuSpriteFrameReady();
+        const bool high=GpuSpriteFrameReady() || GpuTerrainReady();
         const int dw=high?sceneWidth:frameWidth,dh=high?sceneHeight:frameHeight;
         auto *dump = SDL_CreateSurfaceFrom(dw, dh, SDL_PIXELFORMAT_RGBA32, pixels, dw * 4);
         if (!dump) devilution::ErrSdl();
