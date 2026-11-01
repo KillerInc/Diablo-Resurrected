@@ -86,6 +86,7 @@ set(libdevilutionx_SRCS
   reincarnated/gpu_timing.cpp
   reincarnated/gpu_presenter.cpp
   reincarnated/gpu_ui.cpp
+  reincarnated/world_sprite_indices.cpp
   reincarnated/gpu_sprites.cpp
   reincarnated/gpu_terrain.cpp
   engine/palette.cpp

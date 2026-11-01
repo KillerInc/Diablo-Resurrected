@@ -21,12 +21,13 @@ devilution::OwnedClxSpriteListOrSheet AnnotateSheetSource(
     using namespace devilution;
     std::string name(path);
     for (char &c : name) { if (c == '\\') c = '/'; else if (c >= 'A' && c <= 'Z') c += 'a' - 'A'; }
-    const bool world = name.starts_with("plrgfx/") || name.starts_with("monsters/")
-        || name.starts_with("missiles/") || name.starts_with("objects/") || name.starts_with("towners/");
-    if (!world && !(name.starts_with("ctrlpan/") || name.starts_with("data/")
-        || name.starts_with("items/") || name.starts_with("ui_art/") || name.starts_with("gendata/"))) return data;
     const auto dot = name.find_last_of('.');
     if (dot != std::string::npos) name.resize(dot);
+    const bool world = name.starts_with("plrgfx/") || name.starts_with("monsters/")
+        || name.starts_with("missiles/") || name.starts_with("objects/") || name.starts_with("towners/")
+        || name == "levels/l1data/l1s" || name == "levels/l2data/l2s" || name == "levels/towndata/towns";
+    if (!world && !(name.starts_with("ctrlpan/") || name.starts_with("data/")
+        || name.starts_with("items/") || name.starts_with("ui_art/") || name.starts_with("gendata/"))) return data;
     name = "hd/" + name + ".png";
     const ClxSpriteListOrSheet view(data);
     const unsigned columns = view.isSheet() ? view.sheet().numLists() : 1;

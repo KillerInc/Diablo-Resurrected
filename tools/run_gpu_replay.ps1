@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Root,[string]$Case='ui',[int]$Demo=1,[switch]$Capture,[switch]$NormalSpeed,[switch]$DisableGpuSprites,[string]$Executable,[switch]$ConfigureOnly,[switch]$Shareware,[ValidateRange(1,3600)][int]$TimeoutSeconds=360,[string]$DataDirectory='D:\Games\Diablo')
+param([Parameter(Mandatory=$true)][string]$Root,[string]$Case='ui',[int]$Demo=1,[switch]$Capture,[switch]$NormalSpeed,[switch]$DisableGpuSprites,[string]$Executable,[switch]$ConfigureOnly,[switch]$Shareware,[ValidateRange(1,3600)][int]$TimeoutSeconds=360,[string]$DataDirectory='D:\Games\Diablo',[string]$DebugCommand)
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path -LiteralPath $Root).Path
 $taskPackage=Join-Path $taskRoot 'package';$taskSave=Join-Path $taskRoot $Case
@@ -31,6 +31,10 @@ $taskTimed=if($NormalSpeed){''}else{' --timedemo'}
 $taskMode=if($Shareware){'--spawn '}else{''}
 $taskArgs=$taskMode+'--diablo --demo '+$Demo+$taskTimed+' --save-dir "'+$taskSave+'" --config-dir "'+$taskSave+'" --data-dir "'+$DataDirectory+'" --verbose --log-to-file "'+(Join-Path $taskRoot ($Case+'.log'))+'" -n'
 $taskExecutableHash=(Get-FileHash -LiteralPath $taskExecutable -Algorithm SHA256).Hash
+if($DebugCommand){
+    if($DebugCommand.Contains('"') -or $DebugCommand.Contains("`n") -or $DebugCommand.Contains("`r")){throw 'Debug command must be a single line without double quotes'}
+    $taskArgs+=' "+'+$DebugCommand+'"'
+}
 $taskClock=[Diagnostics.Stopwatch]::StartNew()
 $taskProcess=Start-Process -FilePath $taskExecutable -ArgumentList $taskArgs -WorkingDirectory $taskPackage -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $taskRoot ($Case+'-stdout.log')) -RedirectStandardError (Join-Path $taskRoot ($Case+'-stderr.log'))
 $taskPeak=0L;$taskWorkingSet=0L

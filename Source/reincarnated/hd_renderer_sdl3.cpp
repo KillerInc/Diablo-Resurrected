@@ -3,6 +3,7 @@
 #include "raster_bridge.hpp"
 #include "gpu_sprites.hpp"
 #include "gpu_ui.hpp"
+#include "world_sprite_indices.hpp"
 #include "gpu_terrain.hpp"
 #include "cpu_profile.hpp"
 #include "controls/control_mode.hpp"
@@ -477,6 +478,14 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         const double fullLeft=(double(x)+source->width/2-gpu->anchorX+out.region.x)*scale+offsetX;
         const double fullTop=(double(y)+1-gpu->anchorY+out.region.y)*scale;
         GpuSpriteDraw draw;draw.sheet=gpu;draw.frame=packed;
+        const bool nativeIndices=UsesNativeWorldIndices(*source);
+        const auto *sourcePalette=nativeIndices?WorldSourcePalette():nullptr;
+        if(nativeIndices){
+            if(!sourcePalette)return false;
+            draw.uiIndices=WorldSpriteIndices(sprite);if(!draw.uiIndices)return false;
+            draw.uiX=float((x+out.region.x)*scale+offsetX);draw.uiY=float((y+1-sprite.height()+out.region.y)*scale);
+            draw.uiScaleX=draw.uiScaleY=1.0f/scale;
+        }
         draw.x=fullLeft+double(packed.cropX)*scale/gpu->density;draw.y=fullTop+double(packed.cropY)*scale/gpu->density;
         draw.w=double(packed.w)*scale/gpu->density;draw.h=double(packed.h)*scale/gpu->density;draw.alpha=blend?0.5f:1.0f;
         draw.maskX=std::max({int(std::floor(draw.x)),clip.x,out.region.x*scale+offsetX,0});
@@ -493,10 +502,14 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         }
         draw.palette.resize(256*17*4);
         for(unsigned index=0;index<256;++index){
-            const auto &base=matchingPalette[index];auto *dst=draw.palette.data()+index*4;dst[0]=base.r;dst[1]=base.g;dst[2]=base.b;dst[3]=255;
-            uint8_t mapped=header[18+index];if(translation)mapped=translation[mapped];
+            const auto &base=nativeIndices?(*sourcePalette)[index]:matchingPalette[index];auto *dst=draw.palette.data()+index*4;dst[0]=base.r;dst[1]=base.g;dst[2]=base.b;dst[3]=255;
+            uint8_t mapped=nativeIndices?uint8_t(index):header[18+index];if(translation)mapped=translation[mapped];
             for(unsigned level=0;level<16;++level){const auto color=devilution::Palette->colors[lightmap?lightmap->adjustColor(mapped,level):mapped];
                 auto *row=draw.palette.data()+((level+1)*256+index)*4;row[0]=color.r;row[1]=color.g;row[2]=color.b;row[3]=255;}
+        }
+        if(nativeIndices && SDL_getenv("D1R_TRACE_WORLD_SHEETS")) {
+            static std::unordered_map<std::string,bool> traced;
+            if(traced.emplace(source->path,true).second)devilution::Log("HD_WORLD_DRAW source={} native_indices=1",source->path);
         }
         QueueGpuSprite(std::move(draw));
         if(profileFrame){++drawProfile.sprites;drawProfile.gpuPrepareNs+=SDL_GetTicksNS()-profileStarted;}

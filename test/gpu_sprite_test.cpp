@@ -80,7 +80,24 @@ int main(){
  Check(GetGpuSpriteStats().draws==300,"GPU lighting and translation draws");
  Check(GetGpuSpriteStats().renderPasses==250,"one ordered actor pass per frame");
  Check(GetGpuSpriteStats().paletteUploads==4,"retain palettes and invalidate lighting/TRN changes");
- SDL_DestroySurface(image);SDL_DestroySurface(surface);
+ // Prepared world art retains exact native indices even when source palette
+ // entries have identical RGB. Level colours/TRNs must not use nearest ties.
+ std::array<uint8_t,16> native{{2,0,2,255, 2,255,2,255, 2,255,2,255, 0,255,0,255}};
+ auto nativeTexture=CreateGpuUiIndices(2,2,native.data());Check(bool(nativeTexture),"native world index texture");
+ BeginGpuSpriteFrame();
+ GpuSpriteDraw exact;exact.sheet=sheet;exact.uiIndices=nativeTexture;exact.frame=sheet->frames[0];exact.x=exact.y=16;exact.w=exact.h=32;
+ exact.uiX=exact.uiY=16;exact.uiScaleX=exact.uiScaleY=1.0f/16;
+ exact.maskX=exact.maskY=16;exact.maskW=exact.maskH=32;exact.coverage.assign(32*32*4,0);for(size_t i=3;i<exact.coverage.size();i+=4)exact.coverage[i]=255;
+ exact.lighting.assign(32*32,0);exact.palette.assign(256*17*4,0);
+ for(unsigned row=0;row<17;++row)for(unsigned index=0;index<256;++index){auto *p=exact.palette.data()+(row*256+index)*4;p[3]=255;
+  if(index<3){p[0]=120;p[1]=60;p[2]=20;if(row&&index==2){p[0]=p[2]=0;p[1]=200;}if(row&&index==0){p[0]=p[1]=0;p[2]=200;}}}
+ QueueGpuSprite(std::move(exact));SetGpuSpriteFrameReady(true);SDL_FillSurfaceRect(surface,nullptr,SDL_MapSurfaceRGBA(surface,10,20,30,255));
+ for(const auto &entry:std::filesystem::directory_iterator(root))if(entry.path().extension()==".png")std::filesystem::remove(entry.path());
+ for(int i=0;i<100;++i)PresentGpuFrame(surface);
+ for(const auto &entry:std::filesystem::directory_iterator(root))if(entry.path().extension()==".png")image=IMG_Load(entry.path().string().c_str());
+ Check(image,"native world colour readback");expect(20,20,10,20,30);expect(36,20,5,110,15);expect(36,36,5,10,115);
+ SDL_DestroySurface(image);image=nullptr;BeginGpuSpriteFrame();nativeTexture.reset();
+ SDL_DestroySurface(surface);
  // Drop every reference before releasing the GPU device.
  BeginGpuSpriteFrame();sheet.reset();playerSheet.reset();ReleaseGpuPlayerSheets();Check(GetGpuSpriteStats().sheets==0,"class release");
  DestroyGpuPresenter();SDL_DestroyWindow(window);SDL_Quit();

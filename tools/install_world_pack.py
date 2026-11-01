@@ -1,0 +1,79 @@
+"""Install validated private NPC/object BC7 resources without changing existing art."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+from gpu_index import read_index
+from install_terrain_pack import sha
+
+WORLD_PREFIXES = ('objects/', 'towners/')
+OVERLAYS = {'levels/l1data/l1s.png', 'levels/l2data/l2s.png', 'levels/towndata/towns.png'}
+
+
+def install(staged_hd, game_hd, backup, validation, preview_hd=None):
+    staged_hd, game_hd, backup, validation = map(Path, (staged_hd, game_hd, backup, validation))
+    proof = json.loads(validation.read_text(encoding='utf-8'))
+    assert all(proof['checks'][name] for name in ('native_world_gpu_readback', 'town_actual_draws', 'object_actual_draws', 'full_pack_gpu_upload',
+        'gameplay_reference_same', 'gameplay_reference_repeat_same', 'png_free_runtime'))
+    ui = proof['world_pack']
+    old_path, new_path = game_hd/'sprites.gpus', staged_hd/'sprites.gpus'
+    assert sha(old_path) == ui['previous_index_sha256']
+    assert sha(new_path) == ui['index_sha256']
+    old, new = read_index(old_path), read_index(new_path)
+    added = set(new)-set(old)
+    assert added == set(ui['resources']) and added
+    assert all((key.startswith(WORLD_PREFIXES) or key in OVERLAYS) for key in added)
+    assert all(new.get(key) == record for key, record in old.items()), 'Existing records must remain identical'
+    assert not backup.exists(), 'Use a fresh executable/pack backup directory'
+    pages = []
+    for key in sorted(added):
+        record = new[key]; count = int(record[0].split()[-1])
+        for line in record[1:1+count]:
+            name = line.split()[0]
+            assert Path(name).name == name and '/' not in name and chr(92) not in name
+            relative = Path(key).parent/name
+            source, target = staged_hd/relative, game_hd/relative
+            assert target.resolve().is_relative_to(game_hd.resolve())
+            expected = ui['page_hashes'][relative.as_posix()]
+            assert sha(source) == expected
+            assert not target.exists() or sha(target) == expected, 'Refusing to overwrite unknown art'
+            pages.append((source, target, expected))
+    previews = []
+    if preview_hd is not None:
+        preview_hd = Path(preview_hd)
+        for key in sorted(added):
+            source, target = preview_hd/key, game_hd/key
+            assert source.is_file(), 'Missing PNG viewing copy'
+            assert target.resolve().is_relative_to(game_hd.resolve())
+            expected = sha(source)
+            assert not target.exists() or sha(target) == expected, 'Refusing to overwrite existing PNG'
+            previews.append((source, target, expected))
+    previous = old_path.read_bytes(); backup.mkdir(parents=True)
+    (backup/'previous-sprites.gpus').write_bytes(previous)
+    temporary = old_path.with_name('sprites.gpus.new')
+    assert not temporary.exists()
+    try:
+        for source, target, expected in pages + previews:
+            if target.exists(): continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            staging = target.with_name(target.name+'.new'); assert not staging.exists()
+            shutil.copy2(source, staging); assert sha(staging) == expected
+            os.replace(staging, target)
+        temporary.write_bytes(new_path.read_bytes()); os.replace(temporary, old_path)
+        assert read_index(old_path) == new
+        receipt = {'sheets_before':len(old),'sheets_after':len(new),'world_sheets':len(added),
+            'world_pages':len(pages),'png_viewing_copies':len(previews),
+            'existing_records_preserved':True,'index_sha256':sha(old_path)}
+        (backup/'receipt.json').write_text(json.dumps(receipt,indent=2))
+        print(json.dumps(receipt))
+    except BaseException:
+        old_path.write_bytes(previous); temporary.unlink(missing_ok=True)
+        raise
+
+
+if __name__ == '__main__':
+    parser=argparse.ArgumentParser(description=__doc__)
+    for name in ('staged_hd','game_hd','backup','validation'):parser.add_argument(name,type=Path)
+    parser.add_argument('--preview-hd', type=Path)
+    args=parser.parse_args();install(args.staged_hd,args.game_hd,args.backup,args.validation,args.preview_hd)

@@ -1,6 +1,7 @@
 #include "gpu_sprites.hpp"
 #include "gpu_coverage.hpp"
 #include "gpu_ui.hpp"
+#include "world_sprite_indices.hpp"
 #ifdef USE_SDL3
 #include <algorithm>
 #include <bit>
@@ -101,7 +102,7 @@ void InitializeGpuSprites(SDL_GPUDevice *target){
     SDL_GPUShaderCreateInfo sh{};sh.entrypoint="main";sh.format=SDL_GPU_SHADERFORMAT_DXBC;
     sh.stage=SDL_GPU_SHADERSTAGE_VERTEX;sh.code=SpriteVert;sh.code_size=sizeof(SpriteVert);sh.num_uniform_buffers=1;
     auto *vertex=SDL_CreateGPUShader(device,&sh);
-    sh.stage=SDL_GPU_SHADERSTAGE_FRAGMENT;sh.code=SpriteFrag;sh.code_size=sizeof(SpriteFrag);sh.num_samplers=4;sh.num_storage_buffers=1;
+    sh.stage=SDL_GPU_SHADERSTAGE_FRAGMENT;sh.code=SpriteFrag;sh.code_size=sizeof(SpriteFrag);sh.num_samplers=5;sh.num_storage_buffers=1;
     auto *fragment=SDL_CreateGPUShader(device,&sh);
     if(vertex && fragment){
         SDL_GPUColorTargetDescription color{};color.format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
@@ -110,7 +111,7 @@ void InitializeGpuSprites(SDL_GPUDevice *target){
         SDL_GPUGraphicsPipelineCreateInfo p{};p.vertex_shader=vertex;p.fragment_shader=fragment;p.primitive_type=SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
         p.target_info.color_target_descriptions=&color;p.target_info.num_color_targets=1;
         pipeline=SDL_CreateGPUGraphicsPipeline(device,&p);
-        sh.code=UiFrag;sh.code_size=sizeof(UiFrag);sh.num_storage_buffers=0;
+        sh.code=UiFrag;sh.code_size=sizeof(UiFrag);sh.num_storage_buffers=0;sh.num_samplers=4;
         auto *uiFragment=SDL_CreateGPUShader(device,&sh);
         if(uiFragment){p.fragment_shader=uiFragment;uiPipeline=SDL_CreateGPUGraphicsPipeline(device,&p);SDL_ReleaseGPUShader(device,uiFragment);}
         sh.code=UiCacheFrag;sh.code_size=sizeof(UiCacheFrag);sh.num_samplers=2;
@@ -135,7 +136,7 @@ void BeginGpuSpriteFrame(){
     if(w!=coverageWidth||h!=coverageHeight){coverageTiles.clear();coverageTiles.resize(size_t(columns)*rows);coverageWidth=w;coverageHeight=h;coverageColumns=columns;}
     else for(auto &tile:coverageTiles)tile.clear();
 }
-void ReleaseGpuPlayerSheets(){const std::lock_guard<std::mutex> lock(cacheMutex);sheets.clear();}
+void ReleaseGpuPlayerSheets(){const std::lock_guard<std::mutex> lock(cacheMutex);sheets.clear();ClearWorldSpriteIndices();}
 void DestroyGpuSprites(){BeginGpuSpriteFrame();pendingUiUploads.clear();ForgetGpuUiScene();InvalidateGpuUiHud();ClearGpuUiAssets();ReleaseGpuPlayerSheets();
     for(auto &s:controls){if(s.mask)SDL_ReleaseGPUTexture(device,s.mask);if(s.light)SDL_ReleaseGPUTexture(device,s.light);if(s.palette)SDL_ReleaseGPUTexture(device,s.palette);}controls.clear();if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);staging=nullptr;stagingCapacity=0;if(pageStaging)SDL_ReleaseGPUTransferBuffer(device,pageStaging);pageStaging=nullptr;pageStagingCapacity=0;if(nearestBuffer)SDL_ReleaseGPUBuffer(device,nearestBuffer);nearestBuffer=nullptr;nearestPalette.clear();if(nearestPipeline)SDL_ReleaseGPUComputePipeline(device,nearestPipeline);nearestPipeline=nullptr;if(uiCachePipeline)SDL_ReleaseGPUGraphicsPipeline(device,uiCachePipeline);uiCachePipeline=nullptr;if(uiPipeline)SDL_ReleaseGPUGraphicsPipeline(device,uiPipeline);uiPipeline=nullptr;if(pipeline)SDL_ReleaseGPUGraphicsPipeline(device,pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);pipeline=nullptr;sampler=nullptr;device=nullptr;}
 bool CanDrawGpuUi(){return uiPipeline&&sampler;}
@@ -347,8 +348,14 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
     const char *uiControlsSetting=SDL_getenv("D1R_GPU_UI_CONTROLS");
     const bool compactUi=!uiControlsSetting||std::strcmp(uiControlsSetting,"0")!=0;
     size_t slotIndex=0;
-    auto worldDraw=std::find_if(draws.begin(),draws.end(),[](const GpuSpriteDraw &d){return !d.ui;});
+    auto worldDraw=std::find_if(draws.begin(),draws.end(),[](const GpuSpriteDraw &d){return !d.ui&&!d.uiIndices;});
     if(worldDraw!=draws.end())EnsureGpuPalette(cmd,worldDraw->palette.data());
+    else if(!nearestBuffer&&std::any_of(draws.begin(),draws.end(),[](const GpuSpriteDraw &d){return !d.ui;})){
+        // Native-index materials do not read the lookup, but the pipeline's
+        // storage binding must remain valid. Never regenerate it for these draws.
+        SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;info.size=4;
+        nearestBuffer=SDL_CreateGPUBuffer(device,&info);if(!nearestBuffer)devilution::ErrSdl();
+    }
     static bool reported=false;
     if(!reported){devilution::Log("GPU_SPRITE_DRAW physical={}x{} logical={}x{} actors={} shader_lighting=1",pixelW,pixelH,logicalW,logicalH,draws.size());reported=true;}
     // Page uploads and per-frame controls use separate transfer pools. A large
@@ -414,10 +421,10 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
         if(boundPipeline!=desiredPipeline){SDL_BindGPUGraphicsPipeline(pass,desiredPipeline);boundPipeline=desiredPipeline;}
         if(draw.ui){light=draw.panel?draw.sheet->pages[0].texture:draw.uiIndices->pages[0].texture;if(draw.coverage.empty())mask=light;}
         const auto &page=draw.sheet->pages[draw.frame.page];
-        SDL_GPUTextureSamplerBinding bindings[4]={{page.texture,sampler},{mask,sampler},{light,sampler},{pal,sampler}};SDL_BindGPUFragmentSamplers(pass,0,bindings,draw.panel?2:4);
+        SDL_GPUTextureSamplerBinding bindings[5]={{page.texture,sampler},{mask,sampler},{light,sampler},{pal,sampler},{draw.uiIndices?draw.uiIndices->pages[0].texture:light,sampler}};SDL_BindGPUFragmentSamplers(pass,0,bindings,draw.panel?2:(draw.ui?4:5));
         if(!draw.ui)SDL_BindGPUFragmentStorageBuffers(pass,0,&nearestBuffer,1);
         const float vertex[12]={draw.x,draw.y,draw.w,draw.h,float(draw.frame.x)/page.width,float(draw.frame.y)/page.height,float(draw.frame.w)/page.width,float(draw.frame.h)/page.height,float(logicalW),float(logicalH),0,0};
-        const float fragment[16]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,draw.uiHd?1.0f:0.0f,draw.uiScaleX,draw.uiScaleY,draw.uiX,draw.uiY,draw.uiIndices?float(draw.uiIndices->width):0,draw.uiIndices?float(draw.uiIndices->height):0,draw.ui&&draw.coverage.empty()?1.0f:0.0f,0,0,0};
+        const float fragment[16]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,(draw.ui?draw.uiHd:bool(draw.uiIndices))?1.0f:0.0f,draw.uiScaleX,draw.uiScaleY,draw.uiX,draw.uiY,draw.uiIndices?float(draw.uiIndices->width):0,draw.uiIndices?float(draw.uiIndices->height):0,draw.ui&&draw.coverage.empty()?1.0f:0.0f,0,0,0};
         SDL_PushGPUVertexUniformData(cmd,0,vertex,sizeof(vertex));SDL_PushGPUFragmentUniformData(cmd,0,fragment,sizeof(fragment));
         SDL_DrawGPUPrimitives(pass,6,1,0,0);if(!batch)SDL_EndGPURenderPass(pass);++drawCount;
 
