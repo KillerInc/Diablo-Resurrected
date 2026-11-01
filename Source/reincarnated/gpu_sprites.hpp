@@ -6,6 +6,7 @@
 #include <vector>
 #include "sheet_source.hpp"
 namespace reincarnated {
+struct GpuUiPanel;
 struct GpuPage { SDL_GPUTexture *texture=nullptr; unsigned width=0,height=0; };
 struct GpuFrame { unsigned page=0,x=0,y=0,w=0,h=0,cropX=0,cropY=0; };
 struct GpuSheet {
@@ -18,6 +19,7 @@ struct GpuSheet {
     ~GpuSheet();
 };
 struct GpuSpriteDraw {
+    std::shared_ptr<GpuUiPanel> panel;
     std::shared_ptr<GpuSheet> sheet, uiIndices;
     bool ui = false, uiHd = false;
     float uiX = 0, uiY = 0, uiScaleX = 1, uiScaleY = 1;
@@ -26,6 +28,12 @@ struct GpuSpriteDraw {
     float x=0,y=0,w=0,h=0,alpha=1;
     int maskX=0,maskY=0,maskW=0,maskH=0;
     std::vector<unsigned char> coverage,lighting,palette,cursorCoverage;
+};
+struct GpuUiPanel {
+    std::vector<GpuSpriteDraw> commands;
+    std::shared_ptr<GpuSheet> composite;
+    std::array<SDL_Color, 256> palette {};
+    bool valid = false;
 };
 struct GpuSpriteStats { size_t sheets=0,playerSheets=0,bytes=0,cpuMaskBytes=0; uint64_t uploads=0,draws=0,renderPasses=0,paletteUploads=0,controlBytes=0; };
 void InitializeGpuSprites(SDL_GPUDevice *device);

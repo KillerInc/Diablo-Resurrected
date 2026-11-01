@@ -31,3 +31,12 @@ text='#pragma once\ninline constexpr unsigned char UiFrag[] = {\n'
 text+='\n'.join(','.join(str(b) for b in data[i:i+24])+',' for i in range(0,len(data),24))+'\n};\n'
 (root/'Source/reincarnated/shaders/ui_frag.hpp').write_bytes(text.encode())
 print('ui',len(data),'bytes')
+
+with tempfile.TemporaryDirectory() as temporary:
+    binary=Path(temporary)/'ui_cache.dxbc'
+    subprocess.run([str(fxc),'/nologo','/O3','/T','ps_5_1','/E','main','/Fo',str(binary),str(root/'Source/reincarnated/shaders/ui_cache.frag.hlsl')],check=True)
+    data=binary.read_bytes()
+text='#pragma once\ninline constexpr unsigned char UiCacheFrag[] = {\n'
+text+='\n'.join(','.join(str(b) for b in data[i:i+24])+',' for i in range(0,len(data),24))+'\n};\n'
+(root/'Source/reincarnated/shaders/ui_cache_frag.hpp').write_bytes(text.encode())
+print('ui_cache',len(data),'bytes')

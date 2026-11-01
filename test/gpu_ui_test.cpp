@@ -160,7 +160,7 @@ int main()
 	auto image = [&]() {SDL_Surface *result=nullptr;for(auto &entry:std::filesystem::directory_iterator(root))if(entry.path().extension()==".png")result=IMG_Load(entry.path().string().c_str());return result; };
 	SDL_Surface *read = image();
 	Check(read, "UI readback");
-	auto expect = [&](int x, int y, int r, int g, int b) {Uint8 rr,gg,bb,aa;Check(SDL_ReadSurfacePixel(read,x*2+1,y*2+1,&rr,&gg,&bb,&aa),"pixel");if(std::abs(int(rr)-r)>3||std::abs(int(gg)-g)>3||std::abs(int(bb)-b)>3){std::fprintf(stderr,"at %d,%d got %u,%u,%u expected %d,%d,%d\n",x,y,rr,gg,bb,r,g,b);Check(false,"UI colour/order");} };
+	auto expect = [&](int x, int y, int r, int g, int b) {Uint8 rr,gg,bb,aa;Check(SDL_ReadSurfacePixel(read,int((x+0.5)*read->w/400),int((y+0.5)*read->h/180),&rr,&gg,&bb,&aa),"pixel");if(std::abs(int(rr)-r)>3||std::abs(int(gg)-g)>3||std::abs(int(bb)-b)>3){std::fprintf(stderr,"at %d,%d got %u,%u,%u expected %d,%d,%d\n",x,y,rr,gg,bb,r,g,b);Check(false,"UI colour/order");} };
 	expect(15, 15, 120, 60, 20);
 	expect(51, 51, 200, 200, 0);
 	expect(49, 51, 120, 60, 20);
@@ -250,6 +250,51 @@ int main()
 	expect(181, 141, 120, 60, 20);
 	expect(191, 141, 0, 0, 200);
 	SDL_DestroySurface(read);
+	// Cache a finished opaque panel, including a translucent item, as one layer.
+	if (!SDL_getenv("D1R_GPU_INVENTORY_CACHE")) {
+		uint64_t builds = GetGpuUiPanelStats().builds;
+		for (int step = 0; step < 4; ++step) {
+			for (auto &entry : std::filesystem::directory_iterator(root))
+				if (entry.path().extension() == ".png") std::filesystem::remove(entry.path());
+			BeginHdUiFrame(true);
+			const int width = step < 2 ? 10 : 30;
+			const char *key = step < 2 ? "small" : "large";
+			const bool hit = BeginGpuUiPanel(Surface(pal), { 10, 150, 50, 10 }, key);
+			Check(hit == (step == 1 || step == 3), "panel visual-state cache key");
+			if (!hit) {
+				FillRect(Surface(pal), 10, 150, 50, 10, 1);
+				FillRect(Surface(pal), 10, 150, width, 10, 2);
+				DrawGpuUiRect(Surface(pal), 50, 153, 4, 4, 3, true);
+				EndGpuUiPanel();
+			}
+			if (step == 3) SDL_SetPaletteColors(Palette.get(), faded.data(), 0, 256);
+			surface = ComposeHdFrame(base);
+			for (int i = 0; i < 100; ++i) PresentGpuFrame(surface);
+			read = image(); Check(read, "retained panel readback");
+			const int divisor = step == 3 ? 2 : 1;
+			expect(10 + width - 1, 154, 0, 200 / divisor, 0);
+			expect(10 + width, 154, 120 / divisor, 60 / divisor, 20 / divisor);
+			expect(51, 154, 60 / divisor, 30 / divisor, 110 / divisor);
+			SDL_DestroySurface(read);
+			const uint64_t expected = step == 0 || step == 1 ? 1 : (step == 2 ? 2 : 3);
+			Check(GetGpuUiPanelStats().builds == builds + expected, "panel rebuilds only for state or live palette changes");
+		}
+		SDL_SetPaletteColors(Palette.get(), colors.data(), 0, 256);
+		for (auto &entry : std::filesystem::directory_iterator(root))
+			if (entry.path().extension() == ".png") std::filesystem::remove(entry.path());
+		Check(SDL_SetWindowSize(window, 1100, 500), "resize panel target");
+		SDL_PumpEvents();
+		BeginHdUiFrame(true);
+		Check(BeginGpuUiPanel(Surface(pal), { 10, 150, 50, 10 }, "large"), "reuse logical panel after physical resize");
+		SaveGpuSpriteCursor(); MaskGpuSpritePixel(15, 154, 0, 0, 0, 255); RestoreGpuSpriteCursor();
+		MaskGpuSpriteOpaqueSpan(20, 154, 1);
+		MaskGpuSpritePixel(45, 154, 0, 0, 200, 128);
+		surface = ComposeHdFrame(base); for (int i = 0; i < 100; ++i) PresentGpuFrame(surface);
+		read = image(); Check(read, "resized panel readback");
+		expect(15, 154, 0, 200, 0); expect(20, 154, 10, 20, 30); expect(45, 154, 60, 30, 110);
+		Check(GetGpuUiPanelStats().bytes == size_t(read->w) * read->h * 4, "cache uses actual physical viewport");
+		SDL_DestroySurface(read); Check(SDL_SetWindowSize(window, 800, 360), "restore viewport"); SDL_PumpEvents();
+	}
 	// A retained loading backdrop must remain beneath each new bar width.
 	for (int width : { 10, 30 }) {
 		for (auto &entry : std::filesystem::directory_iterator(root))

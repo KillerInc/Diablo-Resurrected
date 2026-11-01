@@ -171,10 +171,12 @@ void EnterGpuUiPhase() { phase = true; }
 void ResetGpuUiFrame()
 {
 	InvalidateGpuUiHud();
+	InvalidateGpuUiPanel();
 	phase = false;
 }
 void ClearGpuUiAssets()
 {
+	InvalidateGpuUiPanel();
 	phase = false;
 	nativeCache.clear();
 	cachedSurfaces.clear();

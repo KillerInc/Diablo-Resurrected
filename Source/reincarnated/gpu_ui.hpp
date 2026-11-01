@@ -4,6 +4,7 @@
 #include <SDL3/SDL_rect.h>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 namespace devilution {
 struct Surface;
 class ClxSprite;
@@ -14,6 +15,12 @@ struct GpuUiStats {
 	size_t textures, bytes;
 };
 GpuUiStats GetGpuUiStats();
+struct GpuUiPanelStats { uint64_t captures, replays, builds; size_t bytes; };
+GpuUiPanelStats GetGpuUiPanelStats();
+// Returns true when a matching completed inventory layer was queued.
+bool BeginGpuUiPanel(const devilution::Surface &out, SDL_Rect bounds, std::string_view key);
+void EndGpuUiPanel();
+void InvalidateGpuUiPanel();
 bool PrepareGpuUiHudLayer(int x, int y, int w, int h);
 bool BeginGpuUiHudComponent(unsigned component, bool changed);
 void EndGpuUiHudComponent(unsigned component);

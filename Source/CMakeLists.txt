@@ -82,6 +82,8 @@ set(libdevilutionx_SRCS
   reincarnated/sheet_png.cpp
   reincarnated/hd_renderer.cpp
   reincarnated/hd_renderer_sdl3.cpp
+  reincarnated/cpu_clock.cpp
+  reincarnated/gpu_timing.cpp
   reincarnated/gpu_presenter.cpp
   reincarnated/gpu_ui.cpp
   reincarnated/gpu_sprites.cpp

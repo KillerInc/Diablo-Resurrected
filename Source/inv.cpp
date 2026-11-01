@@ -1191,6 +1191,22 @@ void InitInv()
 
 void DrawInv(const Surface &out)
 {
+#ifdef USE_SDL3
+    if (reincarnated::GpuUiPhase()) {
+        const Player &player=*InspectPlayer;
+        std::string key;
+        auto add=[&](int value){key.append(reinterpret_cast<const char*>(&value),sizeof(value));};
+        const auto background=reinterpret_cast<uintptr_t>((*pInvCels)[0].pixelData());
+        key.append(reinterpret_cast<const char*>(&background),sizeof(background));
+        add(pcursinvitem);
+        auto item=[&](const Item &value){add(value.isEmpty());if(value.isEmpty())return;add(value._iCurs);add(value._iMagical);add(value._iStatFlag);add(IsInspectingPlayer()?player.CanUseItem(value):value._iStatFlag);add(GetOutlineColor(value,true));add(player.GetItemLocation(value)==ILOC_TWOHAND);};
+        for(const auto &value:player.InvBody)item(value);
+        for(int i=0;i<InventoryGridCells;++i){add(player.InvGrid[i]);if(player.InvGrid[i]>0)item(player.InvList[player.InvGrid[i]-1]);}
+        const auto position=GetPanelPosition(UiPanels::Inventory,{0,0});
+        if(reincarnated::BeginGpuUiPanel(out,{position.x,position.y,SidePanelSize.width,SidePanelSize.height},key))return;
+    }
+#endif
+
 	ClxDraw(out, GetPanelPosition(UiPanels::Inventory, { 0, 351 }), (*pInvCels)[0]);
 
 	const Size slotSize[] = {
@@ -1275,6 +1291,9 @@ void DrawInv(const Surface &out)
 			DrawItem(myPlayer.InvList[ii], out, position, sprite);
 		}
 	}
+#ifdef USE_SDL3
+    reincarnated::EndGpuUiPanel();
+#endif
 }
 
 void DrawInvBelt(const Surface &out)

@@ -11,18 +11,20 @@
 #include "hd_renderer.hpp"
 #include "sheet_png.hpp"
 #include "engine/palette.h"
+#include "engine/surface.hpp"
 #include "utils/log.hpp"
 #include "utils/display.h"
 #ifdef _WIN32
 #include "shaders/sprite_vert.hpp"
 #include "shaders/sprite_frag.hpp"
 #include "shaders/ui_frag.hpp"
+#include "shaders/ui_cache_frag.hpp"
 #include "shaders/sprite_comp.hpp"
 #endif
 namespace reincarnated {
 namespace {
 SDL_GPUDevice *device=nullptr;
-SDL_GPUGraphicsPipeline *pipeline=nullptr,*uiPipeline=nullptr;
+SDL_GPUGraphicsPipeline *pipeline=nullptr,*uiPipeline=nullptr,*uiCachePipeline=nullptr;
 SDL_GPUSampler *sampler=nullptr;
 SDL_GPUComputePipeline *nearestPipeline=nullptr;
 SDL_GPUBuffer *nearestBuffer=nullptr;
@@ -47,6 +49,12 @@ std::array<std::vector<GpuSpriteDraw>,5> uiHud;
 std::array<bool,5> uiHudValid{};
 std::array<size_t,5> uiHudStart{};
 SDL_Rect uiHudRect{};
+std::shared_ptr<GpuUiPanel> inventoryPanel;
+std::string inventoryKey;
+SDL_Rect inventoryBounds{};
+size_t panelStart=0;
+bool panelCapture=false;
+uint64_t panelCaptures=0,panelReplays=0,panelBuilds=0;
 uint64_t uploads=0,drawCount=0,renderPasses=0,paletteUploads=0,controlBytes=0,maskUploads=0,implicitUiDraws=0;
 SDL_GPUTexture *Texture(unsigned w,unsigned h,SDL_GPUTextureFormat format) {
     SDL_GPUTextureCreateInfo info{}; info.type=SDL_GPU_TEXTURETYPE_2D;info.format=format;
@@ -105,6 +113,9 @@ void InitializeGpuSprites(SDL_GPUDevice *target){
         sh.code=UiFrag;sh.code_size=sizeof(UiFrag);sh.num_storage_buffers=0;
         auto *uiFragment=SDL_CreateGPUShader(device,&sh);
         if(uiFragment){p.fragment_shader=uiFragment;uiPipeline=SDL_CreateGPUGraphicsPipeline(device,&p);SDL_ReleaseGPUShader(device,uiFragment);}
+        sh.code=UiCacheFrag;sh.code_size=sizeof(UiCacheFrag);sh.num_samplers=2;
+        auto *cacheFragment=SDL_CreateGPUShader(device,&sh);
+        if(cacheFragment){color.blend_state.src_color_blendfactor=SDL_GPU_BLENDFACTOR_ONE;p.fragment_shader=cacheFragment;uiCachePipeline=SDL_CreateGPUGraphicsPipeline(device,&p);SDL_ReleaseGPUShader(device,cacheFragment);}
     }
     if(vertex)SDL_ReleaseGPUShader(device,vertex);if(fragment)SDL_ReleaseGPUShader(device,fragment);
     SDL_GPUComputePipelineCreateInfo compute{};compute.code=SpriteComp;compute.code_size=sizeof(SpriteComp);compute.entrypoint="main";compute.format=SDL_GPU_SHADERFORMAT_DXBC;
@@ -118,7 +129,7 @@ void InitializeGpuSprites(SDL_GPUDevice *target){
 #endif
 }
 void BeginGpuSpriteFrame(){
-    draws.clear();ready=false;cursorSnapshot=false;
+    draws.clear();ready=false;cursorSnapshot=false;panelCapture=false;
     const unsigned w=unsigned(std::max<int64_t>(0,devilution::gnScreenWidth)),h=unsigned(std::max<int64_t>(0,devilution::gnScreenHeight));
     const unsigned columns=(w+CoverageTileSize-1)>>CoverageTileShift,rows=(h+CoverageTileSize-1)>>CoverageTileShift;
     if(w!=coverageWidth||h!=coverageHeight){coverageTiles.clear();coverageTiles.resize(size_t(columns)*rows);coverageWidth=w;coverageHeight=h;coverageColumns=columns;}
@@ -126,7 +137,7 @@ void BeginGpuSpriteFrame(){
 }
 void ReleaseGpuPlayerSheets(){const std::lock_guard<std::mutex> lock(cacheMutex);sheets.clear();}
 void DestroyGpuSprites(){BeginGpuSpriteFrame();pendingUiUploads.clear();ForgetGpuUiScene();InvalidateGpuUiHud();ClearGpuUiAssets();ReleaseGpuPlayerSheets();
-    for(auto &s:controls){if(s.mask)SDL_ReleaseGPUTexture(device,s.mask);if(s.light)SDL_ReleaseGPUTexture(device,s.light);if(s.palette)SDL_ReleaseGPUTexture(device,s.palette);}controls.clear();if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);staging=nullptr;stagingCapacity=0;if(pageStaging)SDL_ReleaseGPUTransferBuffer(device,pageStaging);pageStaging=nullptr;pageStagingCapacity=0;if(nearestBuffer)SDL_ReleaseGPUBuffer(device,nearestBuffer);nearestBuffer=nullptr;nearestPalette.clear();if(nearestPipeline)SDL_ReleaseGPUComputePipeline(device,nearestPipeline);nearestPipeline=nullptr;if(uiPipeline)SDL_ReleaseGPUGraphicsPipeline(device,uiPipeline);uiPipeline=nullptr;if(pipeline)SDL_ReleaseGPUGraphicsPipeline(device,pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);pipeline=nullptr;sampler=nullptr;device=nullptr;}
+    for(auto &s:controls){if(s.mask)SDL_ReleaseGPUTexture(device,s.mask);if(s.light)SDL_ReleaseGPUTexture(device,s.light);if(s.palette)SDL_ReleaseGPUTexture(device,s.palette);}controls.clear();if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);staging=nullptr;stagingCapacity=0;if(pageStaging)SDL_ReleaseGPUTransferBuffer(device,pageStaging);pageStaging=nullptr;pageStagingCapacity=0;if(nearestBuffer)SDL_ReleaseGPUBuffer(device,nearestBuffer);nearestBuffer=nullptr;nearestPalette.clear();if(nearestPipeline)SDL_ReleaseGPUComputePipeline(device,nearestPipeline);nearestPipeline=nullptr;if(uiCachePipeline)SDL_ReleaseGPUGraphicsPipeline(device,uiCachePipeline);uiCachePipeline=nullptr;if(uiPipeline)SDL_ReleaseGPUGraphicsPipeline(device,uiPipeline);uiPipeline=nullptr;if(pipeline)SDL_ReleaseGPUGraphicsPipeline(device,pipeline);if(sampler)SDL_ReleaseGPUSampler(device,sampler);pipeline=nullptr;sampler=nullptr;device=nullptr;}
 bool CanDrawGpuUi(){return uiPipeline&&sampler;}
 std::shared_ptr<GpuSheet> CreateGpuUiIndices(unsigned w,unsigned h,const uint8_t *rgba){
     if(!CanDrawGpuUi()||!w||!h)return {};
@@ -232,6 +243,30 @@ void MaskGpuSpriteBlendedSpan(int x,int y,const uint32_t *colors,unsigned length
         }
     }
 }
+GpuUiPanelStats GetGpuUiPanelStats(){return {panelCaptures,panelReplays,panelBuilds,inventoryPanel&&inventoryPanel->composite?inventoryPanel->composite->bytes:0};}
+void InvalidateGpuUiPanel(){inventoryPanel.reset();inventoryKey.clear();panelCapture=false;}
+void QueueInventoryPanel(){
+    GpuSpriteDraw draw;draw.ui=true;draw.panel=inventoryPanel;
+    draw.x=draw.y=0;draw.w=float(devilution::gnScreenWidth);draw.h=float(devilution::gnScreenHeight);
+    draw.maskX=inventoryBounds.x;draw.maskY=inventoryBounds.y;draw.maskW=inventoryBounds.w;draw.maskH=inventoryBounds.h;
+    QueueGpuSprite(std::move(draw));
+}
+bool BeginGpuUiPanel(const devilution::Surface &out,SDL_Rect bounds,std::string_view key){
+    panelCapture=false;
+    const char *setting=SDL_getenv("D1R_GPU_INVENTORY_CACHE");
+    if(!GpuUiPhase()||!uiCachePipeline||(setting&&std::strcmp(setting,"0")==0))return false;
+    std::string complete(key);complete.append(reinterpret_cast<const char*>(&out.region),sizeof(out.region));
+    const int dimensions[2]={int(devilution::gnScreenWidth),int(devilution::gnScreenHeight)};
+    complete.append(reinterpret_cast<const char*>(dimensions),sizeof(dimensions));
+    if(inventoryPanel&&inventoryKey==complete&&SDL_RectsEqual(&bounds,&inventoryBounds)){++panelReplays;QueueInventoryPanel();return true;}
+    inventoryPanel=std::make_shared<GpuUiPanel>();inventoryKey=std::move(complete);inventoryBounds=bounds;panelStart=draws.size();panelCapture=true;return false;
+}
+void EndGpuUiPanel(){
+    if(!panelCapture)return;
+    inventoryPanel->commands.assign(draws.begin()+panelStart,draws.end());
+    draws.resize(panelStart);auto earlier=std::move(draws);const bool previousReady=ready;
+    BeginGpuSpriteFrame();for(auto &draw:earlier)QueueGpuSprite(std::move(draw));QueueInventoryPanel();ready=previousReady;++panelCaptures;
+}
 void SaveGpuUiScene(){savedUiScene=draws;}
 void RestoreGpuUiScene(){BeginGpuSpriteFrame();for(const auto &draw:savedUiScene)QueueGpuSprite(draw);}
 void ForgetGpuUiScene(){savedUiScene.clear();}
@@ -244,7 +279,7 @@ bool BeginGpuUiHudComponent(unsigned component,bool changed){
 void EndGpuUiHudComponent(unsigned component){uiHud[component].assign(draws.begin()+uiHudStart[component],draws.end());uiHudValid[component]=true;}
 bool TranslateGpuUiDraws(SDL_Rect rect,const uint8_t *trn){
     std::vector<GpuSpriteDraw> translated;
-    for(auto &draw:draws){if(!draw.ui)continue;SDL_Rect bounds{draw.maskX,draw.maskY,draw.maskW,draw.maskH},area;
+    for(auto &draw:draws){if(!draw.ui||draw.panel)continue;SDL_Rect bounds{draw.maskX,draw.maskY,draw.maskW,draw.maskH},area;
         if(!SDL_GetRectIntersection(&bounds,&rect,&area))continue;
         auto copy=draw;copy.maskX=area.x;copy.maskY=area.y;copy.maskW=area.w;copy.maskH=area.h;if(!draw.coverage.empty())copy.coverage.resize(size_t(area.w)*area.h*4);
         const bool identity=draw.coverage.empty();EnsureCoverage(draw);
@@ -287,6 +322,25 @@ void WarmGpuSpritePalette(const SDL_Color *palette) {
 }
 void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logicalW,int logicalH,int pixelW,int pixelH){
     if(!GpuSpriteFrameReady())return;
+    for(auto &draw:draws)if(draw.panel){
+        auto panel=draw.panel;
+        const bool resized=!panel->composite||panel->composite->pages[0].width!=unsigned(pixelW)||panel->composite->pages[0].height!=unsigned(pixelH);
+        if(resized){
+            panel->composite=std::make_shared<GpuSheet>();auto &sheet=*panel->composite;sheet.owner=device;sheet.width=pixelW;sheet.height=pixelH;sheet.bytes=size_t(pixelW)*pixelH*4;
+            SDL_GPUTextureCreateInfo info{};info.type=SDL_GPU_TEXTURETYPE_2D;info.format=SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;info.usage=SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;info.width=pixelW;info.height=pixelH;info.layer_count_or_depth=info.num_levels=1;
+            auto *texture=SDL_CreateGPUTexture(device,&info);if(!texture)devilution::ErrSdl();sheet.pages.push_back({texture,unsigned(pixelW),unsigned(pixelH)});panel->valid=false;
+        }
+        if(!panel->valid||std::memcmp(panel->palette.data(),devilution::Palette->colors,1024)!=0){
+            auto *texture=panel->composite->pages[0].texture;
+            SDL_GPUColorTargetInfo clear{};clear.texture=texture;clear.load_op=SDL_GPU_LOADOP_CLEAR;clear.store_op=SDL_GPU_STOREOP_STORE;clear.clear_color={0,0,0,0};
+            auto *pass=SDL_BeginGPURenderPass(cmd,&clear,1,nullptr);SDL_EndGPURenderPass(pass);
+            std::vector<GpuSpriteDraw> mainDraws;mainDraws.swap(draws);draws=panel->commands;
+            RenderGpuSprites(cmd,texture,logicalW,logicalH,pixelW,pixelH);
+            draws.clear();draws.swap(mainDraws);
+            std::memcpy(panel->palette.data(),devilution::Palette->colors,1024);panel->valid=true;++panelBuilds;
+        }
+        draw.sheet=panel->composite;draw.frame={0,0,0,unsigned(pixelW),unsigned(pixelH),0,0};
+    }
     if(controls.size()<draws.size())controls.resize(draws.size());
     const char *batchSetting=SDL_getenv("D1R_GPU_ACTOR_BATCH");
     const bool batch=!batchSetting||std::strcmp(batchSetting,"0")!=0;
@@ -303,7 +357,7 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
     std::vector<ControlUpload> jobs;jobs.reserve(draws.size()*3+pendingUiUploads.size());
     for(const auto &upload:pendingUiUploads)jobs.push_back({upload.sheet->pages[0].texture,upload.bytes.data(),upload.sheet->width,upload.sheet->height,4});
     for(auto &draw:draws){
-        if(draw.ui)for(unsigned i=0;i<256;++i)std::memcpy(draw.palette.data()+(256+i)*4,&devilution::Palette->colors[draw.uiTranslation[i]],4);
+        if(draw.ui&&!draw.panel)for(unsigned i=0;i<256;++i)std::memcpy(draw.palette.data()+(256+i)*4,&devilution::Palette->colors[draw.uiTranslation[i]],4);
         if(draw.ui&&!compactUi)EnsureCoverage(draw);
         const bool implicit=draw.ui&&draw.coverage.empty();
         auto &slot=controls[slotIndex++];
@@ -313,8 +367,8 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
             slot.w=std::max(slot.w,(unsigned(draw.maskW)+63)&~63U);slot.h=std::max(slot.h,(unsigned(draw.maskH)+63)&~63U);
             slot.mask=Texture(slot.w,slot.h,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);slot.light=Texture(slot.w,slot.h,SDL_GPU_TEXTUREFORMAT_R8_UNORM);
         }
-        if(!slot.palette)slot.palette=Texture(256,17,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);
-        if((!implicit&&(!slot.mask||!slot.light))||!slot.palette)devilution::ErrSdl();
+        if(!draw.panel&&!slot.palette)slot.palette=Texture(256,17,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);
+        if((!implicit&&(!slot.mask||!slot.light))||(!draw.panel&&!slot.palette))devilution::ErrSdl();
         if(!implicit){
             if(!draw.ui||!compactUi||slot.maskW!=unsigned(draw.maskW)||slot.maskH!=unsigned(draw.maskH)||slot.maskBytes!=draw.coverage){
                 jobs.push_back({slot.mask,draw.coverage.data(),unsigned(draw.maskW),unsigned(draw.maskH),4});++maskUploads;
@@ -325,7 +379,7 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
         if(!draw.ui)jobs.push_back({slot.light,draw.lighting.data(),unsigned(draw.maskW),unsigned(draw.maskH),1});
         // Compare bytes rather than identities: palette cycling and mutable TRNs
         // must invalidate even when the originating pointer stays unchanged.
-        if(!batch||slot.paletteBytes!=draw.palette){
+        if(!draw.panel&&(!batch||slot.paletteBytes!=draw.palette)){
             jobs.push_back({slot.palette,draw.palette.data(),256,draw.ui?2U:17U,4});
             slot.paletteBytes=draw.palette;++paletteUploads;
         }
@@ -356,11 +410,11 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
     slotIndex=0;
     for(const auto &draw:draws){const auto &slot=controls[slotIndex++];auto *mask=slot.mask,*light=slot.light,*pal=slot.palette;
         if(!batch){pass=beginPass();boundPipeline=pipeline;}
-        auto *desiredPipeline=draw.ui?uiPipeline:pipeline;
+        auto *desiredPipeline=draw.panel?uiCachePipeline:(draw.ui?uiPipeline:pipeline);
         if(boundPipeline!=desiredPipeline){SDL_BindGPUGraphicsPipeline(pass,desiredPipeline);boundPipeline=desiredPipeline;}
-        if(draw.ui){light=draw.uiIndices->pages[0].texture;if(draw.coverage.empty())mask=light;}
+        if(draw.ui){light=draw.panel?draw.sheet->pages[0].texture:draw.uiIndices->pages[0].texture;if(draw.coverage.empty())mask=light;}
         const auto &page=draw.sheet->pages[draw.frame.page];
-        SDL_GPUTextureSamplerBinding bindings[4]={{page.texture,sampler},{mask,sampler},{light,sampler},{pal,sampler}};SDL_BindGPUFragmentSamplers(pass,0,bindings,4);
+        SDL_GPUTextureSamplerBinding bindings[4]={{page.texture,sampler},{mask,sampler},{light,sampler},{pal,sampler}};SDL_BindGPUFragmentSamplers(pass,0,bindings,draw.panel?2:4);
         if(!draw.ui)SDL_BindGPUFragmentStorageBuffers(pass,0,&nearestBuffer,1);
         const float vertex[12]={draw.x,draw.y,draw.w,draw.h,float(draw.frame.x)/page.width,float(draw.frame.y)/page.height,float(draw.frame.w)/page.width,float(draw.frame.h)/page.height,float(logicalW),float(logicalH),0,0};
         const float fragment[16]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,draw.uiHd?1.0f:0.0f,draw.uiScaleX,draw.uiScaleY,draw.uiX,draw.uiY,draw.uiIndices?float(draw.uiIndices->width):0,draw.uiIndices?float(draw.uiIndices->height):0,draw.ui&&draw.coverage.empty()?1.0f:0.0f,0,0,0};
