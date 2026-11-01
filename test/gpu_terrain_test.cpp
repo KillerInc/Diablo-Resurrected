@@ -35,6 +35,8 @@ int main(int argc, char **argv)
 {
 	Check(SDL_Init(SDL_INIT_VIDEO), "video");
 	const bool direct = argc < 2 || std::strcmp(argv[1], "--legacy") != 0;
+	const bool spanPath = argc < 2 || std::strcmp(argv[1], "--pixel-grid") != 0;
+	SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_GPU_TERRAIN_SPANS", spanPath ? "1" : "0", true);
 	SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_GPU_TILE_COMMANDS", direct ? "1" : "0", true);
 	SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "D1R_GPU_INDEXED_PRESENT", direct ? "1" : "0", true);
 	auto root = std::filesystem::temp_directory_path() / ("d1r-terrain-synthetic-" + std::to_string(SDL_GetTicksNS()));
@@ -127,6 +129,19 @@ int main(int argc, char **argv)
 			// The compiled art deliberately differs from this native frame's
 			// palette index: HD must preserve its own color, not repaint native RGB.
 			RenderTileFrame(Surface(pal), light, { 56, 39 }, TileType::Square, reinterpret_cast<const uint8_t *>(cel.data() + 1040), 32, MaskType::Solid, LightTables[0].data());
+			// Native fallback runs cross the 32-pixel bin boundary. Blend,
+			// overwrite and blend again to verify last-opaque truncation and
+			// the original order without relying on tile-owned spans.
+			std::array<uint8_t, 40> blueRun;
+			blueRun.fill(3);
+			CaptureGpuTerrainOpaque(4, 34, blueRun.data(), blueRun.size());
+			std::array<uint8_t, 24> greenRun;
+			greenRun.fill(4);
+			CaptureGpuTerrainBlend(24, 34, greenRun.data(), greenRun.size());
+			std::array<uint8_t, 4> brownRun;
+			brownRun.fill(1);
+			CaptureGpuTerrainOpaque(30, 34, brownRun.data(), brownRun.size());
+			CaptureGpuTerrainBlend(32, 34, greenRun.data(), 4);
 			EndHdWorldFrame();
 			*Surface(pal).at(20 * zoom, 20 * zoom) = 3;
 			MirrorOpaque(Surface(pal).at(20 * zoom, 20 * zoom), 1);
@@ -160,6 +175,11 @@ int main(int argc, char **argv)
 			expect(28, 28, 75, 37, 12);
 			expect(2, 2, 10, 20, 30);
 			expect(58, 10, 120, 60, 20);
+			expect(10, 34, 0, 0, 200);
+			expect(28, 34, 0, 100, 100);
+			expect(30, 34, 120, 60, 20);
+			expect(32, 34, 60, 130, 10);
+			expect(34, 34, 0, 150, 50);
 			SDL_DestroySurface(image);
 			std::filesystem::remove(newest);
 			GetRendererSwitch().setMode(RenderMode::Classic);

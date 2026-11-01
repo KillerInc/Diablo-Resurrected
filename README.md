@@ -1,6 +1,6 @@
 # Diablo Reincarnated
 
-Current development build: **0.4.13-pre**. This project extends the existing DevilutionX-based engine with an optional HD renderer while retaining the original gameplay simulation and Classic mode.
+Current development build: **0.4.14-pre**. This project extends the existing DevilutionX-based engine with an optional HD renderer while retaining the original gameplay simulation and Classic mode.
 
 Press **F10** in game to switch between Classic and HD. The renderer reads separately supplied graphics sheets from `hd/plrgfx`, `hd/monsters` and `hd/missiles`; original game data and replacement sheets are not included in this repository or its packages.
 

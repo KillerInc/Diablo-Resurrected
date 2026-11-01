@@ -16,6 +16,9 @@ Texture2D<float> classicImage:register(t13,space2);
 ByteAddressBuffer nearestIndex:register(t14,space2);
 ByteAddressBuffer commands:register(t15,space2);
 ByteAddressBuffer nodes:register(t16,space2);
+ByteAddressBuffer rasterSpans:register(t17,space2);
+ByteAddressBuffer spanLinks:register(t18,space2);
+ByteAddressBuffer spanBytes:register(t19,space2);
 SamplerState pointSampler:register(s0,space2);
 cbuffer Frame:register(b0,space3) {float4 mapping;float4 clipping;float4 options;};
 float4 SampleAtlas(uint page,float2 uv) {
@@ -49,6 +52,24 @@ float3 Lit(uint owner,uint packed,float2 nativePosition) {
     float intensity=min(256,floor(dot(lit,float3(1,1,1))*256/max(1,dot(original,float3(1,1,1)))));
     return clamp(lit+trunc(((float3)bytes-original)*intensity/256),0,255);
 }
+uint ReadByte(uint offset) {return (spanBytes.Load(offset&~3u)>>((offset&3u)*8u))&255u;}
+float3 ResolveSpans(int2 cell,float2 nativePosition) {
+    uint link=heads.Load(int3(cell.x/32,cell.y,0));
+    float weight=1;float3 additions=0;
+    [loop] while(link!=0){
+        uint2 item=spanLinks.Load2(link*8);link=item.x;
+        uint4 a=rasterSpans.Load4(item.y*32),b=rasterSpans.Load4(item.y*32+16);
+        if((uint)cell.x<a.x||(uint)cell.x>=a.x+a.y)continue;
+        uint local=(uint)cell.x-a.x;
+        uint original=b.y!=0?ReadByte(b.y+local):0;
+        uint level=b.w==256?min(15u,ReadByte(b.z+local)):b.w;
+        uint packed=((a.w&2)!=0?0x01000000u:ReadByte(b.x+local))|(original<<8)|(level<<16);
+        float3 color=Lit(a.z,packed,nativePosition);
+        if((a.w&1)==0)return floor(color*weight+additions)/255;
+        weight*=0.5;additions+=color*weight;
+    }
+    return floor(Lit(0,0,nativePosition)*weight+additions)/255;
+}
 float4 main(float4 position:SV_Position,float2 uv:TEXCOORD0,float2 logical:TEXCOORD1):SV_Target0 {
     if(any(logical<clipping.xy)||any(logical>=clipping.xy+clipping.zw)){
         if(options.x!=0){uint color=(uint)round(classicImage.Load(int3(int2(floor(logical)),0))*255);return float4(palette.Load(int3(color,17,0)).rgb,1);}
@@ -57,6 +78,11 @@ float4 main(float4 position:SV_Position,float2 uv:TEXCOORD0,float2 logical:TEXCO
     float2 nativePosition=(logical-float2(mapping.w,0))/mapping.z;
     int2 cell=int2(floor(nativePosition));
     if(any(cell<0)||any(cell>=int2(mapping.xy)))discard;
+    if(options.y!=0){
+        float3 color=ResolveSpans(cell,nativePosition);
+        float4 overlay=ui.Load(int3(int2(floor(logical)),0));
+        return float4(color*overlay.a+overlay.rgb,1);
+    }
     uint4 packed=(uint4)round(indices.Load(int3(cell,0))*255);
     uint index=packed.x|(packed.y<<8)|(packed.z<<16)|(packed.w<<24);
     uint owner=owners.Load(int3(cell,0)),node=heads.Load(int3(cell,0));
