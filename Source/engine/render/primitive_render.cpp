@@ -1,4 +1,5 @@
 #include "engine/render/primitive_render.hpp"
+#include "reincarnated/gpu_ui.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -81,6 +82,10 @@ void DrawHalfTransparentBlendedRectTo(const Surface &out, unsigned sx, unsigned 
 
 void FillRect(const Surface &out, int x, int y, int width, int height, uint8_t colorIndex)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, x, y, width, height, colorIndex)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	for (int j = 0; j < height; j++) {
 		DrawHorizontalLine(out, { x, y + j }, width, colorIndex);
 	}
@@ -101,6 +106,10 @@ void DrawHorizontalLine(const Surface &out, Point from, int width, std::uint8_t 
 
 void UnsafeDrawHorizontalLine(const Surface &out, Point from, int width, std::uint8_t colorIndex)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, from.x, from.y, width, 1, colorIndex)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	std::memset(&out[from], colorIndex, width);
 	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(&out[from], width);
 }
@@ -120,6 +129,10 @@ void DrawVerticalLine(const Surface &out, Point from, int height, std::uint8_t c
 
 void UnsafeDrawVerticalLine(const Surface &out, Point from, int height, std::uint8_t colorIndex)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, from.x, from.y, 1, height, colorIndex)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	auto *dst = &out[from];
 	const auto pitch = out.pitch();
 	while (height-- > 0) {
@@ -160,6 +173,10 @@ void DrawHalfTransparentVerticalLine(const Surface &out, Point from, int height,
 
 void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, int height)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, sx, sy, width, height, 0, true)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	if (sx + width < 0)
 		return;
 	if (sy + height < 0)
@@ -190,6 +207,10 @@ void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, in
 
 void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, int height, uint8_t color)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, sx, sy, width, height, color, true)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	if (sx + width < 0)
 		return;
 	if (sy + height < 0)

@@ -1,3 +1,6 @@
+#ifdef USE_SDL3
+#include "reincarnated/hd_renderer.hpp"
+#endif
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -109,6 +112,9 @@ void CreditsRenderer::Render()
 	if (offsetY == prev_offset_y_)
 		return;
 	prev_offset_y_ = offsetY;
+#ifdef USE_SDL3
+    reincarnated::BeginHdUiFrame(true);
+#endif
 
 	SDL_FillSurfaceRect(DiabloUiSurface(), nullptr, 0);
 	const Point uiPosition = GetUIRectangle().position;

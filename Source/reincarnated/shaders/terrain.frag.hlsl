@@ -80,6 +80,7 @@ float4 main(float4 position:SV_Position,float2 uv:TEXCOORD0,float2 logical:TEXCO
     if(any(cell<0)||any(cell>=int2(mapping.xy)))discard;
     if(options.y!=0){
         float3 color=ResolveSpans(cell,nativePosition);
+        if(options.z==0)return float4(color,1);
         float4 overlay=ui.Load(int3(int2(floor(logical)),0));
         return float4(color*overlay.a+overlay.rgb,1);
     }
@@ -91,6 +92,7 @@ float4 main(float4 position:SV_Position,float2 uv:TEXCOORD0,float2 logical:TEXCO
     float weight=1;float3 additions=0;
     [loop] while(node!=0){uint4 item=nodes.Load4(node*16);weight*=0.5;additions+=Lit(item.y,item.z,nativePosition)*weight;node=item.x;}
     float3 color=floor(Lit(owner,index,nativePosition)*weight+additions)/255;
+    if(options.z==0)return float4(color,1);
     float4 overlay=ui.Load(int3(int2(floor(logical)),0));
     return float4(color*overlay.a+overlay.rgb,1);
 }

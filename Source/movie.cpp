@@ -1,3 +1,6 @@
+#ifdef USE_SDL3
+#include "reincarnated/hd_renderer.hpp"
+#endif
 /**
  * @file movie.cpp
  *
@@ -44,6 +47,9 @@ void play_movie(const char *pszMovie, bool userCanClose)
 	if (HeadlessMode)
 		return;
 
+#ifdef USE_SDL3
+    reincarnated::ResetHdAssets();
+#endif
 	movie_playing = true;
 
 	sound_disable_music(true);

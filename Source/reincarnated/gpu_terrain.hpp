@@ -26,6 +26,7 @@ bool GpuTerrainNeedsCpuCanvas();
 bool GpuTerrainSkipsNativePainting();
 bool QueueGpuTerrainTile(const devilution::Surface &out, devilution::MaskType mask, const uint8_t *table);
 bool SetGpuTerrainNativeCapture(bool value);
+bool GpuTerrainNativeCaptureActive();
 class GpuTerrainNativeCaptureScope {
 	bool previous;
 

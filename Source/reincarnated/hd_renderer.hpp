@@ -35,6 +35,8 @@ bool PreloadHdPlayerSheet(const SheetSource &source);
 HdPlayerCacheStats GetHdPlayerCacheStats();
 void ReleaseHdPlayerSheets();
 void EndHdWorldFrame();
+void BeginHdUiFrame(bool force = false);
+void MarkHdUiPresented();
 // The persistent HUD sits below transient UI (menus, messages and cursor).
 // Its indexed backing keeps the existing dirty-component drawing routines.
 bool PrepareHdHudLayer(int x, int y, int width, int height);
@@ -44,6 +46,7 @@ void SaveHdCursorBackground(int x, int y, int width, int height);
 void RestoreHdCursorBackground();
 SDL_Surface *ComposeHdFrame(SDL_Surface *classic);
 SDL_Surface *GetHdUiSurface();
+bool HasHdUiRaster();
 #endif
 #endif
 } // namespace reincarnated

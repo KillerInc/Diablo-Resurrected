@@ -310,6 +310,7 @@ void RenderPresent()
 
 	if (!gbActive) {
 #ifdef USE_SDL3
+        reincarnated::MarkHdUiPresented();
         reincarnated::GetPerformanceMonitor().resetWindow();
 #endif
 #ifdef __EMSCRIPTEN__

@@ -1,3 +1,6 @@
+#ifdef USE_SDL3
+#include "reincarnated/gpu_ui.hpp"
+#endif
 /**
  * @file inv.cpp
  *
@@ -1146,6 +1149,11 @@ void InvDrawSlotBack(const Surface &out, Point targetPosition, Size size, item_q
 		break;
 	}
 
+#ifdef USE_SDL3
+    std::array<uint8_t,256> translation;
+    for(unsigned i=0;i<256;++i)translation[i]=i>=PAL16_GRAY?uint8_t(i-colorShift):uint8_t(i);
+    if(reincarnated::TranslateGpuUiRect(out, {targetPosition.x,targetPosition.y-size.height+1,size.width,size.height}, translation.data()))return;
+#endif
 	uint8_t *dst = &out[targetPosition];
 	const auto dstPitch = out.pitch();
 	for (int y = size.height; y != 0; --y, dst -= dstPitch + size.width) {

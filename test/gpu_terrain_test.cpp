@@ -189,6 +189,22 @@ int main(int argc, char **argv)
 		}
 	}
 	Check(expectedCaptures == 4, "both lighting and zoom modes");
+    // A frame using only GPU UI must not revive pixels from an earlier CPU UI
+    // raster. When raster drawing resumes, its untouched area stays clear.
+    for(bool raw : {false,true}){
+        BeginHdWorldFrame(1,0,0,128,100);
+        RenderTileFrame(Surface(pal),light,{8,39},TileType::Square,reinterpret_cast<const uint8_t *>(cel.data()+16),32,MaskType::Solid,LightTables[0].data());
+        EndHdWorldFrame();Check(!HasHdUiRaster(),"new frame has no stale UI raster");
+        if(raw){*Surface(pal).at(24,24)=3;MirrorOpaque(Surface(pal).at(24,24),1);Check(HasHdUiRaster(),"raw UI fallback resumes");}
+        auto *frame=ComposeHdFrame(classic);for(int i=0;i<100;++i)PresentGpuFrame(frame);
+        SDL_Surface *result=nullptr;std::filesystem::path path;
+        for(const auto &file:std::filesystem::directory_iterator(root))if(file.path().extension()==".png"){path=file.path();result=IMG_Load(path.string().c_str());}
+        Check(result,"empty UI/readback fallback");Uint8 rr,gg,bb,aa;
+        Check(SDL_ReadSurfacePixel(result,41,41,&rr,&gg,&bb,&aa)&&std::abs(int(rr)-120)<=3&&std::abs(int(gg)-60)<=3&&std::abs(int(bb)-20)<=3,"old UI raster does not return");
+        if(raw)Check(SDL_ReadSurfacePixel(result,49,49,&rr,&gg,&bb,&aa)&&rr==0&&gg==0&&bb==200,"raw UI fallback colour");
+        SDL_DestroySurface(result);std::filesystem::remove(path);
+    }
+
 	ControlMode = ControlTypes::VirtualGamepad;
 	BeginHdWorldFrame(1, 0, 0, 128, 100);
 	Check(!GpuTerrainActive(), "virtual gamepad keeps compatible CPU canvas");

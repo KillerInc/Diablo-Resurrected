@@ -1,3 +1,6 @@
+#ifdef USE_SDL3
+#include "reincarnated/gpu_ui.hpp"
+#endif
 #include "reincarnated/performance_monitor.hpp"
 #include "reincarnated/gpu_sprites.hpp"
 #include "reincarnated/hd_renderer.hpp"
@@ -234,6 +237,9 @@ void FreeCutsceneBackground()
 
 void DrawCutsceneBackground()
 {
+#ifdef USE_SDL3
+    reincarnated::BeginHdUiFrame();
+#endif
 	const Rectangle &uiRectangle = GetUIRectangle();
 	const Surface &out = GlobalBackBuffer();
 	SDL_FillSurfaceRect(out.surface, nullptr, 0);
@@ -242,6 +248,9 @@ void DrawCutsceneBackground()
 		RenderClxSprite(out, sprite, { uiRectangle.position.x - ((sprite.width() - uiRectangle.size.width) / 2), uiRectangle.position.y });
 	}
 	ClxDraw(out, { uiRectangle.position.x, 480 - 1 + uiRectangle.position.y }, (*sgpBackCel)[0]);
+#ifdef USE_SDL3
+    reincarnated::SaveGpuUiScene();
+#endif
 }
 
 uint32_t DisplayedLoadingProgress()
@@ -257,6 +266,9 @@ uint32_t DisplayedLoadingProgress()
 
 void DrawCutsceneForeground()
 {
+#ifdef USE_SDL3
+    reincarnated::RestoreGpuUiScene();
+#endif
     const uint32_t progress = DisplayedLoadingProgress();
 	const Rectangle &uiRectangle = GetUIRectangle();
 	const Surface &out = GlobalBackBuffer();

@@ -553,6 +553,7 @@ void CaptureGpuTerrainBlend(int x, int y, const uint8_t *indices, unsigned lengt
 		for (int py = y * zoom; py < std::min((y + 1) * zoom, clip.h); ++py)
 			MaskGpuSpriteBlendedSpan(left, py, maskColors.data() + left - rawLeft, right - left);
 }
+bool GpuTerrainNativeCaptureActive() { return nativeCapture; }
 bool SetGpuTerrainNativeCapture(bool value) { return SetGpuTerrainNativeCaptureInternal(value); }
 bool QueueGpuTerrainTile(const devilution::Surface &out, devilution::MaskType mask, const uint8_t *table)
 {
@@ -713,9 +714,9 @@ void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Sur
 	};
 	std::vector<ImageUpload> images {
 		{ headTexture, headPixels.data(), headWidth, unsigned(nativeH), 4, headWidth * 4 },
-		{ paletteTexture, palettes.data(), 256, 18, 4, 256 * 4 },
-		{ uiTexture, ui->pixels, unsigned(width), unsigned(height), 4, unsigned(ui->pitch) }
-	};
+        { paletteTexture, palettes.data(), 256, 18, 4, 256 * 4 }
+    };
+    if(HasHdUiRaster())images.push_back({ uiTexture, ui->pixels, unsigned(width), unsigned(height), 4, unsigned(ui->pitch) });
 	if (!gpuSpans) {
 		images.push_back({ ownerTexture, ownerPixels.data(), unsigned(nativeW), unsigned(nativeH), 2, unsigned(nativeW) * 2 });
 		images.push_back({ indexTexture, indexPixels.data(), unsigned(nativeW), unsigned(nativeH), 4, unsigned(nativeW) * 4 });
@@ -789,13 +790,13 @@ void RenderGpuTerrain(SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *target, SDL_Sur
 	SDL_GPUBuffer *buffers[] { nearest, commandBuffer, nodeBuffer, spanBuffer, linkBuffer, byteBuffer };
 	SDL_BindGPUFragmentStorageBuffers(pass, 0, buffers, 6);
 	const float vertex[] { 0, 0, float(width), float(height), 0, 0, 1, 1, float(width), float(height), 0, 0 };
-	const float fragment[] { float(nativeW), float(nativeH), float(zoom), float(offsetX), float(clip.x), float(clip.y), float(clip.w), float(clip.h), indexedPresent ? 1.0f : 0.0f, gpuSpans ? 1.0f : 0.0f, 0, 0 };
+	const float fragment[] { float(nativeW), float(nativeH), float(zoom), float(offsetX), float(clip.x), float(clip.y), float(clip.w), float(clip.h), indexedPresent ? 1.0f : 0.0f, gpuSpans ? 1.0f : 0.0f, HasHdUiRaster() ? 1.0f : 0.0f, 0 };
 	SDL_PushGPUVertexUniformData(cmd, 0, vertex, sizeof(vertex));
 	SDL_PushGPUFragmentUniformData(cmd, 0, fragment, sizeof(fragment));
 	SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
 	SDL_EndGPURenderPass(pass);
 	static unsigned frames = 0;
-	if (SDL_getenv("D1R_PROFILE_HD") && ++frames % 100 == 0) devilution::Log("GPU_TERRAIN_FRAME tiles={} blend_nodes={} cpu_tile_draws_skipped={} indexed_present={} gpu_spans={} spans={} links={} byte_data={}", commands.size(), nodes.size() - 1, directTileCount, indexedPresent, gpuSpans, rasterSpans.size(), spanLinks.size() - 1, spanBytes.size());
+	if (SDL_getenv("D1R_PROFILE_HD") && ++frames % 100 == 0) devilution::Log("GPU_TERRAIN_FRAME tiles={} blend_nodes={} cpu_tile_draws_skipped={} indexed_present={} gpu_spans={} spans={} links={} byte_data={} cpu_ui_raster={}", commands.size(), nodes.size() - 1, directTileCount, indexedPresent, gpuSpans, rasterSpans.size(), spanLinks.size() - 1, spanBytes.size(), HasHdUiRaster());
 }
 } // namespace reincarnated
 #endif

@@ -13,7 +13,7 @@ std::deque<SheetSource> &Sources() { static std::deque<SheetSource> sources; ret
 }
 
 devilution::OwnedClxSpriteListOrSheet AnnotateSheetSource(
-    devilution::OwnedClxSpriteListOrSheet data, const char *path)
+    devilution::OwnedClxSpriteListOrSheet data, const char *path, bool pcx)
 {
 #ifndef USE_SDL3
     return data;
@@ -21,11 +21,10 @@ devilution::OwnedClxSpriteListOrSheet AnnotateSheetSource(
     using namespace devilution;
     std::string name(path);
     for (char &c : name) { if (c == '\\') c = '/'; else if (c >= 'A' && c <= 'Z') c += 'a' - 'A'; }
-    // Only installed world-sprite directories participate; UI and tile microcells
-    // keep their existing rendering and special masks.
-    if (!(name.starts_with("plrgfx/") || name.starts_with("monsters/")
-            || name.starts_with("missiles/") || name.starts_with("objects/")
-            || name.starts_with("towners/"))) return data;
+    const bool world = name.starts_with("plrgfx/") || name.starts_with("monsters/")
+        || name.starts_with("missiles/") || name.starts_with("objects/") || name.starts_with("towners/");
+    if (!world && !(name.starts_with("ctrlpan/") || name.starts_with("data/")
+        || name.starts_with("items/") || name.starts_with("ui_art/") || name.starts_with("gendata/"))) return data;
     const auto dot = name.find_last_of('.');
     if (dot != std::string::npos) name.resize(dot);
     name = "hd/" + name + ".png";
@@ -36,17 +35,17 @@ devilution::OwnedClxSpriteListOrSheet AnnotateSheetSource(
         const auto list = view.isSheet() ? view.sheet()[group] : view.list();
         rows = std::max(rows, list.numSprites());
         for (const auto sprite : list) {
-            if (width && width != sprite.width()) return data;
-            width = sprite.width();
+            if (world && width && width != sprite.width()) return data;
+            width = std::max<unsigned>(width, sprite.width());
         }
     }
     if (!width || !rows || columns > 65535 || rows > 65535) return data;
     auto &sources = Sources();
     auto found = std::find_if(sources.begin(), sources.end(), [&](const SheetSource &s) {
-        return s.path == name && s.columns == columns && s.rows == rows && s.width == width;
+        return s.path == name && s.columns == columns && s.rows == rows && s.width == width && s.pcx == pcx;
     });
     const uint32_t id = static_cast<uint32_t>(found - sources.begin());
-    if (found == sources.end()) sources.push_back({ name, columns, rows, width });
+    if (found == sources.end()) sources.push_back({ name, columns, rows, width, pcx });
     std::vector<uint8_t> bytes(view.isSheet() ? 4 * columns : 0);
     for (unsigned group = 0; group < columns; ++group) {
         const auto list = view.isSheet() ? view.sheet()[group] : view.list();

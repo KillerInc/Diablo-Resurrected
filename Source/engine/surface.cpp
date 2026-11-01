@@ -1,4 +1,5 @@
 #include "engine/surface.hpp"
+#include "reincarnated/gpu_ui.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -10,6 +11,10 @@ namespace {
 template <bool SkipColorIndexZero>
 void SurfaceBlit(const Surface &src, SDL_Rect srcRect, const Surface &dst, Point dstPosition)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiSurface(dst, src, srcRect, dstPosition, SkipColorIndexZero)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(dst);
+#endif
 	// We do not use `SDL_BlitSurface` here because the palettes may be different objects
 	// and SDL would attempt to map them.
 

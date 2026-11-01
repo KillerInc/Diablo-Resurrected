@@ -2,6 +2,7 @@
 #include "hd_renderer.hpp"
 #include "raster_bridge.hpp"
 #include "gpu_sprites.hpp"
+#include "gpu_ui.hpp"
 #include "gpu_terrain.hpp"
 #include "cpu_profile.hpp"
 #include "controls/control_mode.hpp"
@@ -30,6 +31,8 @@
 
 namespace reincarnated {
 bool HdCaptureActive = false;
+static bool standaloneUi = false, standalonePresented = true;
+static bool uiRasterDirty = false, uiWasTerrain = false;
 namespace {
 struct Asset {
     devilution::SDLSurfaceUniquePtr surface;
@@ -82,6 +85,7 @@ bool SourcePosition(const uint8_t *src, int &x, int &y)
 }
 void Pixel(int x, int y, SDL_Color color, bool blend)
 {
+    if(!inWorld)uiRasterDirty=true;
     SDL_Surface *target = inWorld ? world.get() : ui.get();
     const int zoom = inWorld ? scale : 1;
     x = x * zoom + (inWorld ? offsetX : 0);
@@ -216,6 +220,7 @@ void MirrorOpaque(const uint8_t *src, unsigned length)
 {
     int x, y;
     if (!SourcePosition(src, x, y)) return;
+    if(!inWorld)uiRasterDirty=true;
     length = std::min(length, unsigned(devilution::PalSurface->w - x));
     if(profileFrame){++drawProfile.opaqueSpans;drawProfile.opaquePixels+=length;}
     if(inWorld&&GpuTerrainActive()){CaptureGpuTerrainOpaque(x,y,src,length);return;}
@@ -254,6 +259,7 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_
 {
     int x, y;
     if (!SourcePosition(dst, x, y)) return;
+    if(!inWorld)uiRasterDirty=true;
     const uint8_t *light = lightmap ? lightmap->getLightingAt(dst) : nullptr;
     length = std::min(length, unsigned(devilution::PalSurface->w - x));
     if(profileFrame){++drawProfile.blendSpans;drawProfile.blendPixels+=length;}
@@ -306,6 +312,7 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src, uint8_
 void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clipHeight)
 {
     BeginGpuSpriteFrame();
+    standaloneUi = false; ForgetGpuUiScene(); BeginGpuUiFrame(false);
     static const bool profileEnabled=SDL_getenv("D1R_PROFILE_HD")!=nullptr;
     profileFrame=profileEnabled;drawProfile={};
     HdCaptureActive = GetRendererSwitch().usesHdRenderer();
@@ -314,6 +321,7 @@ void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clip
     if (std::memcmp(matchingPalette.data(), devilution::logical_palette.data(), sizeof(matchingPalette)) != 0) {
         matchingPalette = devilution::logical_palette;
     }
+    const bool uiNeedsClear=!ui || ui->w!=devilution::gnScreenWidth || ui->h!=devilution::gnScreenHeight || uiRasterDirty;
     EnsureSurface(ui);
     scale = zoom; offsetX = xOffset;
     clip = { clipX, 0, clipWidth, clipHeight };
@@ -326,16 +334,32 @@ void BeginHdWorldFrame(int zoom, int xOffset, int clipX, int clipWidth, int clip
         SDL_FillSurfaceRect(world.get(), nullptr, SDL_MapSurfaceRGBA(world.get(), 0, 0, 0, 255));
         SDL_SetSurfaceClipRect(world.get(), &clip);
     }
-    SDL_FillSurfaceRect(ui.get(), nullptr, gpuTerrain?SDL_MapSurfaceRGBA(ui.get(),0,0,0,255):0);
+    if(uiNeedsClear || gpuTerrain!=uiWasTerrain || !GpuUiEnabled())SDL_FillSurfaceRect(ui.get(), nullptr, gpuTerrain?SDL_MapSurfaceRGBA(ui.get(),0,0,0,255):0);
+    uiWasTerrain=gpuTerrain;uiRasterDirty=false;
     inWorld = true;
 }
 void EndHdWorldFrame()
 {
     if (!HdCaptureActive) return;
     inWorld = false; ready = true;
+    EnterGpuUiPhase();
     EndGpuTerrainFrame();
     auto *pal = devilution::PalSurface;
     beforeUi.assign(static_cast<uint8_t *>(pal->pixels), static_cast<uint8_t *>(pal->pixels) + size_t(pal->pitch) * pal->h);
+}
+void MarkHdUiPresented(){standalonePresented=true;}
+void BeginHdUiFrame(bool force)
+{
+    if(!force && standaloneUi && !standalonePresented)return;
+    standalonePresented=false;ForgetGpuUiScene();
+    BeginGpuSpriteFrame(); ResetGpuTerrainFrame();
+    uiRasterDirty=true;
+    standaloneUi = true; inWorld = false; suppressed = false; cursorSaved = false;
+    HdCaptureActive = GpuUiEnabled(); ready = HdCaptureActive;
+    BeginGpuUiFrame(true);
+    if (!HdCaptureActive) return;
+    EnsureSurface(ui); SDL_FillSurfaceRect(ui.get(), nullptr, 0);
+    clip = { 0, 0, int(devilution::gnScreenWidth), 0 };
 }
 bool PrepareHdHudLayer(int x, int y, int width, int height)
 {
@@ -363,6 +387,7 @@ devilution::Surface HdHudLayerTarget(const devilution::Surface &fallback)
 }
 void CommitHdHudLayer(bool changed)
 {
+    uiRasterDirty=true;
     if (!HdCaptureActive || !ready || !hudIndexed) return;
     const SDL_Rect bounds { 0, 0, hudIndexed->w, hudIndexed->h };
     SDL_Rect area;
@@ -485,10 +510,12 @@ bool QueueHdTile(int type, unsigned piece, int left, int bottom, int w, int h, i
     const auto base = "hd/tiles/" + std::to_string(type) + "/" + std::to_string(piece);
     return Draw(base + ".png", left, bottom, w, h) || Draw(base + ".dds", left, bottom, w, h);
 }
+bool HasHdUiRaster(){return uiRasterDirty;}
 SDL_Surface *GetHdUiSurface(){return ui.get();}
 SDL_Surface *ComposeHdFrame(SDL_Surface *classic)
 {
-    SetGpuSpriteFrameReady(devilution::gbRunGame && HdCaptureActive && ready && GetRendererSwitch().usesHdRenderer());
+    SetGpuSpriteFrameReady((devilution::gbRunGame || standaloneUi) && HdCaptureActive && ready && GetRendererSwitch().usesHdRenderer());
+    if (standaloneUi) return classic;
     if (!devilution::gbRunGame || !HdCaptureActive || !ready || !GetRendererSwitch().usesHdRenderer()) return classic;
     static unsigned profileFrames=0;
     if(profileFrame&&++profileFrames%100==0)devilution::Log("HD_DRAW_PROFILE sprites={} gpu_prepare_us={} opaque_spans={} opaque_pixels={} blend_spans={} blend_pixels={}",drawProfile.sprites,drawProfile.gpuPrepareNs/1000,drawProfile.opaqueSpans,drawProfile.opaquePixels,drawProfile.blendSpans,drawProfile.blendPixels);
@@ -566,6 +593,8 @@ void ResetHdAssets()
     ResetGpuTerrainFrame();
     BeginGpuSpriteFrame();
     HdCaptureActive = false; inWorld = false; ready = false; suppressed = false;
+    standaloneUi = false; standalonePresented=true; ForgetGpuUiScene(); ResetGpuUiFrame();
+    uiRasterDirty=true;uiWasTerrain=false;
     assets.clear(); world.reset(); ui.reset(); composed.reset(); beforeUi.clear(); cursorBehind.clear(); cursorSaved = false;
     hudIndexed.reset(); hudRgba.reset(); hudValid = false;
 }

@@ -18,7 +18,10 @@ struct GpuSheet {
     ~GpuSheet();
 };
 struct GpuSpriteDraw {
-    std::shared_ptr<GpuSheet> sheet;
+    std::shared_ptr<GpuSheet> sheet, uiIndices;
+    bool ui = false, uiHd = false;
+    float uiX = 0, uiY = 0, uiScaleX = 1, uiScaleY = 1;
+    std::array<uint8_t, 256> uiTranslation {};
     GpuFrame frame;
     float x=0,y=0,w=0,h=0,alpha=1;
     int maskX=0,maskY=0,maskW=0,maskH=0;
@@ -29,6 +32,8 @@ void InitializeGpuSprites(SDL_GPUDevice *device);
 void DestroyGpuSprites();
 std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source);
 void ReleaseGpuPlayerSheets();
+bool CanDrawGpuUi();
+std::shared_ptr<GpuSheet> CreateGpuUiIndices(unsigned width, unsigned height, const uint8_t *rgba);
 GpuSpriteStats GetGpuSpriteStats();
 void BeginGpuSpriteFrame();
 void QueueGpuSprite(GpuSpriteDraw draw);

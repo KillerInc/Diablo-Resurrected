@@ -56,6 +56,7 @@
 #include "options.h"
 #include "reincarnated/hd_renderer.hpp"
 #include "reincarnated/gpu_terrain.hpp"
+#include "reincarnated/gpu_ui.hpp"
 #include "panels/charpanel.hpp"
 #include "panels/console.hpp"
 #include "panels/partypanel.hpp"
@@ -1947,15 +1948,18 @@ void DrawAndBlit()
 	const Rectangle &mainPanel = GetMainPanel();
 
 	bool persistentHud = false;
+    bool gpuUiHud = false;
 	bool hudNeedsRedraw = false;
 #ifdef USE_SDL3
-	persistentHud = reincarnated::GetRendererSwitch().usesHdRenderer();
+	persistentHud = reincarnated::GetRendererSwitch().usesHdRenderer() && !reincarnated::GpuUiEnabled();
+    gpuUiHud = reincarnated::GpuUiEnabled();
+    if (gpuUiHud) hudNeedsRedraw = !reincarnated::PrepareGpuUiHudLayer(mainPanel.position.x, mainPanel.position.y, mainPanel.size.width, mainPanel.size.height);
 	if (persistentHud) {
 		hudNeedsRedraw = !reincarnated::PrepareHdHudLayer(mainPanel.position.x, mainPanel.position.y,
 		    mainPanel.size.width, mainPanel.size.height);
 	}
 #endif
-	if ((!persistentHud && gnScreenWidth > mainPanel.size.width) || IsRedrawEverything() || hudNeedsRedraw) {
+	if ((!persistentHud && !gpuUiHud && gnScreenWidth > mainPanel.size.width) || IsRedrawEverything() || hudNeedsRedraw) {
 		drawHealth = true;
 		drawMana = true;
 		drawControlButtons = true;
@@ -1970,7 +1974,7 @@ void DrawAndBlit()
 	}
 	// Widescreen still presents the complete world, including beside the HUD;
 	// it no longer forces unchanged HUD components to be drawn again.
-	if (persistentHud && gnScreenWidth > mainPanel.size.width)
+	if ((persistentHud || gpuUiHud) && gnScreenWidth > mainPanel.size.width)
 		hgt = gnScreenHeight;
 
 	const Surface &out = GlobalBackBuffer();
@@ -1993,6 +1997,16 @@ void DrawAndBlit()
 #else
 	    out;
 #endif
+#ifdef USE_SDL3
+    if(gpuUiHud){
+        if(reincarnated::BeginGpuUiHudComponent(0,drawCtrlPan)){DrawMainPanel(out);reincarnated::EndGpuUiHudComponent(0);}
+        if(reincarnated::BeginGpuUiHudComponent(1,drawHealth)){DrawLifeFlaskLower(out,true);reincarnated::EndGpuUiHudComponent(1);}
+        if(reincarnated::BeginGpuUiHudComponent(2,drawMana)){DrawManaFlaskLower(out,true);DrawSpell(out);reincarnated::EndGpuUiHudComponent(2);}
+        if(reincarnated::BeginGpuUiHudComponent(3,drawControlButtons)){DrawMainPanelButtons(out);reincarnated::EndGpuUiHudComponent(3);}
+        if(reincarnated::BeginGpuUiHudComponent(4,drawBelt)){DrawInvBelt(out);reincarnated::EndGpuUiHudComponent(4);}
+    } else
+#endif
+    {
 	if (drawCtrlPan) {
 		DrawMainPanel(hudOut);
 	}
@@ -2010,7 +2024,10 @@ void DrawAndBlit()
 	if (drawBelt) {
 		DrawInvBelt(hudOut);
 	}
+    }
+
 #ifdef USE_SDL3
+	if (gpuUiHud) DrawInfoBox(out);
 	if (persistentHud) {
 		reincarnated::CommitHdHudLayer(drawCtrlPan || drawHealth || drawMana || drawControlButtons || drawBelt);
 		// Text and transient overlays stay above the retained HUD background.

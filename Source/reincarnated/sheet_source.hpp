@@ -12,14 +12,15 @@ inline constexpr uint32_t SheetHeaderMagic = 0x31534844;
 struct SheetSource {
     std::string path;
     unsigned columns, rows, width;
+    bool pcx = false;
 };
 #ifdef USE_SDL3
 devilution::OwnedClxSpriteListOrSheet AnnotateSheetSource(
-    devilution::OwnedClxSpriteListOrSheet data, const char *path);
+    devilution::OwnedClxSpriteListOrSheet data, const char *path, bool pcx = false);
 const SheetSource *GetSheetSource(devilution::ClxSprite sprite);
 void ApplySheetTranslation(devilution::ClxSprite sprite, const uint8_t *translation);
 #else
-inline devilution::OwnedClxSpriteListOrSheet AnnotateSheetSource(devilution::OwnedClxSpriteListOrSheet data, const char *) { return data; }
+inline devilution::OwnedClxSpriteListOrSheet AnnotateSheetSource(devilution::OwnedClxSpriteListOrSheet data, const char *, bool = false) { return data; }
 inline const SheetSource *GetSheetSource(devilution::ClxSprite) { return nullptr; }
 inline void ApplySheetTranslation(devilution::ClxSprite, const uint8_t *) {}
 #endif

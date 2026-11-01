@@ -1,5 +1,6 @@
 #include "gpu_presenter.hpp"
 #include "gpu_sprites.hpp"
+#include "gpu_ui.hpp"
 #include "gpu_terrain.hpp"
 #include "cpu_profile.hpp"
 #ifdef USE_SDL3
@@ -130,7 +131,7 @@ void PresentGpuFrame(SDL_Surface *surface)
     int readbackPitch=0;
     static unsigned captureFrame = 0;
     const char *captureDirectory = SDL_getenv("D1R_FRAME_DUMP");
-    const bool capture = captureDirectory && devilution::gbRunGame && (++captureFrame % 100 == 50);
+    const bool capture = captureDirectory && (devilution::gbRunGame || SDL_getenv("D1R_FRAME_DUMP_UI")) && (++captureFrame % 100 == 50);
     if (swapchain) {
         if(!indexed){
         auto *copy = SDL_BeginGPUCopyPass(cmd);
@@ -160,6 +161,8 @@ void PresentGpuFrame(SDL_Surface *surface)
             { CpuStageScope profile(CpuStage::SpriteCommands);
               RenderGpuTerrain(cmd,scene,GetHdUiSurface(),surface,frameWidth,frameHeight,sceneWidth,sceneHeight);
               RenderGpuSprites(cmd,scene,frameWidth,frameHeight,sceneWidth,sceneHeight); }
+            static unsigned uiProfileFrames=0;
+            if(SDL_getenv("D1R_PROFILE_HD")&&++uiProfileFrames%100==0){const auto stats=GetGpuUiStats();devilution::Log("GPU_UI draws={} hd_draws={} native_uploads={} cached_textures={} index_texture_bytes={}",stats.draws,stats.hdDraws,stats.uploads,stats.textures,stats.bytes);}
             display=scene;displayW=sceneWidth;displayH=sceneHeight;
         }
         if(capture) {
@@ -197,6 +200,7 @@ void PresentGpuFrame(SDL_Surface *surface)
         SDL_ReleaseGPUFence(device, fence);
         SDL_ReleaseGPUTransferBuffer(device, readback);
     } else if (!SDL_SubmitGPUCommandBuffer(cmd)) devilution::ErrSdl();
+    MarkHdUiPresented();
 }
 }
 #endif

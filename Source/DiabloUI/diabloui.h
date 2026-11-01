@@ -120,8 +120,8 @@ void UiInitList_clear();
 void UiClearScreen();
 void UiPollAndRender(std::optional<tl::function_ref<bool(SDL_Event &)>> eventHandler = std::nullopt);
 void UiRenderItem(const UiItemBase &item);
-void UiRenderItems(const std::vector<UiItemBase *> &items);
-void UiRenderItems(const std::vector<std::unique_ptr<UiItemBase>> &items);
+void UiRenderItems(const std::vector<UiItemBase *> &items, bool beginFrame = true);
+void UiRenderItems(const std::vector<std::unique_ptr<UiItemBase>> &items, bool beginFrame = true);
 ClxSprite UiGetHeroDialogSprite(size_t heroClassIndex);
 
 void mainmenu_restart_repintro();

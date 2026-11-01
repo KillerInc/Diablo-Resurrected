@@ -1,3 +1,7 @@
+#ifdef USE_SDL3
+#include "reincarnated/hd_renderer.hpp"
+#include "game_mode.hpp"
+#endif
 #include "DiabloUI/diabloui.h"
 
 #include <algorithm>
@@ -411,6 +415,9 @@ bool HandleMenuAction(MenuAction menuAction)
 
 void UiOnBackgroundChange()
 {
+#ifdef USE_SDL3
+    reincarnated::BeginHdUiFrame(true);
+#endif
 	StartUiFadeIn();
 
 	if (IsHardwareCursorEnabled() && ArtCursor && ControlDevice == ControlTypes::KeyboardAndMouse && GetCurrentCursorInfo().type() != CursorType::UserInterface) {
@@ -1143,14 +1150,20 @@ void UiRenderItem(const UiItemBase &item)
 	}
 }
 
-void UiRenderItems(const std::vector<UiItemBase *> &items)
+void UiRenderItems(const std::vector<UiItemBase *> &items, bool beginFrame)
 {
+#ifdef USE_SDL3
+    if (!gbRunGame && beginFrame) reincarnated::BeginHdUiFrame();
+#endif
 	for (const UiItemBase *item : items)
 		UiRenderItem(*item);
 }
 
-void UiRenderItems(const std::vector<std::unique_ptr<UiItemBase>> &items)
+void UiRenderItems(const std::vector<std::unique_ptr<UiItemBase>> &items, bool beginFrame)
 {
+#ifdef USE_SDL3
+    if (!gbRunGame && beginFrame) reincarnated::BeginHdUiFrame();
+#endif
 	for (const std::unique_ptr<UiItemBase> &item : items)
 		UiRenderItem(*item);
 }
