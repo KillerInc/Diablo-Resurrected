@@ -29,6 +29,12 @@ int main(){
  auto monsterFolder=root/"hd/monsters/test";std::filesystem::create_directories(monsterFolder);
  std::filesystem::copy_file(folder/"test.p0.bc7",monsterFolder/"test.p0.bc7");
  {std::ofstream f(root/"hd/sprites.gpus",std::ios::app);f<<"SHEET monsters/test/test.png 1 1 * * * *\ntest.p0.bc7 8 8\n0 0 0 8 8 0 0\n";}
+ for(const auto *name:{"authored-off","authored-on","authored-bad"}){
+  auto npc=root/"hd/towners"/name;std::filesystem::create_directories(npc);
+  std::filesystem::copy_file(folder/"test.p0.bc7",npc/"test.p0.bc7");
+  {std::ofstream f(root/"hd/sprites.gpus",std::ios::app);f<<"SHEET towners/"<<name<<"/test.png 2 1 * * * *\ntest.p0.bc7 8 8\n0 0 0 8 8 0 0\n0 0 0 8 8 0 0\n";}
+  {std::ofstream f(root/"hd/layouts.csv",std::ios::app);f<<"towners/"<<name<<"/test.png,D1R_SHEET_V1 4 1 2\n";}
+ }
  // The current-directory pack must retain precedence over pref overrides,
  // even when the data directory aliases the current directory.
  auto pref=root/"pref-override";std::filesystem::create_directories(pref/"hd");
@@ -97,6 +103,12 @@ int main(){
  for(const auto &entry:std::filesystem::directory_iterator(root))if(entry.path().extension()==".png")image=IMG_Load(entry.path().string().c_str());
  Check(image,"native world colour readback");expect(20,20,10,20,30);expect(36,20,5,110,15);expect(36,36,5,10,115);
  SDL_DestroySurface(image);image=nullptr;BeginGpuSpriteFrame();nativeTexture.reset();
+ Check(!LoadGpuSheet(SheetSource{"hd/towners/authored-off/test.png",1,1,2}),"native NPC rejects mismatched frame count by default");
+ Check(SDL_SetEnvironmentVariable(SDL_GetEnvironment(),"D1R_TEST_AUTHORED_TOWNERS","1",true),"authored NPC review flag");
+ Check(!LoadGpuSheet(SheetSource{"hd/towners/authored-bad/test.png",1,1,2}),"authored NPC also rejects non-native frame count");
+ auto authored=LoadGpuSheet(SheetSource{"hd/towners/authored-on/test.png",1,2,2});
+ Check(authored&&authored->testAuthoredTowner&&authored->rows==2,"opt-in authored NPC frames and layout");
+ authored.reset();
  SDL_DestroySurface(surface);
  // Drop every reference before releasing the GPU device.
  BeginGpuSpriteFrame();sheet.reset();playerSheet.reset();ReleaseGpuPlayerSheets();Check(GetGpuSpriteStats().sheets==0,"class release");
