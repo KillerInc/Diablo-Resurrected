@@ -131,9 +131,6 @@ void Queue(const devilution::Surface &out, std::shared_ptr<GpuSheet> native, con
 		d.maskW = std::min(right, int(std::ceil(x + w))) - d.maskX;
 		d.maskH = std::min(bottom, int(std::ceil(y + h))) - d.maskY;
 		if (d.maskW <= 0 || d.maskH <= 0) return;
-		d.coverage.assign(size_t(d.maskW) * d.maskH * 4, 0);
-		for (size_t i = 3; i < d.coverage.size(); i += 4)
-			d.coverage[i] = 255;
 		Palette(d, source, trn, outline);
 		QueueGpuSprite(std::move(d));
 		++uiDraws;
@@ -231,9 +228,6 @@ bool DrawGpuUiRect(const devilution::Surface &out, int x, int y, int w, int h, u
 	draw.uiY = draw.y;
 	draw.uiScaleX = 1 / draw.w;
 	draw.uiScaleY = 1 / draw.h;
-	draw.coverage.assign(size_t(draw.maskW) * draw.maskH * 4, 0);
-	for (size_t i = 3; i < draw.coverage.size(); i += 4)
-		draw.coverage[i] = 255;
 	Palette(draw, nullptr, nullptr, color);
 	QueueGpuSprite(std::move(draw));
 	++uiDraws;

@@ -2,6 +2,7 @@
 #include "controls/control_mode.hpp"
 #include "engine/palette.h"
 #include "engine/render/clx_render.hpp"
+#include "engine/render/primitive_render.hpp"
 #include "game_mode.hpp"
 #include "reincarnated/gpu_presenter.hpp"
 #include "reincarnated/gpu_sprites.hpp"
@@ -141,6 +142,13 @@ int main()
 		tint[i] = uint8_t(i);
 	tint[1] = 4;
 	Check(TranslateGpuUiRect(Surface(pal), { 50, 50, 6, 6 }, tint.data()), "GPU inventory-style palette tint");
+	// Cursor writes can materialize an implicit mask; restoration must return
+	// it to identity rather than leaving a stale hole in the retained UI.
+	SaveGpuSpriteCursor();
+	MaskGpuSpritePixel(215, 15, 0, 0, 0, 255);
+	RestoreGpuSpriteCursor();
+	MaskGpuSpritePixel(230, 40, 0, 0, 0, 255);
+	MaskGpuSpritePixel(240, 40, 0, 0, 200, 128);
 	SaveGpuUiScene();
 	DrawGpuUiRect(Surface(pal), 14, 14, 4, 4, 3);
 	RestoreGpuUiScene();
@@ -159,6 +167,8 @@ int main()
 	expect(145, 15, 0, 0, 200);
 	expect(215, 15, 120, 60, 20);
 	expect(215, 25, 0, 200, 0);
+	expect(230, 40, 10, 20, 30);
+	expect(240, 40, 0, 100, 100);
 	expect(345, 15, 0, 0, 200);
 	expect(345, 25, 200, 200, 0);
 	expect(199, 70, 0, 0, 200);
@@ -190,6 +200,10 @@ int main()
 	expect(345, 25, 100, 100, 0);
 	expect(31, 21, 0, 0, 100);
 	Check(GetGpuUiStats().uploads == uploads, "warm UI texture retention");
+	const auto warmControlBytes = GetGpuSpriteStats().controlBytes;
+	for (int i = 0; i < 20; ++i) PresentGpuFrame(surface);
+	if (!SDL_getenv("D1R_GPU_UI_CONTROLS"))
+		Check(GetGpuSpriteStats().controlBytes == warmControlBytes, "unchanged UI needs no control uploads");
 	SDL_DestroySurface(read);
 	SDL_SetPaletteColors(Palette.get(), colors.data(), 0, 256);
 	for (auto &entry : std::filesystem::directory_iterator(root))
@@ -236,6 +250,22 @@ int main()
 	expect(181, 141, 120, 60, 20);
 	expect(191, 141, 0, 0, 200);
 	SDL_DestroySurface(read);
+	// A retained loading backdrop must remain beneath each new bar width.
+	for (int width : { 10, 30 }) {
+		for (auto &entry : std::filesystem::directory_iterator(root))
+			if (entry.path().extension() == ".png") std::filesystem::remove(entry.path());
+		BeginHdUiFrame(true);
+		FillRect(Surface(pal), 10, 150, 50, 10, 1);
+		SaveGpuUiScene();
+		RestoreGpuUiScene();
+		FillRect(Surface(pal), 10, 150, width, 10, 2);
+		surface = ComposeHdFrame(base);
+		for (int i = 0; i < 100; ++i) PresentGpuFrame(surface);
+		read = image(); Check(read, "loading bar readback");
+		expect(10 + width - 1, 154, 0, 200, 0);
+		expect(10 + width, 154, 120, 60, 20);
+		SDL_DestroySurface(read);
+	}
 	GetRendererSwitch().setMode(RenderMode::Classic);
 	BeginHdUiFrame();
 	Check(!GpuUiPhase(), "Classic UI fallback");

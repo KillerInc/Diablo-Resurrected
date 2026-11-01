@@ -38,19 +38,27 @@ std::vector<UiUpload> pendingUiUploads;
 constexpr unsigned CoverageTileShift=5, CoverageTileSize=1U<<CoverageTileShift;
 unsigned coverageWidth=0,coverageHeight=0,coverageColumns=0;
 std::vector<std::vector<size_t>> coverageTiles;
-struct ControlSlot { SDL_GPUTexture *mask=nullptr,*light=nullptr,*palette=nullptr;unsigned w=0,h=0;std::vector<unsigned char> paletteBytes; };
+struct ControlSlot { SDL_GPUTexture *mask=nullptr,*light=nullptr,*palette=nullptr;unsigned w=0,h=0;std::vector<unsigned char> paletteBytes, maskBytes;unsigned maskW=0,maskH=0; };
 std::vector<ControlSlot> controls;
 bool ready=false;
 size_t cursorDrawCount=0;
+bool cursorSnapshot=false;
 std::array<std::vector<GpuSpriteDraw>,5> uiHud;
 std::array<bool,5> uiHudValid{};
 std::array<size_t,5> uiHudStart{};
 SDL_Rect uiHudRect{};
-uint64_t uploads=0,drawCount=0,renderPasses=0,paletteUploads=0,controlBytes=0;
+uint64_t uploads=0,drawCount=0,renderPasses=0,paletteUploads=0,controlBytes=0,maskUploads=0,implicitUiDraws=0;
 SDL_GPUTexture *Texture(unsigned w,unsigned h,SDL_GPUTextureFormat format) {
     SDL_GPUTextureCreateInfo info{}; info.type=SDL_GPU_TEXTURETYPE_2D;info.format=format;
     info.usage=SDL_GPU_TEXTUREUSAGE_SAMPLER;info.width=w;info.height=h;info.layer_count_or_depth=1;info.num_levels=1;
     return SDL_CreateGPUTexture(device,&info);
+}
+// An empty UI mask means identity coverage. Allocate only for actual raster
+// overlap; native occupancy and rectangular clipping remain in the UI shader.
+void EnsureCoverage(GpuSpriteDraw &draw) {
+    if(!draw.ui || !draw.coverage.empty())return;
+    draw.coverage.assign(size_t(draw.maskW)*draw.maskH*4,0);
+    for(size_t i=3;i<draw.coverage.size();i+=4)draw.coverage[i]=255;
 }
 // Rows are explicitly aligned for D3D12. Only a bounded page/mask is staged.
 bool Upload(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *texture,const unsigned char *data,unsigned w,unsigned h,unsigned bytesPerPixel,bool bc7=false) {
@@ -110,7 +118,7 @@ void InitializeGpuSprites(SDL_GPUDevice *target){
 #endif
 }
 void BeginGpuSpriteFrame(){
-    draws.clear();ready=false;
+    draws.clear();ready=false;cursorSnapshot=false;
     const unsigned w=unsigned(std::max<int64_t>(0,devilution::gnScreenWidth)),h=unsigned(std::max<int64_t>(0,devilution::gnScreenHeight));
     const unsigned columns=(w+CoverageTileSize-1)>>CoverageTileShift,rows=(h+CoverageTileSize-1)>>CoverageTileShift;
     if(w!=coverageWidth||h!=coverageHeight){coverageTiles.clear();coverageTiles.resize(size_t(columns)*rows);coverageWidth=w;coverageHeight=h;coverageColumns=columns;}
@@ -186,7 +194,7 @@ void MaskGpuSpritePixel(int x,int y,unsigned char r,unsigned char g,unsigned cha
     const auto &tile=coverageTiles[size_t(unsigned(y)>>CoverageTileShift)*coverageColumns+(unsigned(x)>>CoverageTileShift)];
     for(const size_t index:tile){auto &draw=draws[index];const int dx=x-draw.maskX,dy=y-draw.maskY;
         if(dx<0||dy<0||dx>=draw.maskW||dy>=draw.maskH)continue;
-        auto *p=draw.coverage.data()+(size_t(dy)*draw.maskW+dx)*4;ApplyGpuCoverage(p,r,g,b,alpha);
+        EnsureCoverage(draw);auto *p=draw.coverage.data()+(size_t(dy)*draw.maskW+dx)*4;ApplyGpuCoverage(p,r,g,b,alpha);
     }
 }
 void MaskGpuSpriteOpaqueSpan(int x,int y,unsigned length){
@@ -200,7 +208,7 @@ void MaskGpuSpriteOpaqueSpan(int x,int y,unsigned length){
             if(dy<0||dy>=draw.maskH)continue;
             const int64_t begin=std::max<int64_t>(cellLeft,draw.maskX),finish=std::min<int64_t>(cellRight,int64_t(draw.maskX)+draw.maskW);
             if(begin>=finish)continue;
-            auto *pixels=draw.coverage.data()+(size_t(dy)*draw.maskW+size_t(begin-draw.maskX))*4;
+            EnsureCoverage(draw);auto *pixels=draw.coverage.data()+(size_t(dy)*draw.maskW+size_t(begin-draw.maskX))*4;
             // Fully occluded pixels stay discarded through subsequent blends.
             std::memset(pixels,0,size_t(finish-begin)*4);
         }
@@ -217,7 +225,7 @@ void MaskGpuSpriteBlendedSpan(int x,int y,const uint32_t *colors,unsigned length
             if(dy<0||dy>=draw.maskH)continue;
             const int64_t begin=std::max<int64_t>(cellLeft,draw.maskX),finish=std::min<int64_t>(cellRight,int64_t(draw.maskX)+draw.maskW);
             if(begin>=finish)continue;
-            auto *pixels=draw.coverage.data()+(size_t(dy)*draw.maskW+size_t(begin-draw.maskX))*4;
+            EnsureCoverage(draw);auto *pixels=draw.coverage.data()+(size_t(dy)*draw.maskW+size_t(begin-draw.maskX))*4;
             const auto *source=reinterpret_cast<const uint8_t*>(colors+size_t(begin-x));
             for(int64_t px=begin;px<finish;++px,pixels+=4,source+=4)
                 if(pixels[3])ApplyGpuCoverage(pixels,source[0],source[1],source[2],128);
@@ -238,16 +246,18 @@ bool TranslateGpuUiDraws(SDL_Rect rect,const uint8_t *trn){
     std::vector<GpuSpriteDraw> translated;
     for(auto &draw:draws){if(!draw.ui)continue;SDL_Rect bounds{draw.maskX,draw.maskY,draw.maskW,draw.maskH},area;
         if(!SDL_GetRectIntersection(&bounds,&rect,&area))continue;
-        auto copy=draw;copy.maskX=area.x;copy.maskY=area.y;copy.maskW=area.w;copy.maskH=area.h;copy.coverage.resize(size_t(area.w)*area.h*4);
-        for(int y=0;y<area.h;++y){auto *src=draw.coverage.data()+(size_t(y+area.y-draw.maskY)*draw.maskW+area.x-draw.maskX)*4;std::memcpy(copy.coverage.data()+size_t(y)*area.w*4,src,size_t(area.w)*4);std::memset(src,0,size_t(area.w)*4);}
+        auto copy=draw;copy.maskX=area.x;copy.maskY=area.y;copy.maskW=area.w;copy.maskH=area.h;if(!draw.coverage.empty())copy.coverage.resize(size_t(area.w)*area.h*4);
+        const bool identity=draw.coverage.empty();EnsureCoverage(draw);
+        for(int y=0;y<area.h;++y){auto *src=draw.coverage.data()+(size_t(y+area.y-draw.maskY)*draw.maskW+area.x-draw.maskX)*4;if(!identity)std::memcpy(copy.coverage.data()+size_t(y)*area.w*4,src,size_t(area.w)*4);std::memset(src,0,size_t(area.w)*4);}
         for(auto &index:copy.uiTranslation)index=trn[index];translated.push_back(std::move(copy));
     }
     for(auto &draw:translated)QueueGpuSprite(std::move(draw));return !translated.empty();
 }
-void SaveGpuSpriteCursor(){cursorDrawCount=draws.size();for(auto &d:draws)d.cursorCoverage=d.coverage;}
+void SaveGpuSpriteCursor(){cursorSnapshot=true;cursorDrawCount=draws.size();for(auto &d:draws)d.cursorCoverage=d.coverage;}
 void RestoreGpuSpriteCursor(){
+    if(!cursorSnapshot)return;
     if(draws.size()>cursorDrawCount){draws.resize(cursorDrawCount);for(auto &tile:coverageTiles)tile.erase(std::remove_if(tile.begin(),tile.end(),[](size_t i){return i>=cursorDrawCount;}),tile.end());}
-    for(auto &d:draws)if(d.cursorCoverage.size()==d.coverage.size())d.coverage=d.cursorCoverage;
+    for(auto &d:draws)d.coverage=d.cursorCoverage;
 }
 bool HasQueuedGpuSprites(){return !draws.empty();}
 bool GpuSpriteFrameReady(){return ready&&!draws.empty()&&pipeline;}
@@ -280,6 +290,8 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
     if(controls.size()<draws.size())controls.resize(draws.size());
     const char *batchSetting=SDL_getenv("D1R_GPU_ACTOR_BATCH");
     const bool batch=!batchSetting||std::strcmp(batchSetting,"0")!=0;
+    const char *uiControlsSetting=SDL_getenv("D1R_GPU_UI_CONTROLS");
+    const bool compactUi=!uiControlsSetting||std::strcmp(uiControlsSetting,"0")!=0;
     size_t slotIndex=0;
     auto worldDraw=std::find_if(draws.begin(),draws.end(),[](const GpuSpriteDraw &d){return !d.ui;});
     if(worldDraw!=draws.end())EnsureGpuPalette(cmd,worldDraw->palette.data());
@@ -292,15 +304,24 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
     for(const auto &upload:pendingUiUploads)jobs.push_back({upload.sheet->pages[0].texture,upload.bytes.data(),upload.sheet->width,upload.sheet->height,4});
     for(auto &draw:draws){
         if(draw.ui)for(unsigned i=0;i<256;++i)std::memcpy(draw.palette.data()+(256+i)*4,&devilution::Palette->colors[draw.uiTranslation[i]],4);
+        if(draw.ui&&!compactUi)EnsureCoverage(draw);
+        const bool implicit=draw.ui&&draw.coverage.empty();
         auto &slot=controls[slotIndex++];
-        if(slot.w<unsigned(draw.maskW)||slot.h<unsigned(draw.maskH)){
+        if(!implicit&&(slot.w<unsigned(draw.maskW)||slot.h<unsigned(draw.maskH))){
+            slot.maskBytes.clear();
             if(slot.mask)SDL_ReleaseGPUTexture(device,slot.mask);if(slot.light)SDL_ReleaseGPUTexture(device,slot.light);
             slot.w=std::max(slot.w,(unsigned(draw.maskW)+63)&~63U);slot.h=std::max(slot.h,(unsigned(draw.maskH)+63)&~63U);
             slot.mask=Texture(slot.w,slot.h,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);slot.light=Texture(slot.w,slot.h,SDL_GPU_TEXTUREFORMAT_R8_UNORM);
         }
         if(!slot.palette)slot.palette=Texture(256,17,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM);
-        if(!slot.mask||!slot.light||!slot.palette)devilution::ErrSdl();
-        jobs.push_back({slot.mask,draw.coverage.data(),unsigned(draw.maskW),unsigned(draw.maskH),4});
+        if((!implicit&&(!slot.mask||!slot.light))||!slot.palette)devilution::ErrSdl();
+        if(!implicit){
+            if(!draw.ui||!compactUi||slot.maskW!=unsigned(draw.maskW)||slot.maskH!=unsigned(draw.maskH)||slot.maskBytes!=draw.coverage){
+                jobs.push_back({slot.mask,draw.coverage.data(),unsigned(draw.maskW),unsigned(draw.maskH),4});++maskUploads;
+                if(draw.ui&&compactUi){slot.maskBytes=draw.coverage;slot.maskW=draw.maskW;slot.maskH=draw.maskH;}
+                else slot.maskBytes.clear();
+            }
+        }else ++implicitUiDraws;
         if(!draw.ui)jobs.push_back({slot.light,draw.lighting.data(),unsigned(draw.maskW),unsigned(draw.maskH),1});
         // Compare bytes rather than identities: palette cycling and mutable TRNs
         // must invalidate even when the originating pointer stays unchanged.
@@ -310,7 +331,7 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
         }
     }
     unsigned total=0;for(auto &job:jobs){job.offset=total;total+=((job.w*job.bytes+255)&~255U)*job.h;}
-    {
+    if(total){
         const std::lock_guard<std::mutex> stageLock(stagingMutex);
         if(!staging||stagingCapacity<total){if(staging)SDL_ReleaseGPUTransferBuffer(device,staging);
             SDL_GPUTransferBufferCreateInfo info{};info.usage=SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;info.size=std::bit_ceil(std::max(65536U,total));
@@ -337,19 +358,19 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
         if(!batch){pass=beginPass();boundPipeline=pipeline;}
         auto *desiredPipeline=draw.ui?uiPipeline:pipeline;
         if(boundPipeline!=desiredPipeline){SDL_BindGPUGraphicsPipeline(pass,desiredPipeline);boundPipeline=desiredPipeline;}
-        if(draw.ui)light=draw.uiIndices->pages[0].texture;
+        if(draw.ui){light=draw.uiIndices->pages[0].texture;if(draw.coverage.empty())mask=light;}
         const auto &page=draw.sheet->pages[draw.frame.page];
         SDL_GPUTextureSamplerBinding bindings[4]={{page.texture,sampler},{mask,sampler},{light,sampler},{pal,sampler}};SDL_BindGPUFragmentSamplers(pass,0,bindings,4);
         if(!draw.ui)SDL_BindGPUFragmentStorageBuffers(pass,0,&nearestBuffer,1);
         const float vertex[12]={draw.x,draw.y,draw.w,draw.h,float(draw.frame.x)/page.width,float(draw.frame.y)/page.height,float(draw.frame.w)/page.width,float(draw.frame.h)/page.height,float(logicalW),float(logicalH),0,0};
-        const float fragment[12]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,draw.uiHd?1.0f:0.0f,draw.uiScaleX,draw.uiScaleY,draw.uiX,draw.uiY,draw.uiIndices?float(draw.uiIndices->width):0,draw.uiIndices?float(draw.uiIndices->height):0};
+        const float fragment[16]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,draw.uiHd?1.0f:0.0f,draw.uiScaleX,draw.uiScaleY,draw.uiX,draw.uiY,draw.uiIndices?float(draw.uiIndices->width):0,draw.uiIndices?float(draw.uiIndices->height):0,draw.ui&&draw.coverage.empty()?1.0f:0.0f,0,0,0};
         SDL_PushGPUVertexUniformData(cmd,0,vertex,sizeof(vertex));SDL_PushGPUFragmentUniformData(cmd,0,fragment,sizeof(fragment));
         SDL_DrawGPUPrimitives(pass,6,1,0,0);if(!batch)SDL_EndGPURenderPass(pass);++drawCount;
 
     }
     if(batch)SDL_EndGPURenderPass(pass);
     static unsigned profileFrames=0;
-    if(SDL_getenv("D1R_PROFILE_HD")&&++profileFrames%100==0)devilution::Log("GPU_ACTOR_BATCH enabled={} draws={} render_passes={} palette_uploads={} control_bytes={}",batch,drawCount,renderPasses,paletteUploads,controlBytes);
+    if(SDL_getenv("D1R_PROFILE_HD")&&++profileFrames%100==0)devilution::Log("GPU_ACTOR_BATCH enabled={} draws={} render_passes={} palette_uploads={} control_bytes={} mask_uploads={} implicit_ui_draws={}",batch,drawCount,renderPasses,paletteUploads,controlBytes,maskUploads,implicitUiDraws);
 }
 }
 #endif

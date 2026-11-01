@@ -238,7 +238,7 @@ void FreeCutsceneBackground()
 void DrawCutsceneBackground()
 {
 #ifdef USE_SDL3
-    reincarnated::BeginHdUiFrame();
+    reincarnated::BeginHdUiFrame(true);
 #endif
 	const Rectangle &uiRectangle = GetUIRectangle();
 	const Surface &out = GlobalBackBuffer();
@@ -278,7 +278,14 @@ void DrawCutsceneForeground()
 	    out.region.y + BarPos[progress_id][1] + uiRectangle.position.y,
 	    progress,
 	    ProgressHeight);
-	SDL_FillSurfaceRect(out.surface, &rect, BarColor[progress_id]);
+	// Queue above the retained HD background; direct surface fills are hidden
+	// beneath GPU UI commands. FillRect keeps the native path for Classic.
+	FillRect(out, rect.x - out.region.x, rect.y - out.region.y,
+	    rect.w, rect.h, BarColor[progress_id]);
+#ifdef USE_SDL3
+    if (SDL_getenv("D1R_TRACE_LOADING"))
+        Log("LOADING_BAR pixels={} gpu_ui={}", progress, reincarnated::GpuUiPhase());
+#endif
 
 	if (DiabloUiSurface() == PalSurface)
 		BltFast(&rect, &rect);
