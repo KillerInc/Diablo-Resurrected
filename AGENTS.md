@@ -1,5 +1,7 @@
 # Project working agreement
 
+- All in-game animation replacements must preserve vanilla frame counts, frame order, frame delays and gameplay/action timing, including hit frames. Resample longer source animations into the existing frames. Do not increase frame counts or introduce an independent animation clock for HD replacements.
+
 - GitHub is the durable record of this project. Keep completed source changes, tests, build configuration and validation documentation committed and pushed to the working branch. Report the remote commit rather than leaving the only copy in a local working tree.
 - Local source checkouts and build files are temporary tools for implementation and testing. Do not install source into the game directory or keep extra source copies as deliverables. Keep a checkout only while it is needed for active work or validation.
 - The installed graphics sheets are user-supplied reference/test inputs. Never commit or upload them. Do not include screenshots/captures containing that artwork, extracted original game data or saves in repository commits or public build artifacts. Synthetic test fixtures and the repository's existing open-source engine assets remain suitable for version control.
