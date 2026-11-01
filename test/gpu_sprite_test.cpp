@@ -78,6 +78,8 @@ int main(){
   SDL_DestroySurface(image);image=nullptr;
  }
  Check(GetGpuSpriteStats().draws==300,"GPU lighting and translation draws");
+ Check(GetGpuSpriteStats().renderPasses==250,"one ordered actor pass per frame");
+ Check(GetGpuSpriteStats().paletteUploads==4,"retain palettes and invalidate lighting/TRN changes");
  SDL_DestroySurface(image);SDL_DestroySurface(surface);
  // Drop every reference before releasing the GPU device.
  BeginGpuSpriteFrame();sheet.reset();playerSheet.reset();ReleaseGpuPlayerSheets();Check(GetGpuSpriteStats().sheets==0,"class release");

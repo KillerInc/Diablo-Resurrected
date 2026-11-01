@@ -24,7 +24,7 @@ struct GpuSpriteDraw {
     int maskX=0,maskY=0,maskW=0,maskH=0;
     std::vector<unsigned char> coverage,lighting,palette,cursorCoverage;
 };
-struct GpuSpriteStats { size_t sheets=0,playerSheets=0,bytes=0,cpuMaskBytes=0; uint64_t uploads=0,draws=0; };
+struct GpuSpriteStats { size_t sheets=0,playerSheets=0,bytes=0,cpuMaskBytes=0; uint64_t uploads=0,draws=0,renderPasses=0,paletteUploads=0,controlBytes=0; };
 void InitializeGpuSprites(SDL_GPUDevice *device);
 void DestroyGpuSprites();
 std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source);

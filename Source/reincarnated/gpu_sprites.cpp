@@ -33,10 +33,10 @@ std::vector<GpuSpriteDraw> draws;
 constexpr unsigned CoverageTileShift=5, CoverageTileSize=1U<<CoverageTileShift;
 unsigned coverageWidth=0,coverageHeight=0,coverageColumns=0;
 std::vector<std::vector<size_t>> coverageTiles;
-struct ControlSlot { SDL_GPUTexture *mask=nullptr,*light=nullptr,*palette=nullptr;unsigned w=0,h=0; };
+struct ControlSlot { SDL_GPUTexture *mask=nullptr,*light=nullptr,*palette=nullptr;unsigned w=0,h=0;std::vector<unsigned char> paletteBytes; };
 std::vector<ControlSlot> controls;
 bool ready=false;
-uint64_t uploads=0,drawCount=0;
+uint64_t uploads=0,drawCount=0,renderPasses=0,paletteUploads=0,controlBytes=0;
 SDL_GPUTexture *Texture(unsigned w,unsigned h,SDL_GPUTextureFormat format) {
     SDL_GPUTextureCreateInfo info{}; info.type=SDL_GPU_TEXTURETYPE_2D;info.format=format;
     info.usage=SDL_GPU_TEXTUREUSAGE_SAMPLER;info.width=w;info.height=h;info.layer_count_or_depth=1;info.num_levels=1;
@@ -148,7 +148,7 @@ std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source){
     devilution::Log("GPU_SHEET_RESIDENT source={} pages={} bytes={} density=4 cpu_rgba_bytes=0",source.path,pages,sheet->bytes);
     return sheet;
 }
-GpuSpriteStats GetGpuSpriteStats(){const std::lock_guard<std::mutex> lock(cacheMutex);GpuSpriteStats s;for(const auto &entry:sheets)if(entry.second){++s.sheets;if(entry.first.starts_with("hd/plrgfx/"))++s.playerSheets;s.bytes+=entry.second->bytes;}s.uploads=uploads;s.draws=drawCount;return s;}
+GpuSpriteStats GetGpuSpriteStats(){const std::lock_guard<std::mutex> lock(cacheMutex);GpuSpriteStats s;for(const auto &entry:sheets)if(entry.second){++s.sheets;if(entry.first.starts_with("hd/plrgfx/"))++s.playerSheets;s.bytes+=entry.second->bytes;}s.uploads=uploads;s.draws=drawCount;s.renderPasses=renderPasses;s.paletteUploads=paletteUploads;s.controlBytes=controlBytes;return s;}
 void QueueGpuSprite(GpuSpriteDraw draw){
     const size_t index=draws.size();draws.push_back(std::move(draw));const auto &queued=draws.back();
     const int left=std::max(0,queued.maskX),top=std::max(0,queued.maskY);
@@ -233,6 +233,8 @@ void WarmGpuSpritePalette(const SDL_Color *palette) {
 void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logicalW,int logicalH,int pixelW,int pixelH){
     if(!GpuSpriteFrameReady())return;
     if(controls.size()<draws.size())controls.resize(draws.size());
+    const char *batchSetting=SDL_getenv("D1R_GPU_ACTOR_BATCH");
+    const bool batch=!batchSetting||std::strcmp(batchSetting,"0")!=0;
     size_t slotIndex=0;
     EnsureGpuPalette(cmd,draws.front().palette.data());
     static bool reported=false;
@@ -252,7 +254,12 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
         if(!slot.mask||!slot.light||!slot.palette)devilution::ErrSdl();
         jobs.push_back({slot.mask,draw.coverage.data(),unsigned(draw.maskW),unsigned(draw.maskH),4});
         jobs.push_back({slot.light,draw.lighting.data(),unsigned(draw.maskW),unsigned(draw.maskH),1});
-        jobs.push_back({slot.palette,draw.palette.data(),256,17,4});
+        // Compare bytes rather than identities: palette cycling and mutable TRNs
+        // must invalidate even when the originating pointer stays unchanged.
+        if(!batch||slot.paletteBytes!=draw.palette){
+            jobs.push_back({slot.palette,draw.palette.data(),256,17,4});
+            slot.paletteBytes=draw.palette;++paletteUploads;
+        }
     }
     unsigned total=0;for(auto &job:jobs){job.offset=total;total+=((job.w*job.bytes+255)&~255U)*job.h;}
     {
@@ -267,20 +274,29 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
             SDL_GPUTextureRegion dst{};dst.texture=job.texture;dst.w=job.w;dst.h=job.h;dst.d=1;SDL_UploadToGPUTexture(copy,&src,&dst,true);}
         SDL_EndGPUCopyPass(copy);
     }
+    controlBytes+=total;
+    SDL_GPURenderPass *pass=nullptr;
+    const auto beginPass=[&](){
+        SDL_GPUColorTargetInfo color{};color.texture=target;color.load_op=SDL_GPU_LOADOP_LOAD;color.store_op=SDL_GPU_STOREOP_STORE;
+        auto *result=SDL_BeginGPURenderPass(cmd,&color,1,nullptr);SDL_BindGPUGraphicsPipeline(result,pipeline);
+        SDL_GPUViewport viewport{0,0,float(pixelW),float(pixelH),0,1};SDL_SetGPUViewport(result,&viewport);++renderPasses;return result;
+    };
+    if(batch)pass=beginPass();
     slotIndex=0;
     for(const auto &draw:draws){const auto &slot=controls[slotIndex++];auto *mask=slot.mask,*light=slot.light,*pal=slot.palette;
-        SDL_GPUColorTargetInfo color{};color.texture=target;color.load_op=SDL_GPU_LOADOP_LOAD;color.store_op=SDL_GPU_STOREOP_STORE;
-        auto *pass=SDL_BeginGPURenderPass(cmd,&color,1,nullptr);SDL_BindGPUGraphicsPipeline(pass,pipeline);
-        SDL_GPUViewport viewport{0,0,float(pixelW),float(pixelH),0,1};SDL_SetGPUViewport(pass,&viewport);
+        if(!batch)pass=beginPass();
         const auto &page=draw.sheet->pages[draw.frame.page];
         SDL_GPUTextureSamplerBinding bindings[4]={{page.texture,sampler},{mask,sampler},{light,sampler},{pal,sampler}};SDL_BindGPUFragmentSamplers(pass,0,bindings,4);
         SDL_BindGPUFragmentStorageBuffers(pass,0,&nearestBuffer,1);
         const float vertex[12]={draw.x,draw.y,draw.w,draw.h,float(draw.frame.x)/page.width,float(draw.frame.y)/page.height,float(draw.frame.w)/page.width,float(draw.frame.h)/page.height,float(logicalW),float(logicalH),0,0};
         const float fragment[8]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,0,0,0};
         SDL_PushGPUVertexUniformData(cmd,0,vertex,sizeof(vertex));SDL_PushGPUFragmentUniformData(cmd,0,fragment,sizeof(fragment));
-        SDL_DrawGPUPrimitives(pass,6,1,0,0);SDL_EndGPURenderPass(pass);++drawCount;
+        SDL_DrawGPUPrimitives(pass,6,1,0,0);if(!batch)SDL_EndGPURenderPass(pass);++drawCount;
 
     }
+    if(batch)SDL_EndGPURenderPass(pass);
+    static unsigned profileFrames=0;
+    if(SDL_getenv("D1R_PROFILE_HD")&&++profileFrames%100==0)devilution::Log("GPU_ACTOR_BATCH enabled={} draws={} render_passes={} palette_uploads={} control_bytes={}",batch,drawCount,renderPasses,paletteUploads,controlBytes);
 }
 }
 #endif
