@@ -6,9 +6,11 @@ namespace reincarnated {
 struct SheetLayout {
     unsigned density = 0;
     int anchorX = 0, anchorY = 0;
+    bool authored = false;
 };
-// Optional named-sheet sidecar, in original logical pixels:
+// Entry in the cached root layout table, in original logical pixels:
 // D1R_SHEET_V1 <source density> <horizontal center anchor> <bottom anchor>
+// D1R_AUTHORED_SHEET_V1 marks a custom towner silhouette with the same fields.
 bool ParseSheetLayout(const std::vector<uint8_t> &bytes, SheetLayout &layout);
 struct SheetImage {
     unsigned width = 0, height = 0, cellWidth = 0, cellHeight = 0, density = 0;

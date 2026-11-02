@@ -13,8 +13,8 @@ struct GpuSheet {
     SDL_GPUDevice *owner=nullptr;
     unsigned density=0,columns=0,rows=0,width=0,height=0;
     int anchorX=0,anchorY=0;
-    // Opt-in authored NPC review: use its own shape, retaining native CEL frames.
-    bool testAuthoredTowner=false;
+    // Explicit root-layout marker; retain the native CEL animation clock.
+    bool authoredTowner=false;
     size_t bytes=0;
     std::vector<GpuPage> pages;
     std::vector<GpuFrame> frames;

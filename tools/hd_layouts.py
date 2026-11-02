@@ -26,7 +26,7 @@ def validate_layout(value):
     if not value or len(value.encode('utf-8')) > 256 or any(ord(c) < 32 and c != '\t' for c in value):
         raise ValueError('Invalid layout metadata')
     fields = value.split()
-    if fields and fields[0] == 'D1R_SHEET_V1':
+    if fields and fields[0] in ('D1R_SHEET_V1', 'D1R_AUTHORED_SHEET_V1'):
         if len(fields) != 4:
             raise ValueError('Expected density and two anchors')
         density, x, y = map(int, fields[1:])

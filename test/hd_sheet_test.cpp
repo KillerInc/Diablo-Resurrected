@@ -169,6 +169,8 @@ int main(int argc, char **argv)
         Check(parse("D1R_SHEET_V1 2 2 3\n"));
         Check(DecodeSheetPng(png,*source,image,&canvas));
         Check(image.logicalWidth==4 && image.cellHeight/image.density==4 && image.anchorX==2 && image.anchorY==3);
+        Check(parse("D1R_AUTHORED_SHEET_V1 4 2 3") && canvas.authored);
+        Check(parse("D1R_SHEET_V1 4 2 3") && !canvas.authored);
         Check(!parse("D1R_SHEET_V1 3 2 3"));
         Check(!parse("D1R_SHEET_V1 2 -1 3"));
         Check(!parse("D1R_SHEET_V2 2 2 3"));

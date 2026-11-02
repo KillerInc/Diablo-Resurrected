@@ -478,7 +478,7 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         const double fullLeft=(double(x)+source->width/2-gpu->anchorX+out.region.x)*scale+offsetX;
         const double fullTop=(double(y)+1-gpu->anchorY+out.region.y)*scale;
         GpuSpriteDraw draw;draw.sheet=gpu;draw.frame=packed;
-        const bool nativeIndices=UsesNativeWorldIndices(*source)&&!gpu->testAuthoredTowner;
+        const bool nativeIndices=UsesNativeWorldIndices(*source)&&!gpu->authoredTowner;
         const auto *sourcePalette=nativeIndices?WorldSourcePalette():nullptr;
         if(nativeIndices){
             if(!sourcePalette)return false;
@@ -507,7 +507,7 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
             for(unsigned level=0;level<16;++level){const auto color=devilution::Palette->colors[lightmap?lightmap->adjustColor(mapped,level):mapped];
                 auto *row=draw.palette.data()+((level+1)*256+index)*4;row[0]=color.r;row[1]=color.g;row[2]=color.b;row[3]=255;}
         }
-        if((nativeIndices||gpu->testAuthoredTowner) && SDL_getenv("D1R_TRACE_WORLD_SHEETS")) {
+        if((nativeIndices||gpu->authoredTowner) && SDL_getenv("D1R_TRACE_WORLD_SHEETS")) {
             static std::unordered_map<std::string,bool> traced;
             if(traced.emplace(source->path,true).second)devilution::Log("HD_WORLD_DRAW source={} native_indices={} frames={}",source->path,nativeIndices?1:0,gpu->rows);
         }

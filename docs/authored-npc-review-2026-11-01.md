@@ -1,3 +1,6 @@
+> Superseded for normal installation by [0.4.20-pre](releases/0.4.20-pre.md).
+> The review switch below describes the earlier 0.4.19 trial.
+
 # Authored NPC review build, 0.4.19-pre
 
 `D1R_TEST_AUTHORED_TOWNERS=1` allows a compiled town NPC with an explicit

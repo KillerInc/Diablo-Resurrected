@@ -32,7 +32,8 @@ bool ParseSheetLayout(const std::vector<uint8_t> &bytes, SheetLayout &layout)
     std::string version;
     SheetLayout parsed;
     if (!(input >> version >> parsed.density >> parsed.anchorX >> parsed.anchorY)
-        || version != "D1R_SHEET_V1") return false;
+        || (version != "D1R_SHEET_V1" && version != "D1R_AUTHORED_SHEET_V1")) return false;
+    parsed.authored = version == "D1R_AUTHORED_SHEET_V1";
     input >> std::ws;
     if (!input.eof() || !(parsed.density == 1 || parsed.density == 2 || parsed.density == 4
         || parsed.density == 8 || parsed.density == 16)

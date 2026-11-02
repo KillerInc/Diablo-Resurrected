@@ -161,10 +161,14 @@ std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source){
     auto sheet=std::make_shared<GpuSheet>();sheet->owner=device;
     std::istringstream input(std::string(bytes.begin(),bytes.end()));std::string magic;unsigned pages=0;
     input>>magic>>sheet->density>>sheet->columns>>sheet->rows>>sheet->width>>sheet->height>>pages;
-    sheet->testAuthoredTowner=SDL_getenv("D1R_TEST_AUTHORED_TOWNERS")!=nullptr && source.path.starts_with("hd/towners/") && !layout.empty();
     if(!input||magic!="D1R_GPU_SHEET_V1"||sheet->density!=4||sheet->columns!=source.columns||sheet->rows!=source.rows||sheet->width<source.width||!sheet->height||!pages||uint64_t(pages)>uint64_t(sheet->columns)*sheet->rows)return {};
     sheet->anchorX=source.width/2;sheet->anchorY=sheet->height;
-    if(!layout.empty()){SheetLayout parsed;if(!ParseSheetLayout(layout,parsed))return {};sheet->anchorX=parsed.anchorX;sheet->anchorY=parsed.anchorY;}
+    if(!layout.empty()){
+        SheetLayout parsed;if(!ParseSheetLayout(layout,parsed))return {};
+        if(parsed.authored && !source.path.starts_with("hd/towners/"))return {};
+        sheet->authoredTowner=parsed.authored;
+        sheet->anchorX=parsed.anchorX;sheet->anchorY=parsed.anchorY;
+    }
     if(sheet->anchorX<0 || sheet->anchorY<0 || unsigned(sheet->anchorX)>sheet->width || unsigned(sheet->anchorY)>sheet->height || sheet->width>unsigned(INT32_MAX/8) || sheet->height>unsigned(INT32_MAX/8))return {};
     const auto parent=manifest.substr(0,manifest.find_last_of('/')+1);
     for(unsigned i=0;i<pages;++i){
