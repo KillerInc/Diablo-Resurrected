@@ -45,3 +45,5 @@
 - Since 0.4.21-pre, authored NPC hover outlines sample the current BC7 frame's alpha on the GPU. Preserve packed-frame bounds, one-logical-pixel width, palette selection colour, foreground coverage and cursor restoration. Alpha below 0.8 must not contribute, so the 70% projected shadows do not become selection silhouettes. Classic and unmarked assets retain native outlines.
 
 - Since 0.4.22-pre, hovered authored towners draw their sprite before their outline. Keep the edge above baked ground shadows, while retaining traversal order and later foreground occlusion.
+
+- NPC ground shadows must follow the player camera-relative sun (3,-4,6), independent of NPC facing/camera yaw. Use 70% opacity and the equivalent player blur (1 pixel at density 4); exclude alpha hair/face/effect planes. Rebuild shadows beneath approved bodies without recolouring, rescaling, moving anchors or changing native frames. Validate opaque body equality, full cell bounds and BC7 GPU loading. See docs/npc-shadow-policy.md.
