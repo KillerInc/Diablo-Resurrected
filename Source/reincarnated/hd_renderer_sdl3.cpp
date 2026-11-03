@@ -457,7 +457,7 @@ bool HasHdSheet(devilution::ClxSprite sprite)
 }
 
 bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite,
-    const uint8_t *translation, const devilution::Lightmap *lightmap, bool blend)
+    const uint8_t *translation, const devilution::Lightmap *lightmap, bool blend, int outline)
 {
     // Menu/cache renders can use the same sprite data; only replace writes to
     // the active world surface. Keep classic indexed pixels for game logic.
@@ -469,6 +469,8 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         if(traced.emplace(source->path,true).second)devilution::Log("HD_PLAYER_DRAW source={}",source->path);
     }
     if (auto gpu = devilution::ControlMode != devilution::ControlTypes::VirtualGamepad ? LoadGpuSheet(*source) : std::shared_ptr<GpuSheet>{}) {
+        // Unmodified art and Classic keep their native outline/occupancy rules.
+        if (outline >= 0 && !gpu->authoredTowner) return false;
         const uint64_t profileStarted=profileFrame?SDL_GetTicksNS():0;
         const auto *header=sprite.pixelData()-SheetHeaderSize;
         const unsigned group=devilution::LoadLE16(header+14), frame=devilution::LoadLE16(header+16);
@@ -488,6 +490,13 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
         }
         draw.x=fullLeft+double(packed.cropX)*scale/gpu->density;draw.y=fullTop+double(packed.cropY)*scale/gpu->density;
         draw.w=double(packed.w)*scale/gpu->density;draw.h=double(packed.h)*scale/gpu->density;draw.alpha=blend?0.5f:1.0f;
+        if (outline >= 0) {
+            draw.outlineRadius = gpu->density;
+            const auto color = devilution::Palette->colors[outline];
+            draw.outlineColor = { color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, 1.0f };
+            draw.x -= scale; draw.y -= scale;
+            draw.w += 2 * scale; draw.h += 2 * scale;
+        }
         draw.maskX=std::max({int(std::floor(draw.x)),clip.x,out.region.x*scale+offsetX,0});
         draw.maskY=std::max({int(std::floor(draw.y)),out.region.y*scale,0});
         const int right=std::min({int(std::ceil(draw.x+draw.w)),clip.x+clip.w,(out.region.x+out.w())*scale+offsetX,int(devilution::gnScreenWidth)});

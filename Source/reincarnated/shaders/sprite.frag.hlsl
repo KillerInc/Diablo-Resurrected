@@ -8,11 +8,32 @@ SamplerState pointSampler : register(s0, space2);
 SamplerState unused1 : register(s1, space2);
 SamplerState unused2 : register(s2, space2);
 SamplerState unused3 : register(s3, space2);
-cbuffer Mask : register(b0, space3) { float4 bounds; float4 options; float4 origin; };
+cbuffer Mask : register(b0, space3) {
+    float4 bounds; float4 options; float4 origin;
+    float4 effects; float4 outlineColor; float4 frameRect; float4 pageSize;
+};
+float silhouetteAlpha(int2 pixel) {
+    // Never sample the neighbouring packed frame, including at page edges.
+    if(any(pixel<int2(frameRect.xy))||any(pixel>=int2(frameRect.xy+frameRect.zw)))return 0;
+    return image.Load(int3(pixel,0)).a;
+}
 float4 main(float4 position:SV_Position,float2 uv:TEXCOORD0,float2 logical:TEXCOORD1):SV_Target0 {
     int2 xy=int2(floor(logical))-int2(bounds.xy);
     if(any(xy<0)||any(xy>=int2(bounds.zw))) discard;
     float4 overlay=coverage.Load(int3(xy,0)); if(overlay.a==0) discard;
+    if(effects.y>0){
+        int2 pixel=int2(floor(uv*pageSize.xy));
+        // Ground shadows are authored at 70% opacity; only the opaque actor
+        // silhouette contributes to selection, including antialiased edges.
+        if(silhouetteAlpha(pixel)>=0.8)discard;
+        bool edge=false;
+        [loop] for(int d=1;d<=int(effects.y);++d){
+            edge=edge||silhouetteAlpha(pixel+int2(d,0))>=0.8||silhouetteAlpha(pixel-int2(d,0))>=0.8
+                ||silhouetteAlpha(pixel+int2(0,d))>=0.8||silhouetteAlpha(pixel-int2(0,d))>=0.8;
+        }
+        if(!edge)discard;
+        return float4(saturate(outlineColor.rgb*overlay.a+overlay.rgb),outlineColor.a*options.x);
+    }
     float4 src=image.SampleLevel(pointSampler,uv,0); if(src.a==0) discard;
     uint3 sourceBytes=(uint3)round(src.rgb*255);
     float3 source=(float3)sourceBytes;

@@ -663,6 +663,7 @@ void ClxDrawBlendedWithLightmap(const Surface &out, Point position, ClxSprite cl
 void ClxDrawOutline(const Surface &out, uint8_t col, Point position, ClxSprite clx)
 {
 #ifdef USE_SDL3
+    if (reincarnated::DrawHdSheet(out, position.x, position.y, clx, nullptr, nullptr, false, col)) return;
     if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx, nullptr, false, col)) return;
 #endif
 	RenderClxOutline</*SkipColorIndexZero=*/false>(out, position, clx, col);
@@ -671,6 +672,7 @@ void ClxDrawOutline(const Surface &out, uint8_t col, Point position, ClxSprite c
 void ClxDrawOutlineSkipColorZero(const Surface &out, uint8_t col, Point position, ClxSprite clx)
 {
 #ifdef USE_SDL3
+    if (reincarnated::DrawHdSheet(out, position.x, position.y, clx, nullptr, nullptr, false, col)) return;
     if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx, nullptr, false, col, true)) return;
 #endif
 	RenderClxOutline</*SkipColorIndexZero=*/true>(out, position, clx, col);

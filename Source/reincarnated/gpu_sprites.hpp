@@ -28,6 +28,8 @@ struct GpuSpriteDraw {
     std::array<uint8_t, 256> uiTranslation {};
     GpuFrame frame;
     float x=0,y=0,w=0,h=0,alpha=1;
+    unsigned outlineRadius = 0;
+    std::array<float, 4> outlineColor {};
     int maskX=0,maskY=0,maskW=0,maskH=0;
     std::vector<unsigned char> coverage,lighting,palette,cursorCoverage;
 };

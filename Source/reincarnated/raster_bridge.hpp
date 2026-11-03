@@ -11,7 +11,7 @@ void MirrorBlend(const uint8_t *dst, unsigned length, const uint8_t *src,
     uint8_t color, const uint8_t *map = nullptr, const devilution::Lightmap *lightmap = nullptr);
 void SetHdCaptureSuppressed(bool value);
 bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite,
-    const uint8_t *translation = nullptr, const devilution::Lightmap *lightmap = nullptr, bool blend = false);
+    const uint8_t *translation = nullptr, const devilution::Lightmap *lightmap = nullptr, bool blend = false, int outline = -1);
 bool HasHdSheet(devilution::ClxSprite sprite);
 class ClassicSpriteScope {
     bool suppressed;

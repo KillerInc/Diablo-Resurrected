@@ -428,8 +428,9 @@ void RenderGpuSprites(SDL_GPUCommandBuffer *cmd,SDL_GPUTexture *target,int logic
         const auto &page=draw.sheet->pages[draw.frame.page];
         SDL_GPUTextureSamplerBinding bindings[5]={{page.texture,sampler},{mask,sampler},{light,sampler},{pal,sampler},{draw.uiIndices?draw.uiIndices->pages[0].texture:light,sampler}};SDL_BindGPUFragmentSamplers(pass,0,bindings,draw.panel?2:(draw.ui?4:5));
         if(!draw.ui)SDL_BindGPUFragmentStorageBuffers(pass,0,&nearestBuffer,1);
-        const float vertex[12]={draw.x,draw.y,draw.w,draw.h,float(draw.frame.x)/page.width,float(draw.frame.y)/page.height,float(draw.frame.w)/page.width,float(draw.frame.h)/page.height,float(logicalW),float(logicalH),0,0};
-        const float fragment[16]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,(draw.ui?draw.uiHd:bool(draw.uiIndices))?1.0f:0.0f,draw.uiScaleX,draw.uiScaleY,draw.uiX,draw.uiY,draw.uiIndices?float(draw.uiIndices->width):0,draw.uiIndices?float(draw.uiIndices->height):0,draw.ui&&draw.coverage.empty()?1.0f:0.0f,0,0,0};
+        const float radius = float(draw.outlineRadius);
+        const float vertex[12]={draw.x,draw.y,draw.w,draw.h,(float(draw.frame.x)-radius)/page.width,(float(draw.frame.y)-radius)/page.height,(float(draw.frame.w)+2*radius)/page.width,(float(draw.frame.h)+2*radius)/page.height,float(logicalW),float(logicalH),0,0};
+        const float fragment[28]={float(draw.maskX),float(draw.maskY),float(draw.maskW),float(draw.maskH),draw.alpha,(draw.ui?draw.uiHd:bool(draw.uiIndices))?1.0f:0.0f,draw.uiScaleX,draw.uiScaleY,draw.uiX,draw.uiY,draw.uiIndices?float(draw.uiIndices->width):0,draw.uiIndices?float(draw.uiIndices->height):0,draw.ui&&draw.coverage.empty()?1.0f:0.0f,radius,0,0,draw.outlineColor[0],draw.outlineColor[1],draw.outlineColor[2],draw.outlineColor[3],float(draw.frame.x),float(draw.frame.y),float(draw.frame.w),float(draw.frame.h),float(page.width),float(page.height),0,0};
         SDL_PushGPUVertexUniformData(cmd,0,vertex,sizeof(vertex));SDL_PushGPUFragmentUniformData(cmd,0,fragment,sizeof(fragment));
         SDL_DrawGPUPrimitives(pass,6,1,0,0);if(!batch)SDL_EndGPURenderPass(pass);++drawCount;
 

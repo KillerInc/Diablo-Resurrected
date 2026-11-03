@@ -111,6 +111,34 @@ int main(){
  auto authored=LoadGpuSheet(SheetSource{"hd/towners/authored-on/test.png",1,2,2});
  Check(authored&&authored->authoredTowner&&authored->rows==2,"explicit authored NPC frames and layout without a test flag");
  authored.reset();
+ // Authored hover outlines use the current cropped HD silhouette, not the
+ // unrelated native CEL. Opaque neighbouring atlas texels and 70% shadows
+ // must not contribute; foreground masks and cursor restoration still apply.
+ std::vector<uint8_t> silhouette(16*16*4,0);
+ for(int y=0;y<16;++y)for(int x=0;x<16;++x){
+  auto *p=silhouette.data()+(y*16+x)*4;p[0]=180;p[1]=90;p[2]=40;
+  if(x<4)p[3]=255;
+  if(x>=4&&x<8&&y>=5&&y<11)p[3]=255;
+  if(x>=9&&x<12&&y>=5&&y<11)p[3]=179;
+ }
+ auto outlineSheet=CreateGpuUiIndices(16,16,silhouette.data());Check(bool(outlineSheet),"outline fixture");
+ BeginGpuSpriteFrame();SDL_FillSurfaceRect(surface,nullptr,SDL_MapSurfaceRGBA(surface,10,20,30,255));
+ GpuSpriteDraw outline;outline.sheet=outlineSheet;outline.frame={0,4,4,8,8,0,0};
+ outline.x=outline.y=12;outline.w=outline.h=40;outline.maskX=outline.maskY=12;outline.maskW=outline.maskH=40;
+ outline.outlineRadius=1;outline.outlineColor={200.0f/255,160.0f/255,80.0f/255,1};
+ outline.coverage.assign(40*40*4,0);for(size_t i=3;i<outline.coverage.size();i+=4)outline.coverage[i]=255;
+ outline.lighting.assign(40*40,0);outline.palette.assign(256*17*4,0);
+ QueueGpuSprite(std::move(outline));
+ for(int y=26;y<30;++y){MaskGpuSpriteOpaqueSpan(12,y,4);for(int x=12;x<16;++x)pixel(x,y,0,0,200);}
+ SaveGpuSpriteCursor();MaskGpuSpritePixel(14,24,0,0,0,255);RestoreGpuSpriteCursor();
+ SetGpuSpriteFrameReady(true);
+ for(const auto &entry:std::filesystem::directory_iterator(root))if(entry.path().extension()==".png")std::filesystem::remove(entry.path());
+ for(int i=0;i<100;++i)PresentGpuFrame(surface);
+ for(const auto &entry:std::filesystem::directory_iterator(root))if(entry.path().extension()==".png")image=IMG_Load(entry.path().string().c_str());
+ Check(image,"authored outline readback");
+ expect(14,24,200,160,80);expect(20,24,10,20,30);expect(32,24,200,160,80);
+ expect(40,24,10,20,30);expect(50,24,10,20,30);expect(14,28,0,0,200);
+ SDL_DestroySurface(image);image=nullptr;BeginGpuSpriteFrame();outlineSheet.reset();
  SDL_DestroySurface(surface);
  // Drop every reference before releasing the GPU device.
  BeginGpuSpriteFrame();sheet.reset();playerSheet.reset();ReleaseGpuPlayerSheets();Check(GetGpuSpriteStats().sheets==0,"class release");
@@ -118,5 +146,5 @@ int main(){
  std::filesystem::current_path(previousDirectory);
  Check(std::filesystem::equivalent(root.parent_path(),std::filesystem::temp_directory_path()),"temporary cleanup boundary");
  std::filesystem::remove_all(root);
- std::puts("PASS: synthetic BC7 GPU draw, exact lookup, shader lighting/TRN, native 2x viewport, transparent foreground, ordered actors, opaque coverage, cursor restore and resource release");
+ std::puts("PASS: synthetic BC7 GPU draw, exact lookup, shader lighting/TRN, native 2x viewport, transparent foreground, ordered actors, opaque coverage, cursor restore, authored silhouette outlines and resource release");
 }
