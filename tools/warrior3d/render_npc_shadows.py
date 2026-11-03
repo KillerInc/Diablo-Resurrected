@@ -15,6 +15,7 @@ from bpy_extras.object_utils import world_to_camera_view
 from mathutils import Vector
 
 recipe, output = map(Path, sys.argv[sys.argv.index('--') + 1:])
+recipe, output = recipe.resolve(), output.resolve()
 spec = json.loads(recipe.read_text())
 output.mkdir(parents=True, exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=spec['source'])
@@ -28,6 +29,7 @@ scene.render.film_transparent = True
 scene.render.image_settings.color_mode = 'RGBA'
 actors = [o for o in scene.objects if o.type == 'MESH' and not o.hide_render
           and not o.name.startswith('Icosphere')]
+visible_geometry = [o for o in scene.objects if o.type in ('MESH', 'CURVE') and not o.hide_render]
 
 def set_frame(time):
     scene.frame_set(math.floor(time), subframe=time-math.floor(time))
@@ -116,6 +118,12 @@ for row, time in enumerate(spec['times']):
     mesh.clear_geometry()
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
+    if spec.get('render_bodies'):
+        for obj in visible_geometry:
+            obj.hide_render = False
+        shadow.hide_render = True
+        scene.render.filepath = str(output/f'body-{row:02}.png')
+        bpy.ops.render.render(write_still=True)
     for obj in scene.objects:
         if obj.type in ('MESH', 'CURVE'):
             obj.hide_render = obj != shadow
@@ -125,4 +133,5 @@ for row, time in enumerate(spec['times']):
 (output/'audit.json').write_text(json.dumps({'recipe': spec, 'ray_world': list(ray),
     'camera_right': list(right), 'sun_camera_relative': [3,-4,6],
     'excluded_materials': sorted(excluded), 'ground_z': .002,
-    'opacity': .7, 'blur_pixels_at_4x': 1, 'body_rerendered': False}, indent=2))
+    'opacity': .7, 'blur_pixels_at_4x': 1,
+    'body_rerendered': bool(spec.get('render_bodies'))}, indent=2))
