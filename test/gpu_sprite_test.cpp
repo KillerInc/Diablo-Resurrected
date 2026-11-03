@@ -128,6 +128,10 @@ int main(){
  outline.outlineRadius=1;outline.outlineColor={200.0f/255,160.0f/255,80.0f/255,1};
  outline.coverage.assign(40*40*4,0);for(size_t i=3;i<outline.coverage.size();i+=4)outline.coverage[i]=255;
  outline.lighting.assign(40*40,0);outline.palette.assign(256*17*4,0);
+ // The same 70% shadow is below the outline: gold stays exact where they overlap.
+ GpuSpriteDraw shadow=outline;shadow.outlineRadius=0;
+ shadow.frame={0,9,5,1,1,0,0};
+ QueueGpuSprite(std::move(shadow));
  QueueGpuSprite(std::move(outline));
  for(int y=26;y<30;++y){MaskGpuSpriteOpaqueSpan(12,y,4);for(int x=12;x<16;++x)pixel(x,y,0,0,200);}
  SaveGpuSpriteCursor();MaskGpuSpritePixel(14,24,0,0,0,255);RestoreGpuSpriteCursor();
@@ -136,8 +140,8 @@ int main(){
  for(int i=0;i<100;++i)PresentGpuFrame(surface);
  for(const auto &entry:std::filesystem::directory_iterator(root))if(entry.path().extension()==".png")image=IMG_Load(entry.path().string().c_str());
  Check(image,"authored outline readback");
- expect(14,24,200,160,80);expect(20,24,10,20,30);expect(32,24,200,160,80);
- expect(40,24,10,20,30);expect(50,24,10,20,30);expect(14,28,0,0,200);
+ expect(14,24,200,160,80);expect(20,24,3,6,9);expect(32,24,200,160,80);
+ expect(40,24,3,6,9);expect(50,24,3,6,9);expect(14,28,0,0,200);
  SDL_DestroySurface(image);image=nullptr;BeginGpuSpriteFrame();outlineSheet.reset();
  SDL_DestroySurface(surface);
  // Drop every reference before releasing the GPU device.

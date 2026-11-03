@@ -13,6 +13,8 @@ void SetHdCaptureSuppressed(bool value);
 bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite,
     const uint8_t *translation = nullptr, const devilution::Lightmap *lightmap = nullptr, bool blend = false, int outline = -1);
 bool HasHdSheet(devilution::ClxSprite sprite);
+// Draw the authored actor and then its selection edge, above baked shadows.
+bool DrawHdTownerWithOutline(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite, uint8_t color);
 class ClassicSpriteScope {
     bool suppressed;
 public:

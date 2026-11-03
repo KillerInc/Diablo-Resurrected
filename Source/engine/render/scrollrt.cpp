@@ -57,6 +57,7 @@
 #include "reincarnated/hd_renderer.hpp"
 #include "reincarnated/gpu_terrain.hpp"
 #include "reincarnated/gpu_ui.hpp"
+#include "reincarnated/raster_bridge.hpp"
 #include "panels/charpanel.hpp"
 #include "panels/console.hpp"
 #include "panels/partypanel.hpp"
@@ -800,6 +801,10 @@ void DrawMonsterHelper(const Surface &out, Point tilePosition, Point targetBuffe
 		auto &towner = Towners[mi];
 		const Point position = targetBufferPosition + towner.getRenderingOffset();
 		const ClxSprite sprite = towner.currentSprite();
+#ifdef USE_SDL3
+		if (mi == pcursmonst && reincarnated::DrawHdTownerWithOutline(out, position.x, position.y, sprite, OutlineColorsTowner))
+			return;
+#endif
 		if (mi == pcursmonst) {
 			ClxDrawOutlineSkipColorZero(out, OutlineColorsTowner, position, sprite);
 		}

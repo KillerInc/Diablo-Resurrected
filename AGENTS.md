@@ -43,3 +43,5 @@
 - Since 0.4.20-pre, authored town NPCs opt into their own silhouette through `D1R_AUTHORED_SHEET_V1` in the root layout CSV. Reject this marker outside towners. Unmarked world art retains native index/occupancy textures. Native frame counts, order and delays remain mandatory; effects share those frames. The previous test-only authored-towner environment switch is superseded.
 
 - Since 0.4.21-pre, authored NPC hover outlines sample the current BC7 frame's alpha on the GPU. Preserve packed-frame bounds, one-logical-pixel width, palette selection colour, foreground coverage and cursor restoration. Alpha below 0.8 must not contribute, so the 70% projected shadows do not become selection silhouettes. Classic and unmarked assets retain native outlines.
+
+- Since 0.4.22-pre, hovered authored towners draw their sprite before their outline. Keep the edge above baked ground shadows, while retaining traversal order and later foreground occlusion.

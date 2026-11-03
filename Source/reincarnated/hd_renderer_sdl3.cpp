@@ -527,6 +527,19 @@ bool DrawHdSheet(const devilution::Surface &out, int x, int y, devilution::ClxSp
     return false; // Compiled resource unavailable: retain Classic pixels, never decode PNG.
 }
 
+bool DrawHdTownerWithOutline(const devilution::Surface &out, int x, int y, devilution::ClxSprite sprite, uint8_t color)
+{
+    if (!HdCaptureActive || !inWorld || suppressed || out.surface != devilution::PalSurface
+        || devilution::ControlMode == devilution::ControlTypes::VirtualGamepad) return false;
+    const auto *source = GetSheetSource(sprite);
+    if (!source) return false;
+    const auto sheet = LoadGpuSheet(*source);
+    if (!sheet || !sheet->authoredTowner) return false;
+    if (!DrawHdSheet(out, x, y, sprite)) return false;
+    DrawHdSheet(out, x, y, sprite, nullptr, nullptr, false, color);
+    return true;
+}
+
 bool QueueHdTile(int type, unsigned piece, int left, int bottom, int w, int h, int)
 {
     const auto base = "hd/tiles/" + std::to_string(type) + "/" + std::to_string(piece);
