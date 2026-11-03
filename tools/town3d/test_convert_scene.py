@@ -10,9 +10,22 @@ import numpy as np
 from convert_scene import Reader, read_model, read_static, transform
 from register_buildings import apply_registration, envelope, fit
 from native_palette import match_palette
+from deform_building_cage import deform, interpolate
 
 
 class SceneTests(unittest.TestCase):
+    def test_building_cage_ground_eave_and_ridge(self):
+        cage=dict(source_x=[0,2,4],target_x=[1,2,5],source_z=[0,4],
+                  target_z=[2,5],source_eave_height=2,source_ridge_height=5,
+                  target_eave_heights=[3,3,2.5],target_ridge_height=6)
+        points=np.array([[0.,0,0],[2,2,4],[2,5,0],[2,2-1e-7,0],
+                         [2,2+1e-7,0]])
+        result=deform(points,cage)
+        np.testing.assert_allclose(result[:3],[[1,0,2],[2,3,5],[2,6,2]])
+        self.assertLess(abs(result[3,1]-result[4,1]),1e-6)
+        np.testing.assert_allclose(interpolate(np.array([-2.,6]),[0,2,4],[1,2,5]),[0,8])
+        np.testing.assert_array_equal(points[0],[0,0,0])
+
     def test_native_camera_calibration(self):
         # Blender's 30-degree camera and z conversion reproduce native pixels.
         xyz=np.array([[1,0,0],[0,0,1],[0,1,0],[12.25,3.5,21.75]])

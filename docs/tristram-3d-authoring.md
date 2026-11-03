@@ -150,3 +150,20 @@ static geometry/source UV preservation, untouched original albedos, and intact
 installed town pages/index/layouts. The candidate still contains unfinished
 roof/wall shapes, especially visible on the tavern, and requires further model
 work before a one-to-one production bake. No BC7 replacement is installed.
+
+### Measured tavern roof candidate
+
+`deform_building_cage.py INPUT RECIPE OUTPUT` applies a private, mesh-hash-bound
+recipe to a separate authoring directory. Piecewise controls move the roof ridge,
+eaves and upper walls together while retaining zero-height vertices. Knots use
+native-camera landmarks; hidden surfaces remain inferred, not measured assets.
+The original five vertex fields retain their source texture coordinates. A second
+UV layer, `Native reference projection`, supplies the optional reprojected facade
+without destroying coordinates needed for later texture replacement.
+
+The first tavern candidate improves the main roof silhouette, but comparison
+still exposes missing dormer/roof projections, unfinished wing edges and facade
+fringe copied from the native reference. It is not a production bake or a claim
+of one-to-one geometry. All other building positions and native terrain batches
+remain unchanged. The additional synthetic cage test checks grounded vertices,
+eave/ridge controls, continuity and extrapolation.

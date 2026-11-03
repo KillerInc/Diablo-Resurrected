@@ -54,6 +54,9 @@ for i,entry in enumerate(spec['materials']):
     texture.interpolation='Closest'
     texture.extension='REPEAT' if entry['repeat'] else 'CLIP'
     texture.label='Replace this image for higher-resolution artwork'
+    if entry.get('uv_map'):
+        mapping=nodes.new('ShaderNodeUVMap');mapping.uv_map=entry['uv_map']
+        material.node_tree.links.new(mapping.outputs['UV'],texture.inputs['Vector'])
     emission=nodes.new('ShaderNodeEmission')
     material.node_tree.links.new(texture.outputs['Color'],emission.inputs[0])
     destination=nodes.new('ShaderNodeOutputMaterial')
@@ -93,6 +96,10 @@ for i,entry in enumerate(spec['meshes']):
     uv=mesh.uv_layers.new(name='Source UV - retain for texture replacement')
     coords=data[:,3:5].copy();coords[:,1]=1-coords[:,1]
     uv.data.foreach_set('uv',coords.ravel())
+    if data.shape[1]>=7:
+        reference_uv=mesh.uv_layers.new(name='Native reference projection')
+        reference_coords=data[:,5:7].copy();reference_coords[:,1]=1-reference_coords[:,1]
+        reference_uv.data.foreach_set('uv',reference_coords.ravel())
     mesh.materials.append(materials[entry['material']])
     mesh.update()
     obj=bpy.data.objects.new(entry['name'],mesh)
