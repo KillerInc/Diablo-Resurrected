@@ -8,6 +8,8 @@ import unittest
 import numpy as np
 
 from convert_scene import Reader, read_model, read_static, transform
+from register_buildings import apply_registration, envelope, fit
+from native_palette import match_palette
 
 
 class SceneTests(unittest.TestCase):
@@ -25,6 +27,29 @@ class SceneTests(unittest.TestCase):
         points=np.array([[4,2,6],[5,2,6]],dtype=float)
         out=transform(points,(4,2,6),(1,0,-1),math.pi/2,2)
         np.testing.assert_allclose(out,[[5,2,5],[5,2,3]],atol=1e-12)
+
+    def test_registration_matches_envelope_and_keeps_ground_flat(self):
+        points=np.array([[x,h,z] for x in (2.,7.) for h in (0.,6.) for z in (4.,8.)])
+        known=dict(pivot=[4.,0.,6.],horizontal_scale=.8,height_scale=1.2,translation=[.7,0.,-.3])
+        target=envelope(apply_registration(points,known))
+        record=fit(points,target,[4.,0.,6.])
+        repaired=apply_registration(points,record)
+        np.testing.assert_allclose(envelope(repaired),target,atol=1e-10)
+        np.testing.assert_array_equal(repaired[points[:,1]==0,1],0)
+        np.testing.assert_array_equal(points[:,1],[0,0,6,6,0,0,6,6])
+
+    def test_palette_candidate_preserves_source_size_and_detail_order(self):
+        from PIL import Image
+        pixels=np.repeat(np.array([[[30],[90],[150],[240]]],dtype=np.uint8),3,axis=2)
+        original=Image.fromarray(pixels)
+        native=Image.fromarray(np.array([[[4,8,16,255],[10,20,40,255],
+                                         [20,40,80,255],[30,60,120,255]]],dtype=np.uint8))
+        image,report=match_palette(original,native,np.array([[[0,0],[1,0],[1,1]],[[0,0],[1,1],[0,1]]]))
+        self.assertEqual(image.size,original.size)
+        np.testing.assert_array_equal(np.asarray(original),pixels)
+        result=np.asarray(image)
+        self.assertTrue(np.all(np.diff(result[0,:,0].astype(int))>=0))
+        self.assertTrue(np.all(result[:,:,2]>=result[:,:,0]))
 
     def test_static_ground_and_coverage(self):
         with tempfile.TemporaryDirectory() as directory:

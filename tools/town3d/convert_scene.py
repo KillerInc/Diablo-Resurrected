@@ -191,6 +191,12 @@ def convert(args):
     manifest=configparser.ConfigParser(strict=False,interpolation=None)
     manifest.read(args.scene/'d3d-scenes/tristram.ini',encoding='utf-8')
     buildings=[]
+    palette_reports=[]
+    registrations={}
+    if args.registrations:
+        registration_data=json.loads(args.registrations.read_text())
+        assert registration_data['format']=='d1r.tristram-registration-v1'
+        registrations={identity:group for group in registration_data['groups'] if group['apply'] for identity in group['ids']}
     for identity in manifest.sections():
         if identity=='Scene':continue
         section=manifest[identity];path=args.scene/section['model'];raw=path.read_bytes()
@@ -198,7 +204,15 @@ def convert(args):
         model=read_model(path);data=model['geometry']
         if model['width']:
             filename=identity+'-basecolor.png'
-            Image.frombytes('RGB',(model['width'],model['height']),model['rgb']).save(output/'textures'/filename)
+            embedded=Image.frombytes('RGB',(model['width'],model['height']),model['rgb'])
+            embedded.save(output/'textures'/filename)
+            if args.native_palette:
+                from native_palette import match_palette
+                native_image,_,_=native_facade(model,dpieces,micros,sol,atlas)
+                matched,report=match_palette(embedded,native_image,data['v'][:,:,3:5])
+                filename=identity+'-native-palette.png'
+                matched.save(output/'textures'/filename)
+                palette_reports.append(dict(id=identity,**report))
         else:
             image,origin,reference=native_facade(model,dpieces,micros,sol,atlas)
             filename=identity+'-native-front.png';image.save(output/'textures'/filename)
@@ -214,6 +228,9 @@ def convert(args):
             translation=tuple(map(float,section['translation'].split(',')))
             authored=tuple(map(float,section.get('authoredscale','1,1,1').split(',')))
             v[:,:3]=transform(v[:,:3],pivot,translation,math.radians(float(section['yawdegrees'])),float(section['uniformscale']),authored)
+            if identity in registrations:
+                from register_buildings import apply_registration
+                v[:,:3]=apply_registration(v[:,:3],registrations[identity])
             key=f'mesh{len(meshes)}';archive[key]=v
             meshes.append(dict(key=key,name=identity+f' surface {material}',material=mat,collection='Tristram buildings',building=identity,surface=int(material)))
         buildings.append(dict(id=identity,source=str(path),sha256=section['sha256'],native_min=model['minimum'],native_max=model['maximum'],triangles=len(data),embedded_texture=bool(model['width']),unimported_interior_bytes=model['adjunct_bytes']))
@@ -221,6 +238,8 @@ def convert(args):
     summary=dict(format='d1r.tristram-authoring-v1',grid=[112,112],native_projection={'x':'32*(x-z)','y':'16*(x+z)-32*height'},
                  blender_height_scale=math.sqrt(2/3),materials=materials,meshes=meshes,buildings=buildings,
                  static_object_count=len(objects),static_texture_count=len(materials)-len(buildings),
+                 registration_file=str(args.registrations.resolve()) if args.registrations else None,
+                 native_palette_candidates=palette_reports,
                  static_archive_sha256=hashlib.sha256((args.static/'tristram.d3dvis').read_bytes()).hexdigest(),
                  limitations=['Imported building geometry is a supplied candidate, not verified against vanilla silhouettes.',
                               'Hidden interior/light adjuncts are recorded but not imported.',
@@ -235,4 +254,6 @@ def convert(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for field in ('static','scene','native','atlas','output'):p.add_argument(field,type=Path)
+    p.add_argument('--registrations',type=Path)
+    p.add_argument('--native-palette',action='store_true')
     convert(p.parse_args())

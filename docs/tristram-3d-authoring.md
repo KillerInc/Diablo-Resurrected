@@ -104,3 +104,49 @@ logical anchors and source IDs. Encode a private candidate with the existing
 BC7 packer; then validate loader/readback, native comparisons, gameplay and
 index preservation before any installation. No production replacement BC7 is
 generated or installed by this preview pipeline.
+
+## Native registration and colour pass
+
+`register_buildings.py CONVERTED NATIVE_INPUT TOWN_ATLAS OUTPUT` produces
+native facade references and candidate ground-plane registrations. Tavern
+main/wing and smithy house/forge are evaluated as pairs so their geometry is
+not fitted independently to the same native artwork. Horizontal scale, height
+scale and ground-plane translation are fitted against the original coverage
+envelope. Height-zero vertices stay at zero; source UVs are preserved. Native
+coverage includes fringe scenery, so this is not a proof of exact architecture.
+
+The candidate is applied only when native coverage intersection-over-union
+improves by more than 0.005 and the height scale stays within the review range.
+The first pass accepts 12 models and retains the smithy pair unchanged because
+its proposed adjustment reduces overlap. Example coverage scores:
+
+| Group | Before | Candidate |
+| --- | ---: | ---: |
+| Cathedral | 0.484 | 0.736 |
+| Well | 0.206 | 0.613 |
+| Pepin's house | 0.706 | 0.921 |
+| Tavern pair | 0.734 | 0.772 |
+| Smithy pair, rejected | 0.744 | 0.737 |
+
+Pass `--registrations OUTPUT/registrations.json` to `convert_scene.py` to build
+a separate candidate. All 1,093 native static mesh batches remain bit-exact.
+Registration does not modify the original prefabs, collision, logical tile
+bindings or installed game. `render_building_comparisons.py` renders the groups
+on the same native pixel canvas as their original facade references; it does
+not resize each side independently to conceal registration differences.
+
+The optional `--native-palette` creates separate albedo candidates for the
+cathedral, Pepin's house and east cabin. Source UV coverage determines the
+luminance distribution, which is matched to native facade quantiles and native
+median colours. Original albedo PNGs remain unchanged. Texture dimensions and
+detail order are retained; this is a reversible reference look, not approval
+of every material, missing lit window or detailed shape. Native-camera renders
+remain at exposure zero.
+
+Six synthetic tests cover binary fields, truncated records, coplanar ground
+coverage, camera calibration, ground-preserving registration, and reversible
+palette matching. Private checks verify all 12 comparison canvas sizes, exact
+static geometry/source UV preservation, untouched original albedos, and intact
+installed town pages/index/layouts. The candidate still contains unfinished
+roof/wall shapes, especially visible on the tavern, and requires further model
+work before a one-to-one production bake. No BC7 replacement is installed.
