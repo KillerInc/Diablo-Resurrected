@@ -1,0 +1,99 @@
+# Layered Tristram canvas and flat-paint export
+
+This replaces the attempted full 3D reconstruction as the immediate texture
+authoring route. It assembles the user's original art on the native town grid,
+keeps every overlapping fragment independently accessible, and exports pixels
+back into their original atlas identities. It does not generate new artwork by
+itself or install a replacement pack. All art and derived documents stay private.
+
+## Created private deliverables
+
+`Tristram-layered.ora` is the full 28,672 x 14,336 OpenRaster canvas at density 4.
+Its 29,879 fragment layers retain native painter order, grouped by contiguous
+draw diagonals. Underlying covered pixels remain in the layers. Shared source
+images initially reference the same PNG; all 3,584 atlas slots are also available
+as canonical `frames/NNNN.png`, including slots not drawn on this map.
+
+`town-preview.png` is a small whole-town overview; `mergedimage.png` is the full
+resolution composite. The latter is streamed in 128-pixel stripes instead of
+allocating a 1.5-GiB canvas for each editing layer. `project.json` retains source
+hashes, the exact world origin, frame identities and individual layer locations.
+
+The assembled map contains no baked NPCs, UI, actors or game lights. It is the
+native base town, not a claim that the terrain has already been remastered.
+
+## Flat painting workflow (preferred)
+
+Use `town_canvas.py region PROJECT REGION --rect LEFT TOP WIDTH HEIGHT`, where
+the rectangle is in native projected world pixels. It writes `paint.png`, an
+unchanged `reference.png`, and a protected per-pixel source-address map. The
+prepared private project includes twelve building-group regions covering all
+fourteen buildings. Rectangles match the existing native comparison canvases.
+
+Paint RGB details directly on `paint.png`, at its original dimensions. Preserve
+its alpha and placement. Then run:
+
+```
+python tools/town3d/town_canvas.py apply-region REGION EDITED.png NEW_PROJECT
+python tools/town3d/town_canvas.py export NEW_PROJECT NEW_PROJECT/Tristram-layered.ora EXPORT
+```
+
+The importer maps each changed visible pixel to its original fragment and local
+pixel, preserving hidden/unmodified pixels. Shared fragment edits propagate to
+all their world occurrences and are counted in `paint-report.json`. If a source
+pixel receives different colours in two visible places, the import rejects the
+edit rather than choosing a last writer. Partial-alpha composites are not
+paintable because their colour belongs to more than one source.
+
+Edits requiring genuinely different artwork for the same shared fragment need a
+separate reviewed frame/MIN mapping change; this tool does not silently create a
+runtime override. That limitation should guide texture edits around repeats.
+
+Use a sibling output project. Never edit the protected reference/address files.
+Import rejects stale source frames, resized images and changed alpha. Regions
+for a following edit should be created from the latest project, not an older one.
+
+## Direct layer editing (alternative)
+
+Open the ORA in an OpenRaster-capable painting application. Preserve native
+layer names, order, opacity, blend modes and positions; edit within layers.
+All instances of a shared frame must agree. Export accepts normal editor crops
+around transparent borders and restores the original RGB under transparent
+texels. Preview-only visibility toggles do not remove source layers on export.
+
+Do not mix direct ORA edits with canonical-frame/region edits in the same project:
+export the edited ORA first and create a new project from that resulting atlas.
+
+## Create from original inputs
+
+```
+python tools/town3d/town_canvas.py create ATLAS.png town.min native-object-map.json PROJECT
+python tools/town3d/town_canvas.py export PROJECT PROJECT/Tristram-layered.ora EXPORT
+```
+
+The atlas must be column-major with 128 rows and 32 logical pixels per cell.
+At density 4 the town sheet is 3,584 x 16,384. The MIN reader retains the engine's
+native block permutation, half-cell offsets and vertical pair ordering.
+
+`tools/town3d/audit_town.py` separately records complete-town 3D comparison
+coverage and every fragment/world use; it is useful reference, not a required
+component of the flat painting path.
+
+## BC7 validation
+
+Encode the exported sheet with the existing `pack_gpu_sprites.py`, inventory
+`levels/towndata/town.png: {columns: 28, rows: 128, source_density: 4}`, 4096-pixel
+pages and the existing `alpha_fast` profile. Consolidate the private runtime
+index after encoding. Solid-block reuse is optional; detailed painted pixels
+automatically use normal BC7 compression. No downsampling is introduced.
+
+The real unmodified project round trip retained every source RGBA pixel. All
+four newly encoded BC7 pages matched the installed pages byte-for-byte. The
+hidden/silent runtime-loader test uploaded one sheet, four pages, 62,455,808
+bytes, with no PNG input. Nothing was installed. This proves the slicing/export
+route, not the quality or gameplay validation of future painted artwork.
+
+Eight synthetic checks cover exact round trips, linked edits, shared conflicts,
+alpha preservation, editor cropping, layer order, flat-paint re-slicing and
+shared-pixel conflicts. Future art changes still need visual seam checks, BC7
+quality inspection and in-game occlusion/lighting checks before installation.
