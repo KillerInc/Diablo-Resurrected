@@ -175,8 +175,8 @@ them through the inverse native isometric projection, using a periodic material
 field. Every occurrence of a canonical frame must resolve to the same UV phase;
 conflicting phases fail before output. A reflected material sample gives equal
 opposing edges. Bilinear sampling includes both axes. The source colour field
-is used only to locate dirt/grass transitions, not to retain pixel texture or
-per-frame brightness. Four synthetic tests cover shared-frame translation,
+locates dirt/grass transitions and retains baked shadows and coloured light,
+while replacing the original fine pixel texture. Four synthetic tests cover shared-frame translation,
 periodic edges, adjacent half-cell sampling and alpha/hidden-pixel preservation.
 
 The private 214-frame experiment replaces 5,965 occurrences while retaining all
@@ -187,3 +187,93 @@ states. Generated assembled-area previews are art direction, not packable atlas
 replacements. Keep them labelled and private. No candidate from this experiment
 is installed or approved, and the earlier candidate's BC7 upload results do not
 validate this new artwork.
+
+## Complete vanilla-town authoring and release path
+
+The final workflow assembles the aged building art, new ground materials and
+scenery into the existing 3,584-cell atlas. The source remains 3584x16384 RGBA at
+four times native dimensions, with 28 columns, 128 rows and 128px cells. There
+are no MIN/TIL/SOL/map edits, additional terrain layers, frame remaps or engine
+changes. Hellfire remains outside this art pass.
+
+`assemble_town_art.py PLAN OUTPUT_NEW --dependencies PRIVATE_OPENCV_DIRECTORY`
+registers painted RGB to native views and writes through verified source-owner
+maps. Native alpha and hidden RGBA remain exact. Shared addresses get one
+deterministic sample, preferentially from the most complete visible occurrence.
+An explicit initial atlas/coverage permits incremental assembly; reassignment
+unlocks samples without erasing previous authoring elsewhere. Optional
+`source_cells` masks select one native object occurrence. Never treat unchanged
+background scenery in a building preview as authoritative scenery artwork.
+
+`audit_town_art.py PROJECT COVERAGE OUTPUT_NEW --ground-plan GROUND_PLAN`
+streams the native painter-order owner canvas and audits visible SOURCE PIXELS,
+not just changed-frame counts. The private final base-map audit accounts for
+29,124,784 visible source pixels, with zero pending pixels. Constant-black cells
+1047/1048 are deliberately retained masks. Coverage proves provenance, not
+artistic quality: also inspect assembled close views and the whole town.
+
+`reconcile_town_seams.py PROJECT ATLAS OUTPUT_NEW --dependencies OPENCV_DIRECTORY`
+finds canonical fragment joins where original coarse colours agree within six
+levels but painted channels jump by at least 18. It balances shared boundary
+samples and feathers bounded corrections inside the existing cells. Corrections
+are capped at 24 levels per channel per pass; alpha, hidden pixels and native
+constant-black masks are preserved. Original sharp material boundaries remain
+ineligible. Review the result; this does not guarantee perfect texture or
+geometric continuity in generated art.
+
+Author and inspect clean/poisoned water, open/closed catacombs and caves, and the
+open Hell fissure plus its closed ground variants. `southern_warp_states` reads
+the original sector3 and sector1 DUN files: the closed Hell loop writes overlapping
+2x2 blocks at EVERY x from 36 through 45, including x=46 in the adjoining sector.
+The four closed floor choices cover the native source-tile alternatives; their
+random placement remains game logic. `town_canvas.region(..., layers=...)` can
+expose a state or omit occluders for authoring without changing the town map.
+
+Pack the final atlas with the existing BC7 encoder and normal terrain inventory
+(`columns=28`, `rows=128`, `source_density=4`, page size 4096). Finalize the private
+root index after encoding. The prepared release has four pages, 62,455,808 GPU
+bytes (59.56 MiB), exactly the installed page/crop/frame records. Full decode
+validation measured RGB MAE 0.468/255, worst-frame MAE 1.292/255, maximum alpha
+error one and zero crossings of the 0.8 alpha threshold. The real D3D12 pack
+loader uploaded all pages without PNG input or retained CPU player RGBA.
+
+`install_town_art.py GAME_HD PACK_HD AUTHORING_PNG` is inspection-only by default.
+After runtime review, `--install --backup NEW_PRIVATE_DIRECTORY` stages and
+verifies each of the four town pages and the authoring PNG, then replaces them
+with rollback on failure. It requires identical compiled metadata/layouts and
+native alpha, and never writes the root index, layout CSV, executable, settings
+or saves. Close the game before installation and restart afterward because GPU
+textures and metadata are cached for the process lifetime. The executable build
+number does not change for an artwork-only release.
+
+Run replay checks from untouched fixtures, not old replay output saves. For a
+fresh town capture, the existing offline save tool's `hero-fixture INPUT OUTPUT_NEW`
+mode writes a new hero-only test archive, verifies the decoded hero is unchanged
+and verifies it has no saved dungeon. The normal executable can then start a
+fresh town. Keep fixtures, archives, art, captures and validation manifests
+private. Graphics tests remain muted, use copied settings/saves and the left
+monitor. SDL's `SDL_WINDOW_ACTIVATE_WHEN_SHOWN=0` and
+`SDL_WINDOW_ACTIVATE_WHEN_RAISED=0` avoid taking focus during tests.
+
+### Completed Tristram validation (2026-11-04)
+
+The final vanilla-town pass covers all 29,124,784 visible base-map source pixels
+and the unique well/entrance state pixels. Native tile IDs, alpha, hidden RGBA,
+map data and collision remain unchanged. Both fresh reference gameplay replays
+finished with the same saved-game outcomes as their references. All 38 offline
+town-tool tests passed, including interrupted-install rollback. The native
+hero-only fixture helper built and verified byte-identical decoded hero data.
+A separate fresh-town capture from the normal 0.4.22-pre executable confirmed
+GPU terrain loading and the authored buildings, ground and scenery. This was a
+visual capture run, not a performance benchmark. The original short capture
+attempt reached its timeout; its output is not counted as a completed replay.
+
+The artwork is private. Repository history contains only the authoring tools,
+synthetic tests and documentation. Texture joins can still need artistic polish;
+coverage and seam reconciliation are not a claim of perfect visual continuity.
+
+Installed the four validated BC7 pages and viewing PNG with verified rollback
+backups. Post-install hashes match the tested pack; the executable, root index,
+layout CSV and all five normal save/config files are unchanged. The fresh-town
+normal-executable replay completed with exit 0. Restart the game to use the new
+process-cached terrain textures.

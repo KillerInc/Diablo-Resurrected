@@ -34,6 +34,37 @@ def tile_frames(micros,megas,tile):
     return sorted({int(v)&4095 for piece in megas[tile-1] for v in micros[int(piece)] if int(v)&4095})
 
 
+def southern_warp_states(cells,megas,sector3,sector1):
+    """Native cave/hell variants; closed Hell has four random floor choices.
+
+    Restore open tiles from sector3's actual DUN layer, never from a guessed
+    visual. These private maps do not change game logic or the user's saves.
+    """
+    result={};opened=cells.copy()
+    for x,z in ((16,68),(16,70)):
+        tile=sector_tile(sector3,x//2,(z-46)//2)
+        opened=fill_tile(opened,megas,x,z,tile)
+    result['caves-open']=opened
+    closed=fill_tile(fill_tile(opened,megas,16,68,332),megas,16,70,331)
+    result['caves-closed']=closed
+    opened=cells.copy()
+    for x in range(36,46):
+        # FillSector writes a 2x2 mega at even coordinates. DrlgTPass3's
+        # closed loop later overwrites overlapping 2x2 blocks at EVERY x.
+        even=x-x%2
+        tile=sector_tile(sector3,even//2,(78-46)//2)
+        opened=fill_tile(opened,megas,even,78,tile)
+    # The closed loop at x=45 also writes x=46, beyond the even anchor 44.
+    tile=sector_tile(sector1,0,(78-46)//2)
+    opened=fill_tile(opened,megas,46,78,tile)
+    result['hell-open']=opened
+    for floor in (1,2,3,4):
+        closed=opened.copy()
+        for x in range(36,46):closed=fill_tile(closed,megas,x,78,floor)
+        result[f'hell-closed-floor-{floor}']=closed
+    return result
+
+
 def render(layers,atlas,rect,density=4):
     left,top,width,height=rect;cell=32*density
     result=Image.new('RGBA',(width*density,height*density));cache={}

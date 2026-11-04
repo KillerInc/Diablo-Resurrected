@@ -208,7 +208,7 @@ def export(args):
     print(json.dumps(report))
 
 
-def region(args):
+def region(args,layers=None):
     """Flatten an editable local view, retaining a per-pixel source address."""
     project=args.project.resolve();m=json.loads((project/'project.json').read_text())
     if args.output.exists():raise ValueError('Use a new region directory')
@@ -216,7 +216,7 @@ def region(args):
     if width<=0 or height<=0:raise ValueError('Invalid region size')
     image=Image.new('RGBA',(width*density,height*density))
     owners=np.zeros((height*density,width*density),dtype=np.uint32);cache={}
-    for layer in m['layers']:
+    for layer in m['layers'] if layers is None else layers:
         x=(layer['world'][0]-left)*density;y=(layer['world'][1]-top)*density
         if x>=image.width or y>=image.height or x+cell<=0 or y+cell<=0:continue
         frame=layer['frame']

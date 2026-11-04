@@ -62,6 +62,12 @@ def replace(original,dirt,grass,uv_phase):
     soil=np.clip((field[:,:,0]-field[:,:,1]+1)/11,0,1)
     soil=soil*soil*(3-2*soil)
     rgb=sample(grass,uv_phase)*(1-soil[:,:,None])+sample(dirt,uv_phase)*soil[:,:,None]
+    # Preserve baked cast shadows and coloured window/cathedral spill, while
+    # replacing the underlying material. Native high-frequency dithering is
+    # not transferred. Expected values describe unlit native grass and dirt.
+    expected=np.array([31,31,31])*(1-soil[:,:,None])+np.array([55,42,48])*soil[:,:,None]
+    illumination=np.clip(field/expected,.08,2.4)
+    rgb*=illumination
     result=src.copy();visible=src[:,:,3]>0
     result[visible,:3]=np.rint(np.clip(rgb,0,255)).astype(np.uint8)[visible]
     assert np.array_equal(src[:,:,3],result[:,:,3])
@@ -79,13 +85,20 @@ def build(args):
     allowed=ground_only_frames(micros,args.sol.read_bytes())
     if not frames<=allowed:raise ValueError('Non-ground frame selected')
     phases=defaultdict(set);uses=defaultdict(int)
+    # Include tiles absent from this town state (for example an opened warp).
+    # Integer world-cell translations do not change this material period.
+    for piece in micros:
+        for block in range(16):
+            f=int(piece[14+(block&1)-(block&14)])&4095
+            if f in frames:
+                phases[f].add(phase((-32+(block&1)*32,-(block//2)*32-31)))
     for layer in meta['layers']:
         if layer['frame'] in frames:
             phases[layer['frame']].add(phase(layer['world']));uses[layer['frame']]+=1
     if set(phases)!=frames or any(len(v)!=1 for v in phases.values()):
         raise ValueError('A shared frame requires conflicting material phases')
     dirt=periodic_material(Image.open(args.dirt),(52,43,32))
-    grass=periodic_material(Image.open(args.grass),(28,35,23))
+    grass=periodic_material(Image.open(args.grass),(33,32,26))
     atlas=Image.open(project/'base-atlas.png').convert('RGBA');before=np.asarray(atlas).copy()
     if atlas.size!=(3584,16384):raise ValueError('Expected native-density-four town atlas')
     args.output.mkdir(parents=True);(args.output/'frames').mkdir()

@@ -1,4 +1,4 @@
-// Offline save inspection and copy-only stash editing with the engine codec.
+// Offline save inspection, copy-only stash editing and hero-only test fixtures.
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
@@ -43,7 +43,7 @@ static std::map<uint32_t,std::vector<std::byte>> Entries(const std::filesystem::
 }
 int main(int argc,char **argv){try{
  gbIsSpawn=false;gbIsMultiplayer=false;gbIsHellfire=false;
- Require(argc>=3,"Usage: inspect PROFILE | quarter-copy INPUT OUTPUT | verify INPUT OUTPUT");
+ Require(argc>=3,"Usage: inspect PROFILE | quarter-copy INPUT OUTPUT | verify INPUT OUTPUT | hero-fixture INPUT OUTPUT_NEW");
  const std::string mode=argv[1];
  if(mode=="inspect"){
   for(const auto &entry:std::filesystem::directory_iterator(argv[2])){
@@ -59,6 +59,16 @@ int main(int argc,char **argv){try{
  }
  Require(argc==4,"Input and output paths required");
  const std::filesystem::path before=argv[2],after=argv[3];
+ if(mode=="hero-fixture"){
+  Require(!std::filesystem::exists(after),"Fixture output must be a new working copy");
+  const auto hero=Decode(before,"hero");Require(hero.size()==sizeof(PlayerPack),"Unsupported hero format");
+  const auto length=codec_get_encoded_len(hero.size());std::vector<std::byte> encoded(length);
+  std::copy(hero.begin(),hero.end(),encoded.begin());codec_encode(encoded.data(),hero.size(),encoded.size(),pfile_get_password());
+  {MpqWriter writer(after.string());Require(writer.WriteFile("hero",encoded.data(),encoded.size()),"Fixture hero write failed");}
+  Require(Decode(after,"hero")==hero,"Fixture changed hero data");
+  auto archive=MpqArchive::Open(after.string().c_str());Require(bool(archive)&&!archive->HasFile("game"),"Fixture contains a saved dungeon");
+  std::cout<<"VERIFIED hero-only fresh-game fixture; decoded hero bytes unchanged; no saved dungeon\n";return 0;
+ }
  const auto original=Decode(before,"spstashitems");const uint32_t previous=Gold(original),target=INT32_MAX/4;
  if(mode=="quarter-copy"){
   Require(!std::filesystem::exists(after),"Output must be a new working copy");
