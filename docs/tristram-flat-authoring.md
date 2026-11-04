@@ -97,3 +97,38 @@ Eight synthetic checks cover exact round trips, linked edits, shared conflicts,
 alpha preservation, editor cropping, layer order, flat-paint re-slicing and
 shared-pixel conflicts. Future art changes still need visual seam checks, BC7
 quality inspection and in-game occlusion/lighting checks before installation.
+
+## Quest and entrance variants are required
+
+The base canvas alone does not show every native tile. In `Source/levels/town.cpp`,
+`DrlgTPass3` selects fountain mega tile 342 at (60,70) while Poisoned Water is
+available and unfinished, and mega tile 71 when done or unavailable.
+`CleanTownFountain` also switches to tile 71. These are alternate MIN fragments,
+not merely a global palette change.
+
+The catacombs entrance uses `FillTile(48,20,320)` while
+`IsWarpOpen(DTYPE_CATACOMBS)` is false. The open artwork comes from the unmodified
+sector2s DUN tile at (1,10), currently mega tile 321. The original warp logic in
+`Source/levels/trigs.cpp` remains authoritative; do not infer state from artwork.
+
+`town_states.py` reads the user's original TIL, sector2s DUN, MIN, object map and
+atlas. It exports both reference views and all four native source-cell maps,
+which can be passed to `town_canvas.py create` for state-specific canvases.
+Its manifest distinguishes shared and state-only source frames. For current
+retail inputs:
+
+| Structure | States | State-only source frames |
+|---|---|---|
+| Fountain | Poisoned / clean | 3542–3547 / 594–597, 602–603 |
+| Catacombs | Closed / open | 3298–3303, 3309–3311 / 3312–3320 |
+
+Fountain frames 598–601 and 604–605 are shared. Catacombs frames 3297 and
+3304–3308 are shared. Edit the union of both frame sets and keep shared source
+pixels consistent; preserve water colour differences and the blocked versus
+passable entrance. A base-map-only painting pass is insufficient.
+
+The extractor verifies that its poisoned/closed views exactly match the base
+canvas. Three synthetic tests check local 2x2 mega replacement, sector-derived
+open tile identity, truncation handling and type-bit-independent frame IDs.
+Alternate-state generated artwork remains a preview until registration,
+per-state atlas assembly and runtime state-transition validation pass.
