@@ -167,3 +167,17 @@ fringe copied from the native reference. It is not a production bake or a claim
 of one-to-one geometry. All other building positions and native terrain batches
 remain unchanged. The additional synthetic cage test checks grounded vertices,
 eave/ridge controls, continuity and extrapolation.
+
+Cross-gables may set `ridge_axis: "x"` to evaluate controls in the transposed
+local frame. `preserve_footprint: true` keeps foundation X/Z coordinates fixed
+and blends the horizontal correction up to the eaves. Explicit `surfaces`
+can add convex solid faces through vertex/face lists, for example a missing
+rooftop projection. These are editable mesh additions, not camera-facing image
+cards. New surfaces receive the reference projection; original source UVs on
+existing meshes remain intact. Eight synthetic tests now cover these controls
+and reject degenerate faces or invalid vertex indices.
+
+The following tavern pass adjusts both roof envelopes and adds the small roof
+projection. It still uses projected original facade artwork and approximate
+hidden faces. Exposed silhouette fringes and detailed architectural topology
+remain unfinished; the scene is not ready to replace the installed town atlas.

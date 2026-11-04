@@ -10,7 +10,7 @@ import numpy as np
 from convert_scene import Reader, read_model, read_static, transform
 from register_buildings import apply_registration, envelope, fit
 from native_palette import match_palette
-from deform_building_cage import deform, interpolate
+from deform_building_cage import deform, interpolate, surface_vertices
 
 
 class SceneTests(unittest.TestCase):
@@ -25,6 +25,20 @@ class SceneTests(unittest.TestCase):
         self.assertLess(abs(result[3,1]-result[4,1]),1e-6)
         np.testing.assert_allclose(interpolate(np.array([-2.,6]),[0,2,4],[1,2,5]),[0,8])
         np.testing.assert_array_equal(points[0],[0,0,0])
+        cross=dict(cage,ridge_axis='x')
+        np.testing.assert_allclose(deform(points[:,[2,1,0]],cross),result[:,[2,1,0]])
+        locked=deform(points,dict(cage,preserve_footprint=True))
+        np.testing.assert_array_equal(locked[0],points[0])
+        np.testing.assert_allclose(locked[1:],result[1:],atol=1e-7)
+
+    def test_authored_solid_surface_faces(self):
+        vertices=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1]]
+        data=surface_vertices(vertices,[[0,1,2,3],[0,4,1]])
+        self.assertEqual(data.shape,(9,5))
+        np.testing.assert_array_equal(data[:3,:3],vertices[:3])
+        np.testing.assert_array_equal(data[:,3:],0)
+        with self.assertRaises(AssertionError):surface_vertices(vertices,[[0,0,1]])
+        with self.assertRaises(AssertionError):surface_vertices(vertices,[[0,1,99]])
 
     def test_native_camera_calibration(self):
         # Blender's 30-degree camera and z conversion reproduce native pixels.
