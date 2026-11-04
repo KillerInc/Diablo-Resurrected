@@ -161,3 +161,29 @@ ordinary encoder instead of solid-colour reuse. Verify metadata identity, decode
 quality and real GPU upload, and review joins in assembled town views before
 installing. Exact border pixels are a compatibility guarantee, not proof that a
 texture's visual scale or repetition is artistically approved.
+
+### Material replacement experiment (not installed)
+
+The detail-transfer candidate above was rejected as insufficiently different
+from the original. Preserving original edge RGB is not a user requirement;
+native tile reuse, masks and layout are. Do not describe the earlier filter as
+an approved ground overhaul.
+
+`replace_ground_materials.py PROJECT PAGE_PLAN MIN SOL DIRT GRASS OUTPUT_NEW`
+instead replaces visible ground RGB with new dirt/grass materials. It samples
+them through the inverse native isometric projection, using a periodic material
+field. Every occurrence of a canonical frame must resolve to the same UV phase;
+conflicting phases fail before output. A reflected material sample gives equal
+opposing edges. Bilinear sampling includes both axes. The source colour field
+is used only to locate dirt/grass transitions, not to retain pixel texture or
+per-frame brightness. Four synthetic tests cover shared-frame translation,
+periodic edges, adjacent half-cell sampling and alpha/hidden-pixel preservation.
+
+The private 214-frame experiment replaces 5,965 occurrences while retaining all
+unselected RGBA and all alpha exactly. This demonstrates replacement and reuse,
+not finished artwork: fountain/object fragments still contain baked old ground,
+and those visible transitions require a separate art pass across both quest
+states. Generated assembled-area previews are art direction, not packable atlas
+replacements. Keep them labelled and private. No candidate from this experiment
+is installed or approved, and the earlier candidate's BC7 upload results do not
+validate this new artwork.
