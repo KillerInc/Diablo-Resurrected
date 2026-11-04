@@ -33,19 +33,26 @@ def within(root,relative):
 def inspect(game,pack,source):
     key='levels/towndata/town.png'
     existing=read_index(game/'sprites.gpus');candidate=read_index(pack/'sprites.gpus')
-    if set(candidate)!={key}:raise ValueError('Expected a town-only compiled pack')
-    if candidate[key]!=existing[key]:raise ValueError('Native GPU metadata changed')
+    if key not in candidate or not set(candidate)<={key,'levels/towndata/towns.png'}:
+        raise ValueError('Expected a town/foreground-only compiled pack')
+    if any(candidate[k]!=existing[k] for k in candidate):raise ValueError('Native GPU metadata changed')
     if sha(game/'layouts.csv')!=sha(pack/'layouts.csv'):raise ValueError('Layout table changed')
     original=Image.open(game/key).convert('RGBA');new=Image.open(source).convert('RGBA')
     if original.size!=new.size or not np.array_equal(np.asarray(original)[:,:,3],np.asarray(new)[:,:,3]):
         raise ValueError('Native atlas geometry or alpha changed')
-    head=candidate[key][0].split();pages=int(head[-1]);files=[]
-    for line in candidate[key][1:1+pages]:
-        name,w,h=line.split();rel=Path(key).parent/name
-        old=within(game,rel);new_page=within(pack,rel)
-        if old.stat().st_size!=new_page.stat().st_size:raise ValueError('Page storage size changed')
-        files.append((new_page,old))
-    files.append((source,within(game,key)))
+    files=[]
+    for sheet,record in candidate.items():
+        authored=source if sheet==key else source.with_name('towns.png')
+        previous=Image.open(game/sheet).convert('RGBA');replacement=Image.open(authored).convert('RGBA')
+        if previous.size!=replacement.size or not np.array_equal(np.asarray(previous)[:,:,3],np.asarray(replacement)[:,:,3]):
+            raise ValueError('Native atlas geometry or alpha changed: '+sheet)
+        pages=int(record[0].split()[-1])
+        for line in record[1:1+pages]:
+            name,w,h=line.split();rel=Path(sheet).parent/name
+            old=within(game,rel);new_page=within(pack,rel)
+            if old.stat().st_size!=new_page.stat().st_size:raise ValueError('Page storage size changed')
+            files.append((new_page,old))
+        files.append((authored,within(game,sheet)))
     report=dict(index_sha256=sha(game/'sprites.gpus'),layouts_sha256=sha(game/'layouts.csv'),
                 metadata_identical=True,alpha_exact=True,files=[dict(source=str(a),destination=str(b),
                     before_sha256=sha(b),after_sha256=sha(a)) for a,b in files])

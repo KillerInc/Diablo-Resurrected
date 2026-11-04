@@ -277,3 +277,71 @@ backups. Post-install hashes match the tested pack; the executable, root index,
 layout CSV and all five normal save/config files are unchanged. The fresh-town
 normal-executable replay completed with exit 0. Restart the game to use the new
 process-cached terrain textures.
+
+
+### Foreground and consistency correction pass
+
+The first installed pass missed `levels/towndata/towns.png`. This is the native
+foreground tree-leaf sheet, not an optional patch. `InitTownPieces` maps terrain
+piece IDs to special frames; `scrollrt` draws them after the following diagonal
+so they cover actors. A terrain-only source coverage audit cannot detect stale
+foreground artwork or establish visual completeness.
+
+`town_foreground.py` mirrors those placements and delayed draw order for combined
+offline views. Terrain microcells and 64x224 special sprites have separate pixel
+address ranges. `apply_scene_art.py` gathers one RGB sample per canonical source
+pixel, rejects hidden/mixed-alpha edits and preserves both sheets' geometry.
+Include foreground trees when reviewing houses, riverbanks and the whole town.
+Do not mix a new base tree with an unchanged foreground canopy. Review repeated
+occurrences, not just the authoring reference; preserve original special-frame
+counts and renderer ordering.
+
+The correction workflow includes the foreground canopies, underlying trunk joins,
+cathedral surface consistency in close overlapping views, the detached repeated
+rock shard, coarse stumps, and the squared riverbank joins near Adria. A distinct
+tree baked into Adria's building tiles also needs its own combined edit.
+Native alpha, hidden RGBA and compiled terrain/foreground frame/page metadata
+must still match the installed originals exactly. Artwork stays private.
+
+NPC scale comparisons must use actual sprite density and body proportions:
+Warrior authoring PNGs can be 8x while their GPU frames are 4x. Normalize to the
+compiled density before comparing; do not mistake half of a source cell for a
+complete player. Compare seated heads/arms/torsos, not standing bounding-box
+height. `rescale_npc_sheet.py` applies one offline transform to all native cells,
+including props and baked shadows, around the existing game anchor. It preserves
+cell size, order, native frame count and timing. Farnham's correction uses 0.88.
+
+The BC7 packer permits an explicit offline alpha_fast/alpha_basic/alpha_slow
+profile, recorded in its proof and checked when resuming. This changes encoding
+work only, not runtime texture size or format. Decode every resulting frame.
+Farnham's existing AA edges already have BC7 alpha quantization: baseline alpha
+RMSE was 1.988/255 with 673 crossings at the outline threshold. The smaller
+alpha_slow candidate measured 2.209/255 and 687 crossings, with zero black baked
+shadow pixels crossing the threshold. Maximum alpha error alone is not a useful
+whole-sheet quality measure; check edge RMS, actual decoded appearance and
+shadow exclusion. Terrain/foreground binary masks retain the stricter zero
+threshold-crossing check.
+
+
+Correction release verification: 43 town-tool tests passed. All 3,620 source
+frames were decoded and compared; both terrain sheets retained identical native
+metadata, maximum alpha error one and zero outline-threshold crossings. Real
+D3D12 upload passed for three sheets, six pages and 65,716,224 bytes, without PNG
+input. A fresh muted replay using the normal executable and isolated hero/config
+finished with exit 0; its capture was visually reviewed. This inactive-window
+capture is not an FPS benchmark. The whole-town combined view and eleven close
+building views were also reviewed, with extra repairs for the Adria bank corner,
+her distinct building tree and repeated stumps.
+
+The paired terrain/foreground pages and viewing PNGs were installed with private
+rollback backups. Farnham uses a new content-named BC7 page and a single updated
+record in the consolidated index; all other records and the layout CSV are
+unchanged. Post-install file hashes match the tested pack. Normal saves,
+settings and executable remain unchanged. There is no executable version bump
+for these artwork changes. Restart to load the new process-cached textures.
+
+Only the 15 special frames referenced by native InitTownPieces are reauthored;
+unused original frames 3/4/5 remain in the 18-frame sheet. Native geometry and
+frame numbering are preserved. Fine native silhouette edges and some texture
+joins can still benefit from further artistic refinement; this pass does not
+claim geometrically seamless generated artwork everywhere.

@@ -28,6 +28,21 @@ class TownInstall(unittest.TestCase):
         Image.new('RGBA',(4,4),(80,90,100,0)).save(self.source)
         with self.assertRaises(ValueError):inspect(self.game,self.pack,self.source)
 
+    def test_foreground_is_installed_and_alpha_checked_with_terrain(self):
+        for root,data in ((self.game,b'old'),(self.pack,b'new')):
+            index=root/'sprites.gpus'
+            index.write_text(index.read_text()+'SHEET levels/towndata/towns.png 1 1 * * * *\ntowns.p0.bc7 4 4\n0 0 0 4 4 0 0\n')
+            (root/'levels/towndata/towns.p0.bc7').write_bytes(data)
+        Image.new('RGBA',(4,4),(40,50,60,255)).save(self.game/'levels/towndata/towns.png')
+        foreground=self.source.with_name('towns.png')
+        Image.new('RGBA',(4,4),(70,80,90,255)).save(foreground)
+        files,_=inspect(self.game,self.pack,self.source)
+        self.assertEqual(len(files),4)
+        install(SimpleNamespace(game=self.game,pack=self.pack,source=self.source,install=True,backup=self.root/'both-backup'))
+        self.assertEqual((self.game/'levels/towndata/towns.p0.bc7').read_bytes(),b'new')
+        Image.new('RGBA',(4,4),(70,80,90,0)).save(foreground)
+        with self.assertRaises(ValueError):inspect(self.game,self.pack,self.source)
+
     def test_install_and_rollback_leave_index_and_layout_untouched(self):
         original=(self.game/'sprites.gpus').read_bytes();backup=self.root/'backup'
         install(SimpleNamespace(game=self.game,pack=self.pack,source=self.source,install=True,backup=backup))

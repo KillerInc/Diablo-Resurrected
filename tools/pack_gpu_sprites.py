@@ -28,10 +28,11 @@ def constant_blocks(image,bc,settings,cache):
     return blocks[indices].tobytes()
 
 
-def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.json", inventory=None, page_size=2048, solid_blocks=False):
+def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.json", inventory=None, page_size=2048, solid_blocks=False, encoder_profile='alpha_fast'):
     assert page_size in (2048,4096), 'Supported offline page sizes: 2048, 4096'
     sys.path.insert(0,str(encoder_path));import ispc_texcomp as bc
-    settings=bc.BC7EncSettings.from_profile('alpha_fast')
+    assert encoder_profile in ('alpha_fast','alpha_basic','alpha_slow')
+    settings=bc.BC7EncSettings.from_profile(encoder_profile)
     Image.MAX_IMAGE_PIXELS=None
     layouts=read_table(hd/'layouts.csv')
     grids={p.removeprefix('hd/'):(int(c),int(r)) for p,c,r in re.findall(r'Loaded HD sheet: (hd/[^ ]+) \([^\n]*?, (\d+) directions, (\d+) frames,',log.read_text(errors='replace'))}
@@ -53,6 +54,7 @@ def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.
         meta=dst.with_suffix('.gpus')
         if meta.exists():
             assert rel in proofs, 'Existing sheet has no proof: '+rel
+            assert proofs[rel]['encoder_profile']==encoder_profile, 'Encoder profile changed: use a new output pack'
             assert proofs[rel]['source_sha256']==sha(source) and proofs[rel]['prepared_sha256']==sha(path), 'Input changed: use a new output pack for '+rel
             continue
         pages=[];frames=[];page=Image.new('RGBA',(page_size,page_size));x=y=rowh=0
@@ -87,7 +89,7 @@ def pack(hd,custom,log,output,encoder_path,only=None,proof_name="gpu-pack-proof.
             f.write(f'D1R_GPU_SHEET_V1 4 {cols} {rows} {lw} {lh} {len(pages)}\n')
             for name,w,h,size in pages:f.write(f'{name} {w} {h}\n')
             for frame in frames:f.write(' '.join(map(str,frame))+'\n')
-        proofs[rel]={'source_sha256':sha(source),'prepared_sha256':sha(path),'columns':cols,'rows':rows,'density':4,'pages':len(pages),'gpu_bytes':sum(p[3] for p in pages),'rgba_equivalent':lw*lh*16*4*cols*rows,'frames':frames,'encoder_profile':'alpha_fast'}
+        proofs[rel]={'source_sha256':sha(source),'prepared_sha256':sha(path),'columns':cols,'rows':rows,'density':4,'pages':len(pages),'gpu_bytes':sum(p[3] for p in pages),'rgba_equivalent':lw*lh*16*4*cols*rows,'frames':frames,'encoder_profile':encoder_profile}
         proof_file.write_text(json.dumps(proofs,indent=2))
         print(f'{number}: {Path(rel).stem}: {len(pages)} pages, {sum(p[3] for p in pages)/2**20:.2f} MiB',flush=True)
     # Retain the single runtime anchor table, never sidecars.
@@ -106,7 +108,8 @@ if __name__=='__main__':
     p.add_argument('--finalize-index',action='store_true',help='After all workers finish, publish the one runtime index')
     p.add_argument('--page-size',type=int,choices=(2048,4096),default=2048)
     p.add_argument('--solid-blocks',action='store_true',help='Reuse identical native-4x solid BC7 blocks; requires numpy')
-    a=p.parse_args();pack(a.hd,a.custom,a.log,a.output,a.encoder_path,a.only,a.proof_name,json.loads(a.inventory.read_text()) if a.inventory else None,a.page_size,a.solid_blocks)
+    p.add_argument('--encoder-profile',choices=('alpha_fast','alpha_basic','alpha_slow'),default='alpha_fast')
+    a=p.parse_args();pack(a.hd,a.custom,a.log,a.output,a.encoder_path,a.only,a.proof_name,json.loads(a.inventory.read_text()) if a.inventory else None,a.page_size,a.solid_blocks,a.encoder_profile)
     if a.finalize_index:
         from gpu_index import consolidate
         consolidate(a.output/'HD')
