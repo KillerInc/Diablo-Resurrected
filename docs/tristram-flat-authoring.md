@@ -132,3 +132,32 @@ canvas. Three synthetic tests check local 2x2 mega replacement, sector-derived
 open tile identity, truncation handling and type-bit-independent frame IDs.
 Alternate-state generated artwork remains a preview until registration,
 per-state atlas assembly and runtime state-transition validation pass.
+
+## Reused ground texture pass
+
+Ground art must be edited by canonical frame, never independently at a town
+location. The first private candidate selects 198 manually reviewed common
+grass/dirt/path fragments, used at 5,661 positions on the base town map. It is
+a first material pass, not a claim to cover all ground: other floor fragments
+can contain building bases, shoreline, rocks or quest-specific illumination.
+
+`pack_ground_art.py PROJECT PAGE_PLAN MIN SOL OUTPUT_NEW_DIRECTORY` checks every
+selected frame's uses throughout the original MIN table: all must be in the
+bottom pair of non-solid floor pieces. A frame also used higher in architecture
+is excluded. Private page plans retain each frame ID and its painted atlas slot.
+The painter supplies texture detail; the packing pass restores exact native
+alpha and a two-render-pixel outer rim, with a four-pixel feather inside it.
+Detail is transferred around the original local colour field, preserving native
+grass/path transitions. Matching only a tile's average colour was insufficient:
+it left bright interiors surrounded by visibly dark rims. No per-instance art,
+frame remapping, MIN changes, collision edits or runtime code changes are used.
+
+All 3,584 atlas slots are checked after reassembly. Unselected RGBA and every
+original alpha channel remain exact; protected rims are also exact. Five
+synthetic tests cover masked and opaque borders, missing paint, mixed
+ground/architecture references, and preservation of a native colour gradient.
+The resulting full atlas can use the normal BC7 packer; detailed blocks use the
+ordinary encoder instead of solid-colour reuse. Verify metadata identity, decode
+quality and real GPU upload, and review joins in assembled town views before
+installing. Exact border pixels are a compatibility guarantee, not proof that a
+texture's visual scale or repetition is artistically approved.
