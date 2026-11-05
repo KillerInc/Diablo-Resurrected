@@ -24,6 +24,14 @@ bool GpuTerrainReady();
 bool GpuTerrainUsesIndexedPresent();
 bool GpuTerrainNeedsCpuCanvas();
 bool GpuTerrainSkipsNativePainting();
+void SetGpuTerrainCell(int x, int z, unsigned piece);
+class GpuTerrainCellScope {
+public:
+	GpuTerrainCellScope(int x, int z, unsigned piece) { SetGpuTerrainCell(x, z, piece); }
+	GpuTerrainCellScope(const GpuTerrainCellScope &) = delete;
+	GpuTerrainCellScope &operator=(const GpuTerrainCellScope &) = delete;
+	~GpuTerrainCellScope() { SetGpuTerrainCell(-1, -1, 0); }
+};
 bool QueueGpuTerrainTile(const devilution::Surface &out, devilution::MaskType mask, const uint8_t *table);
 bool SetGpuTerrainNativeCapture(bool value);
 bool GpuTerrainNativeCaptureActive();

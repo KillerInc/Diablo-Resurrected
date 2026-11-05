@@ -53,3 +53,16 @@ which cell/block positions contributed to the rock silhouette. Several of the
 rock pixels come from blocks 0 and 1, so block number alone cannot distinguish
 ground from a prop. Use the native floor and cell rendering rules when adding
 runtime bindings. Walkability and actor occlusion still need an in-game test.
+
+The isolated runtime proof uses `D1R_HD_RC2_ROCK_TEST=1` and a separate BC7
+terrain sheet named `town-rc2-rock.png` in the HD index. The authoring tool
+`pack_instance_preview.py` appends 11 replacement frames, leaving all original
+atlas slots intact. The test binds each replacement by world cell, native piece
+and native frame. It draws the authored composite in the existing native depth
+slots. The ground, shadow and rock are separate authoring layers in this proof.
+Independent GPU drawing of all three layers remains a later step.
+
+For an isolated demo capture, set `D1R_HD_RC2_ROCK_CAMERA=1` to frame the river
+patch. This camera setting only applies during town replay and does not move
+the player. The river restricts movement around this particular rock, so use a
+different, reachable prop for the full front-and-behind walk test.

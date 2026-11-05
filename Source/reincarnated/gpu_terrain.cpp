@@ -44,6 +44,24 @@ struct Source {
 std::unordered_map<const uint8_t *, Source> sources;
 std::shared_ptr<GpuSheet> material;
 std::string materialPath, palettePath;
+bool rockPreview = false;
+int cellX = -1, cellZ = -1;
+unsigned cellPiece = 0;
+
+// Test atlas bindings are limited to the riverside rock and its ground patch.
+// Match the native piece and frame so a changed map retains its native art.
+struct RockBinding {
+	int x, z;
+	unsigned piece, original, replacement;
+};
+constexpr RockBinding RockBindings[] = {
+	{ 87, 12, 362, 840, 3585 }, { 87, 12, 362, 841, 3586 },
+	{ 87, 13, 364, 849, 3587 }, { 88, 12, 217, 511, 3588 },
+	{ 88, 12, 217, 50, 3589 }, { 88, 13, 218, 512, 3590 },
+	{ 88, 13, 218, 513, 3591 }, { 89, 12, 25, 51, 3592 },
+	{ 88, 14, 24, 50, 3593 }, { 89, 13, 27, 55, 3594 },
+	{ 89, 13, 27, 56, 3595 },
+};
 std::array<SDL_Color, 256> originalPalette {};
 std::vector<uint16_t> ownerPixels;
 std::vector<uint32_t> indexPixels;
@@ -196,7 +214,12 @@ bool Warm()
 	warmed = true;
 	if (!pipeline || materialPath.empty()) return false;
 	AssetBytes bytes, layout;
-	if (!GetHdAssetStore().readGpuWithLayout(materialPath, bytes, layout)) return false;
+	if (!GetHdAssetStore().readGpuWithLayout(materialPath, bytes, layout)) {
+		if (!rockPreview) return false;
+		rockPreview = false;
+		materialPath = "hd/levels/towndata/town.png";
+		if (!GetHdAssetStore().readGpuWithLayout(materialPath, bytes, layout)) return false;
+	}
 	std::istringstream in(std::string(bytes.begin(), bytes.end()));
 	std::string magic;
 	unsigned density, cols, rows, w, h, count;
@@ -302,6 +325,7 @@ void ReleaseGpuTerrainLevel()
 	sources.clear();
 	originals.clear();
 	materialPath.clear();
+	rockPreview = false;
 	warmed = false;
 	ResetGpuTerrainFrame();
 }
@@ -345,6 +369,10 @@ void RegisterGpuTerrain(const std::byte *cells, std::span<const std::pair<uint16
 	default: return;
 	}
 	materialPath = std::string("hd/levels/") + stem + ".png";
+	const char *preview = SDL_getenv("D1R_HD_RC2_ROCK_TEST");
+	rockPreview = leveltype == DTYPE_TOWN && preview != nullptr && std::strcmp(preview, "1") == 0;
+	if (rockPreview)
+		materialPath = "hd/levels/towndata/town-rc2-rock.png";
 	palettePath = std::string("levels/") + stem + (leveltype == DTYPE_HELL ? "_1.pal" : ".pal");
 	for (size_t i = 0; i < frames.size(); ++i) {
 		const auto *source = GetDunFrame(cells, uint32_t(i + 1));
@@ -410,6 +438,12 @@ bool GpuTerrainReady() { return ready && active; }
 bool GpuTerrainUsesIndexedPresent() { return GpuTerrainReady() && indexedPresent; }
 bool GpuTerrainNeedsCpuCanvas() { return !active || !indexedPresent; }
 bool GpuTerrainSkipsNativePainting() { return active && directTiles && !nativeCapture; }
+void SetGpuTerrainCell(int x, int z, unsigned piece)
+{
+	cellX = x;
+	cellZ = z;
+	cellPiece = piece;
+}
 uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilution::TileType type, int height, const devilution::Lightmap &lightmap, const uint8_t *table)
 {
 	const auto previous = current;
@@ -418,8 +452,22 @@ uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilutio
 	const auto found = sources.find(source);
 	if (found == sources.end()) return previous;
 	const auto &info = found->second;
-	if (info.frame >= material->frames.size() || commands.size() >= 65535) return previous;
-	const auto &frame = material->frames[info.frame];
+	unsigned frameIndex = info.frame;
+	if (rockPreview && cellX >= 87 && cellX <= 89 && cellZ >= 12 && cellZ <= 14) {
+		for (const auto &binding : RockBindings) {
+			if (binding.x == cellX && binding.z == cellZ && binding.piece == cellPiece && binding.original == info.frame + 1 && binding.replacement <= material->frames.size()) {
+				frameIndex = binding.replacement - 1;
+				static bool logged = false;
+				if (!logged) {
+					logged = true;
+					devilution::Log("HD_RC2_ROCK_DRAW cell=({}, {}) frame={} replacement={}", cellX, cellZ, binding.original, binding.replacement);
+				}
+				break;
+			}
+		}
+	}
+	if (frameIndex >= material->frames.size() || commands.size() >= 65535) return previous;
+	const auto &frame = material->frames[frameIndex];
 	const auto &page = material->pages[frame.page];
 	commands.push_back({ uint32_t(x), uint32_t(bottom + info.offset - 31), frame.x, frame.y, frame.cropX, frame.cropY, frame.w, frame.h, frame.page, material->density, page.width, page.height });
 	const auto key = std::make_tuple(source, int(type), height);

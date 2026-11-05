@@ -11,6 +11,7 @@
 #include <cstdint>
 
 #ifdef USE_SDL3
+#include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_timer.h>
@@ -29,6 +30,7 @@
 #include "diablo_msg.hpp"
 #include "doom.h"
 #include "engine/backbuffer_state.hpp"
+#include "engine/demomode.h"
 #include "engine/displacement.hpp"
 #include "engine/dx.h"
 #include "engine/point.hpp"
@@ -597,6 +599,9 @@ static void DrawDungeon(const Surface & /*out*/, const Lightmap & /*lightmap*/, 
 void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, Point targetBufferPosition, int lightTableIndex)
 {
 	const uint16_t levelPieceId = dPiece[tilePosition.x][tilePosition.y];
+#ifdef USE_SDL3
+	const reincarnated::GpuTerrainCellScope gpuCell(tilePosition.x, tilePosition.y, levelPieceId);
+#endif
 
 #if !defined(USE_SDL1) && !defined(USE_SDL3)
     reincarnated::QueueHdTile(static_cast<int>(leveltype), levelPieceId,
@@ -735,6 +740,7 @@ void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, P
 void DrawFloorTile(const Surface &out, const Lightmap &lightmap, Point tilePosition, Point targetBufferPosition)
 {
 #ifdef USE_SDL3
+	const reincarnated::GpuTerrainCellScope gpuCell(tilePosition.x, tilePosition.y, dPiece[tilePosition.x][tilePosition.y]);
     const bool hdFloor = reincarnated::QueueHdTile(static_cast<int>(leveltype), dPiece[tilePosition.x][tilePosition.y],
         targetBufferPosition.x, targetBufferPosition.y, TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
     reincarnated::ClassicSpriteScope floorScope(hdFloor);
@@ -1991,7 +1997,13 @@ void DrawAndBlit()
 #ifdef USE_SDL3
     const uint64_t perfDrawStart = SDL_GetTicksNS();
 #endif
-	DrawView(out, ViewPosition);
+	Point camera = ViewPosition;
+#ifdef USE_SDL3
+	// The isolated replay can frame the test patch without moving its hero.
+	if (leveltype == DTYPE_TOWN && demo::IsRunning() && SDL_getenv("D1R_HD_RC2_ROCK_CAMERA") != nullptr)
+		camera = { 87, 14 };
+#endif
+	DrawView(out, camera);
 #ifdef USE_SDL3
     reincarnated::GetPerformanceMonitor().drawMs = double(SDL_GetTicksNS() - perfDrawStart)/1e6;
 	reincarnated::CpuStageScope hudProfile(reincarnated::CpuStage::HudAndCursor);
