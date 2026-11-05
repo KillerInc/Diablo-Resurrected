@@ -232,7 +232,8 @@ bool Warm()
 	AssetBytes bytes, layout;
 	if (housePreview) {
 		AssetBytes bindingBytes;
-		if (GetHdAssetStore().read("hd/levels/towndata/town-rc2-house.bindings", bindingBytes)) {
+		const auto bindingPath = layeredRockPreview ? "hd/levels/towndata/town-rc2-combined.bindings" : "hd/levels/towndata/town-rc2-house.bindings";
+		if (GetHdAssetStore().read(bindingPath, bindingBytes)) {
 			std::istringstream bindings(std::string(bindingBytes.begin(), bindingBytes.end()));
 			std::string header;
 			std::getline(bindings, header);
@@ -253,6 +254,7 @@ bool Warm()
 		}
 		if (houseBindings.empty()) {
 			housePreview = false;
+			layeredRockPreview = false;
 			materialPath = "hd/levels/towndata/town.png";
 		}
 	}
@@ -260,6 +262,8 @@ bool Warm()
 		rockLayers = LoadGpuSheet({ "hd/levels/towndata/town-rc2-prop.png", 2, 1, 176 });
 		if (!rockLayers || rockLayers->frames.size() != 2) {
 			layeredRockPreview = false;
+			housePreview = false;
+			houseBindings.clear();
 			materialPath = "hd/levels/towndata/town.png";
 		}
 	}
@@ -434,7 +438,6 @@ void RegisterGpuTerrain(const std::byte *cells, std::span<const std::pair<uint16
 	houseBindings.clear();
 	if (housePreview) {
 		rockPreview = false;
-		layeredRockPreview = false;
 	}
 	rockLayers.reset();
 	if (rockPreview)
@@ -442,7 +445,7 @@ void RegisterGpuTerrain(const std::byte *cells, std::span<const std::pair<uint16
 	if (layeredRockPreview)
 		materialPath = "hd/levels/towndata/town-rc2-walk.png";
 	if (housePreview)
-		materialPath = "hd/levels/towndata/town-rc2-house.png";
+		materialPath = layeredRockPreview ? "hd/levels/towndata/town-rc2-combined.png" : "hd/levels/towndata/town-rc2-house.png";
 	palettePath = std::string("levels/") + stem + (leveltype == DTYPE_HELL ? "_1.pal" : ".pal");
 	for (size_t i = 0; i < frames.size(); ++i) {
 		const auto *source = GetDunFrame(cells, uint32_t(i + 1));
@@ -593,7 +596,7 @@ uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilutio
 		}
 	}
 	const bool nearRiver = rockPreview && cellX >= 87 && cellX <= 89 && cellZ >= 12 && cellZ <= 14;
-	const bool nearWalkRock = layeredRockPreview && cellX >= 75 && cellX <= 77 && cellZ >= 76 && cellZ <= 78;
+	const bool nearWalkRock = layeredRockPreview && !housePreview && cellX >= 75 && cellX <= 77 && cellZ >= 76 && cellZ <= 78;
 	if (nearRiver || nearWalkRock) {
 		const std::span<const TownBinding> bindings = nearWalkRock ? std::span<const TownBinding>(WalkRockBindings) : std::span<const TownBinding>(RockBindings);
 		for (const auto &binding : bindings) {

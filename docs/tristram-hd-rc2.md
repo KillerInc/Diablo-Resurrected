@@ -97,3 +97,12 @@ its front door. Both took the same 11 moves around the house. The captures
 show the roof covering the hero from behind and the hero visible at the
 door. This test is private and opt-in. The installed RC1 files still match
 the frozen snapshot.
+
+Enable both `D1R_HD_RC2_HOUSE_TEST=1` and `D1R_HD_RC2_ROCK_TEST=2` for the
+combined test. `merge_town_instances.py` builds one terrain atlas and one
+binding table from the two proofs, with 76 house slots and 14 rock ground
+slots. The rock and shadow still use separate prop frames. The merged frames
+decode exactly like the verified individual packs. One muted replay walked
+around the house, continued south to the rock, and walked around its blocked
+center to `(76, 78)`. The replay exited normally. This pack stays isolated
+from the RC1 installation.
