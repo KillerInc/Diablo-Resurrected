@@ -2611,7 +2611,12 @@ void InitPlayer(Player &player, bool firstTime)
 #ifdef USE_SDL3
 		if (const char *replay = SDL_getenv("D1R_HD_RC2_WALK_REPLAY");
 		    replay != nullptr && &player == MyPlayer && firstTime && leveltype == DTYPE_TOWN && demo::IsRunning()) {
-			player.position.tile = SDL_strcmp(replay, "house") == 0 ? WorldTilePosition { 69, 68 } : WorldTilePosition { 76, 76 };
+			if (SDL_strcmp(replay, "west") == 0)
+				player.position.tile = { 25, 50 };
+			else if (SDL_strcmp(replay, "house") == 0)
+				player.position.tile = { 69, 68 };
+			else
+				player.position.tile = { 76, 76 };
 			ViewPosition = player.position.tile;
 		}
 #endif

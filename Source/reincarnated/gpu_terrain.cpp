@@ -243,8 +243,8 @@ bool Warm()
 				while (bindings >> std::ws && !bindings.eof()) {
 					if (!(bindings >> binding.x >> binding.z >> binding.piece >> binding.original >> binding.replacement)
 					    || binding.x < 0 || binding.x >= MAXDUNX || binding.z < 0 || binding.z >= MAXDUNY
-					    || binding.original == 0 || binding.original > 3584 || binding.replacement < 3585 || binding.replacement > 3712
-					    || houseBindings.size() >= 128
+					    || binding.original == 0 || binding.original > 3584 || binding.replacement < 3585 || binding.replacement > 3840
+					    || houseBindings.size() >= 256
 					    || !houseBindings.emplace(std::make_tuple(binding.x, binding.z, binding.piece, binding.original), binding.replacement - 1).second) {
 						houseBindings.clear();
 						break;

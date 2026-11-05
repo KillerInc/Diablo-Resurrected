@@ -106,3 +106,13 @@ decode exactly like the verified individual packs. One muted replay walked
 around the house, continued south to the rock, and walked around its blocked
 center to `(76, 78)`. The replay exited normally. This pack stays isolated
 from the RC1 installation.
+
+The west cabin adds 58 private roof and wall frames, for 148 total bindings
+with the riverside house and layered rock. The merge tool carries these over
+two private columns while retaining all 3,584 native frames. It rejects
+overlapping binding keys and inputs with different base artwork. The west
+cabin frames decode exactly like RC1. The earlier house and rock frames and
+the transparent prop sheet also match their previous verified packs.
+RC1 and RC2 replays took the same 11 moves from `(25, 50)` behind the west
+cabin to `(31, 50)` beside its front door. The RC2 log recorded a private
+west cabin frame, and both replays exited normally.

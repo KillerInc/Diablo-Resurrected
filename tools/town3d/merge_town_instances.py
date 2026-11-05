@@ -11,27 +11,32 @@ def merge(first, second, first_bindings, second_bindings, output):
     cell = 128
     original_width, height = 28 * cell, 128 * cell
     first_private_frame = 28 * 128 + 1
-    if first.size != (original_width + cell, height) or second.size != first.size:
-        raise ValueError('Expected two town atlases with one appended column each')
+    if any(atlas.height != height or atlas.width <= original_width or atlas.width % cell
+           for atlas in (first, second)):
+        raise ValueError('Expected town atlases with whole appended columns')
     original = (0, 0, original_width, height)
     if first.crop(original).tobytes() != second.crop(original).tobytes():
         raise ValueError('Both atlases must share the same original art')
 
     count = len(first_bindings) + len(second_bindings)
     keys = {tuple(row[:4]) for row in first_bindings + second_bindings}
-    if not first_bindings or not second_bindings or len(keys) != count or count > 128:
-        raise ValueError('Bindings must be disjoint and fit one column')
+    if not first_bindings or not second_bindings or len(keys) != count or count > 256:
+        raise ValueError('Bindings must be disjoint and fit two private columns')
 
-    merged = Image.new('RGBA', first.size)
+    columns = (count + 127) // 128
+    merged = Image.new('RGBA', (original_width + columns * cell, height))
     merged.paste(first.crop(original))
     bindings = []
     for source, rows in ((first, first_bindings), (second, second_bindings)):
         for *key, frame in rows:
             index = frame - first_private_frame
-            if not 0 <= index < 128:
-                raise ValueError('Replacement frame is outside the private column')
-            tile = source.crop((original_width, index * cell, source.width, (index + 1) * cell))
-            merged.paste(tile, (original_width, len(bindings) * cell))
+            source_column, source_row = divmod(index, 128)
+            source_x = original_width + source_column * cell
+            if index < 0 or source_x + cell > source.width:
+                raise ValueError('Replacement frame is outside the private columns')
+            tile = source.crop((source_x, source_row * cell, source_x + cell, (source_row + 1) * cell))
+            column, row = divmod(len(bindings), 128)
+            merged.paste(tile, (original_width + column * cell, row * cell))
             bindings.append((*key, first_private_frame + len(bindings)))
 
     output.mkdir(parents=True)
