@@ -15,6 +15,8 @@
 #include "utils/attributes.h"
 #include "utils/clx_decode.hpp"
 #include "utils/static_vector.hpp"
+#include "reincarnated/sheet_source.hpp"
+#include "reincarnated/gpu_ui.hpp"
 
 #ifdef DEBUG_CLX
 
@@ -412,6 +414,7 @@ void RenderClxOutline(const Surface &out, Point position, ClxSprite sprite, uint
 	    && position.y >= 0 && position.y + sprite.height() + 2 < out.h()) {
 		for (const auto &[x, y] : OutlinePixelsCache.outlinePixels) {
 			*out.at(position.x + x, position.y + y) = color;
+			if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(out.at(position.x + x, position.y + y), 1);
 		}
 	} else {
 		for (const auto &[x, y] : OutlinePixelsCache.outlinePixels) {
@@ -422,6 +425,7 @@ void RenderClxOutline(const Surface &out, Point position, ClxSprite sprite, uint
 
 void ClxApplyTrans(ClxSprite sprite, const uint8_t *trn)
 {
+	reincarnated::ApplySheetTranslation(sprite, trn);
 	// A bit of a hack but this is the only place in the code where we need mutable sprites.
 	auto *dst = const_cast<uint8_t *>(sprite.pixelData());
 	uint16_t remaining = sprite.pixelDataSize();
@@ -586,41 +590,91 @@ std::string ClxDescribe(ClxSprite clx)
 
 void ClxDraw(const Surface &out, Point position, ClxSprite clx)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx)) return;
+#endif
+#ifdef USE_SDL3
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+	reincarnated::ClassicSpriteScope hd(reincarnated::DrawHdSheet(out, position.x, position.y, clx));
+#endif
 	DoRenderBackwards(out, position, clx.pixelData(), clx.pixelDataSize(), clx.width(), clx.height(), BlitDirect {});
+#ifdef USE_SDL3
+    reincarnated::RememberGpuUiSurface(out, position.x, position.y, clx);
+#endif
 }
 
 void ClxDrawTRN(const Surface &out, Point position, ClxSprite clx, const uint8_t *trn)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx, trn)) return;
+#endif
+#ifdef USE_SDL3
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+	reincarnated::ClassicSpriteScope hd(reincarnated::DrawHdSheet(out, position.x, position.y, clx, trn));
+#endif
 	DoRenderBackwards(out, position, clx.pixelData(), clx.pixelDataSize(), clx.width(), clx.height(), BlitWithMap { trn });
+#ifdef USE_SDL3
+    reincarnated::RememberGpuUiSurface(out, position.x, position.y, clx);
+#endif
 }
 
 void ClxDrawWithLightmap(const Surface &out, Point position, ClxSprite clx, const Lightmap &lightmap)
 {
+#ifdef USE_SDL3
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+	reincarnated::ClassicSpriteScope hd(reincarnated::DrawHdSheet(out, position.x, position.y, clx, nullptr, &lightmap));
+#endif
 	DoRenderBackwards(out, position, clx.pixelData(), clx.pixelDataSize(), clx.width(), clx.height(), BlitWithLightmap { lightmap });
 }
 
 void ClxDrawBlended(const Surface &out, Point position, ClxSprite clx)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx, nullptr, true)) return;
+#endif
+#ifdef USE_SDL3
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+	reincarnated::ClassicSpriteScope hd(reincarnated::DrawHdSheet(out, position.x, position.y, clx, nullptr, nullptr, true));
+#endif
 	DoRenderBackwards(out, position, clx.pixelData(), clx.pixelDataSize(), clx.width(), clx.height(), BlitBlended {});
 }
 
 void ClxDrawBlendedTRN(const Surface &out, Point position, ClxSprite clx, const uint8_t *trn)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx, trn, true)) return;
+#endif
+#ifdef USE_SDL3
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+	reincarnated::ClassicSpriteScope hd(reincarnated::DrawHdSheet(out, position.x, position.y, clx, trn, nullptr, true));
+#endif
 	DoRenderBackwards(out, position, clx.pixelData(), clx.pixelDataSize(), clx.width(), clx.height(), BlitBlendedWithMap { trn });
 }
 
 void ClxDrawBlendedWithLightmap(const Surface &out, Point position, ClxSprite clx, const Lightmap &lightmap)
 {
+#ifdef USE_SDL3
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+	reincarnated::ClassicSpriteScope hd(reincarnated::DrawHdSheet(out, position.x, position.y, clx, nullptr, &lightmap, true));
+#endif
 	DoRenderBackwards(out, position, clx.pixelData(), clx.pixelDataSize(), clx.width(), clx.height(), BlitBlendedWithLightmap { lightmap });
 }
 
 void ClxDrawOutline(const Surface &out, uint8_t col, Point position, ClxSprite clx)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawHdSheet(out, position.x, position.y, clx, nullptr, nullptr, false, col)) return;
+    if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx, nullptr, false, col)) return;
+#endif
 	RenderClxOutline</*SkipColorIndexZero=*/false>(out, position, clx, col);
 }
 
 void ClxDrawOutlineSkipColorZero(const Surface &out, uint8_t col, Point position, ClxSprite clx)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawHdSheet(out, position.x, position.y, clx, nullptr, nullptr, false, col)) return;
+    if (reincarnated::DrawGpuUiSprite(out, position.x, position.y, clx, nullptr, false, col, true)) return;
+#endif
 	RenderClxOutline</*SkipColorIndexZero=*/true>(out, position, clx, col);
 }
 

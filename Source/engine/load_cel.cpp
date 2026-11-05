@@ -14,6 +14,7 @@
 #include "mpq/mpq_common.hpp"
 #include "utils/status_macros.hpp"
 #include "utils/str_cat.hpp"
+#include "reincarnated/sheet_source.hpp"
 
 #ifdef UNPACKED_MPQS
 #include "engine/load_clx.hpp"
@@ -29,14 +30,15 @@ std::expected<OwnedClxSpriteListOrSheet, std::string> LoadCelListOrSheetWithStat
 	char path[MaxMpqPathSize];
 	*BufCopy(path, pszName, DEVILUTIONX_CEL_EXT) = '\0';
 #ifdef UNPACKED_MPQS
-	return LoadClxListOrSheetWithStatus(path);
+	ASSIGN_OR_RETURN(OwnedClxSpriteListOrSheet result, LoadClxListOrSheetWithStatus(path));
+	return reincarnated::AnnotateSheetSource(std::move(result), pszName);
 #else
 	size_t size;
 	ASSIGN_OR_RETURN(std::unique_ptr<uint8_t[]> data, LoadFileInMemWithStatus<uint8_t>(path, &size));
 #ifdef DEBUG_CEL_TO_CL2_SIZE
 	std::cout << path;
 #endif
-	return CelToClx(data.get(), size, widthOrWidths);
+	return reincarnated::AnnotateSheetSource(CelToClx(data.get(), size, widthOrWidths), pszName);
 #endif
 }
 

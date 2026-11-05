@@ -6,6 +6,7 @@
 #include <version>
 
 #include "engine/render/light_render.hpp"
+#include "reincarnated/raster_bridge.hpp"
 #include "utils/attributes.h"
 #include "utils/palette_blending.hpp"
 
@@ -21,12 +22,14 @@ DVL_ALWAYS_INLINE DVL_ATTRIBUTE_HOT void BlitFillDirect(uint8_t *dst, unsigned l
 {
 	DVL_ASSUME(length != 0);
 	std::memset(dst, color, length);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, length);
 }
 
 DVL_ALWAYS_INLINE DVL_ATTRIBUTE_HOT void BlitPixelsDirect(uint8_t *DVL_RESTRICT dst, const uint8_t *DVL_RESTRICT src, unsigned length)
 {
 	DVL_ASSUME(length != 0);
 	std::memcpy(dst, src, length);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, length);
 }
 
 struct BlitDirect {
@@ -44,12 +47,14 @@ inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitFillWithMap(uint8_t *dst, unsign
 {
 	DVL_ASSUME(length != 0);
 	std::memset(dst, colorMap[color], length);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, length);
 }
 
 inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitPixelsWithMap(uint8_t *DVL_RESTRICT dst, const uint8_t *DVL_RESTRICT src, unsigned length, const uint8_t *DVL_RESTRICT colorMap)
 {
 	DVL_ASSUME(length != 0);
 	std::transform(DEVILUTIONX_BLIT_EXECUTION_POLICY src, src + length, dst, [colorMap](uint8_t srcColor) { return colorMap[srcColor]; });
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, length);
 }
 
 struct BlitWithMap {
@@ -72,6 +77,7 @@ inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitFillWithLightmap(uint8_t *dst, u
 	std::transform(DEVILUTIONX_BLIT_EXECUTION_POLICY light, light + length, dst, [color, &lightmap](uint8_t lightLevel) {
 		return lightmap.adjustColor(color, lightLevel);
 	});
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, length);
 }
 
 inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitPixelsWithLightmap(uint8_t *DVL_RESTRICT dst, const uint8_t *DVL_RESTRICT src, unsigned length, const Lightmap &lightmap)
@@ -81,6 +87,7 @@ inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitPixelsWithLightmap(uint8_t *DVL_
 	std::transform(DEVILUTIONX_BLIT_EXECUTION_POLICY src, src + length, light, dst, [&lightmap](uint8_t srcColor, uint8_t lightLevel) {
 		return lightmap.adjustColor(srcColor, lightLevel);
 	});
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, length);
 }
 
 struct BlitWithLightmap {
@@ -98,6 +105,7 @@ struct BlitWithLightmap {
 
 inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitFillBlended(uint8_t *dst, unsigned length, uint8_t color)
 {
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorBlend(dst, length, nullptr, color);
 	DVL_ASSUME(length != 0);
 	std::for_each(DEVILUTIONX_BLIT_EXECUTION_POLICY dst, dst + length, [tbl = paletteTransparencyLookup[color]](uint8_t &dstColor) {
 		dstColor = tbl[dstColor];
@@ -106,6 +114,7 @@ inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitFillBlended(uint8_t *dst, unsign
 
 inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitPixelsBlended(uint8_t *DVL_RESTRICT dst, const uint8_t *DVL_RESTRICT src, unsigned length)
 {
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorBlend(dst, length, src, 0);
 	DVL_ASSUME(length != 0);
 	std::transform(DEVILUTIONX_BLIT_EXECUTION_POLICY src, src + length, dst, dst, [pal = paletteTransparencyLookup](uint8_t srcColor, uint8_t dstColor) {
 		return pal[srcColor][dstColor];
@@ -125,6 +134,7 @@ struct BlitBlended {
 
 inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitPixelsBlendedWithMap(uint8_t *DVL_RESTRICT dst, const uint8_t *DVL_RESTRICT src, unsigned length, const uint8_t *DVL_RESTRICT colorMap)
 {
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorBlend(dst, length, src, 0, colorMap);
 	DVL_ASSUME(length != 0);
 	std::transform(DEVILUTIONX_BLIT_EXECUTION_POLICY src, src + length, dst, dst, [colorMap, pal = paletteTransparencyLookup](uint8_t srcColor, uint8_t dstColor) {
 		return pal[dstColor][colorMap[srcColor]];
@@ -146,6 +156,7 @@ struct BlitBlendedWithMap {
 
 inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitFillBlendedWithLightmap(uint8_t *dst, unsigned length, uint8_t color, const Lightmap &lightmap)
 {
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorBlend(dst, length, nullptr, color, nullptr, &lightmap);
 	DVL_ASSUME(length != 0);
 	const uint8_t *light = lightmap.getLightingAt(dst);
 	std::transform(DEVILUTIONX_BLIT_EXECUTION_POLICY light, light + length, dst, dst, [color, &lightmap, pal = paletteTransparencyLookup](uint8_t lightLevel, uint8_t dstColor) {
@@ -156,6 +167,7 @@ inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitFillBlendedWithLightmap(uint8_t 
 
 inline DVL_NO_INLINE DVL_ATTRIBUTE_HOT void BlitPixelsBlendedWithLightmap(uint8_t *DVL_RESTRICT dst, const uint8_t *DVL_RESTRICT src, unsigned length, const Lightmap &lightmap)
 {
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorBlend(dst, length, src, 0, nullptr, &lightmap);
 	DVL_ASSUME(length != 0);
 	const uint8_t *light = lightmap.getLightingAt(dst);
 

@@ -1,0 +1,19 @@
+{
+  "version": "0.4.0-pre",
+  "date": "2026-10-23",
+  "timezone": "America/Toronto",
+  "sourceBaseSha": "073e2cc12d67cf5d09d9d114f2e7d78b7fd65493",
+  "kind": "local-tested-development-build",
+  "executableSha256": "F43F53A3F57090EA4C8B52E5B205C298FEFC01C44BD2C9F38932D3FF13659E8B",
+  "windowsFileVersion": "0.4.0-pre",
+  "windowsProductVersion": "0.4.0-pre",
+  "upstreamFormatVersion": "1.6.0",
+  "sheetStructuralAudit": { "count": 1102, "matchingOriginals": 1102, "invalidGrids": 0, "interlaced": 0 },
+  "sheetRenderingRegression": "passed",
+  "existingRendererFoundationTests": { "passed": 4, "failed": 0 },
+  "gameplayReplay": { "frames": 4853, "exitCode": 0, "sameReferenceSaveOutcome": true, "seconds": 57.88, "averageFpsWithCaptures": 83.8 },
+  "uiReplay": { "frames": 2700, "exitCode": 0, "seconds": 16.25, "zoomedHudSamplesMatchingClassic": 3 },
+  "artworkUploaded": false,
+  "saveOrSettingsChanges": false,
+  "limits": ["Local validation is not a tested CI artifact release", "Not a full playthrough or every class/animation visual check", "GPU texture captures are not desktop or physical input verification", "Current world mapping is 1x/2x CPU composition with SDL_GPU presentation"]
+}

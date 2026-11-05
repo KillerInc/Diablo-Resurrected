@@ -1,4 +1,5 @@
 #include "engine/surface.hpp"
+#include "reincarnated/gpu_ui.hpp"
 
 #include <cstdint>
 #include <cstring>
@@ -10,6 +11,10 @@ namespace {
 template <bool SkipColorIndexZero>
 void SurfaceBlit(const Surface &src, SDL_Rect srcRect, const Surface &dst, Point dstPosition)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiSurface(dst, src, srcRect, dstPosition, SkipColorIndexZero)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(dst);
+#endif
 	// We do not use `SDL_BlitSurface` here because the palettes may be different objects
 	// and SDL would attempt to map them.
 
@@ -25,14 +30,17 @@ void SurfaceBlit(const Surface &src, SDL_Rect srcRect, const Surface &dst, Point
 	for (unsigned h = srcRect.h; h != 0; --h) {
 		if (SkipColorIndexZero) {
 			for (unsigned w = srcRect.w; w != 0; --w) {
-				if (*srcBuf != 0)
+				if (*srcBuf != 0) {
 					*dstBuf = *srcBuf;
+					if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dstBuf, 1);
+				}
 				++srcBuf, ++dstBuf;
 			}
 			srcBuf += srcPitch - srcRect.w;
 			dstBuf += dstPitch - srcRect.w;
 		} else {
 			std::memcpy(dstBuf, srcBuf, srcRect.w);
+			if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dstBuf, srcRect.w);
 			srcBuf += srcPitch;
 			dstBuf += dstPitch;
 		}

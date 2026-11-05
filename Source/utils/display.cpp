@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 #ifdef USE_SDL3
@@ -47,6 +48,7 @@
 #include "engine/backbuffer_state.hpp"
 #include "engine/dx.h"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_presenter.hpp"
 #include "headless_mode.hpp"
 #include "options.h"
 #include "utils/log.hpp"
@@ -635,11 +637,44 @@ bool SpawnWindow(const char *lpWindowName)
 	}
 
 #ifdef USE_SDL3
-	if (*GetOptions().Graphics.upscale) {
-		if (!SDL_CreateWindowAndRenderer(lpWindowName, windowSize.width, windowSize.height, flags, &ghMainWnd, &renderer)) ErrSdl();
-	} else {
-		ghMainWnd = SDL_CreateWindow(lpWindowName, windowSize.width, windowSize.height, flags);
-	}
+    // Test runs stay on the user's left-hand secondary monitor. Use creation
+    // properties so the window never flashes onto the primary display first.
+    const char *testDisplay = SDL_getenv("D1R_TEST_DISPLAY");
+    if (testDisplay != nullptr && std::string_view(testDisplay) == "left") {
+        int count = 0;
+        SDL_DisplayID *displays = SDL_GetDisplays(&count);
+        SDL_Rect primaryBounds {};
+        const auto primary = SDL_GetPrimaryDisplay();
+        if (!displays || !SDL_GetDisplayBounds(primary, &primaryBounds)) ErrSdl();
+        SDL_DisplayID selected = 0;
+        SDL_Rect selectedBounds = primaryBounds;
+        for (int i = 0; i < count; ++i) {
+            SDL_Rect bounds;
+            if (displays[i] != primary && SDL_GetDisplayBounds(displays[i], &bounds)
+                && bounds.x < selectedBounds.x) {
+                selected = displays[i]; selectedBounds = bounds;
+            }
+        }
+        SDL_free(displays);
+        if (!selected) {
+            SDL_SetError("Test display unavailable: no monitor left of the primary display");
+            ErrSdl();
+        }
+        const auto properties = SDL_CreateProperties();
+        if (!properties
+            || !SDL_SetStringProperty(properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, lpWindowName)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, windowSize.width)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, windowSize.height)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, flags)
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(selected))
+            || !SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED_DISPLAY(selected))) ErrSdl();
+        ghMainWnd = SDL_CreateWindowWithProperties(properties);
+        SDL_DestroyProperties(properties);
+        Log("Test display: left secondary id={} bounds={},{},{}x{}", selected,
+            selectedBounds.x, selectedBounds.y, selectedBounds.w, selectedBounds.h);
+    } else {
+        ghMainWnd = SDL_CreateWindow(lpWindowName, windowSize.width, windowSize.height, flags);
+    }
 #else
 	ghMainWnd = SDL_CreateWindow(lpWindowName, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowSize.width, windowSize.height, flags);
 #endif
@@ -764,6 +799,10 @@ void ReinitializeRenderer()
 		ErrSdl();
 	}
 	AdjustToScreenGeometry(Size(surface->w, surface->h));
+#elif defined(USE_SDL3)
+    reincarnated::InitializeGpuPresenter(ghMainWnd);
+    RendererTextureSurface.reset(SDL_CreateSurface(gnScreenWidth, gnScreenHeight, SDL_PIXELFORMAT_RGBA32));
+    if (!RendererTextureSurface) ErrSdl();
 #else
 
 	if (*GetOptions().Graphics.upscale) {
@@ -898,7 +937,11 @@ void ResizeWindow()
 	}
 
 	// Handle switching between "fake fullscreen" and "true fullscreen" when upscale is toggled
-	const bool upscaleChanged = *GetOptions().Graphics.upscale != (renderer != nullptr);
+	#ifdef USE_SDL3
+    const bool upscaleChanged = false; // GPU owns both scaled and 1:1 presentation.
+#else
+    const bool upscaleChanged = *GetOptions().Graphics.upscale != (renderer != nullptr);
+#endif
 	if (upscaleChanged && *GetOptions().Graphics.fullscreen) {
 #ifdef USE_SDL3
 		if (!SDL_SetWindowFullscreen(ghMainWnd, *GetOptions().Graphics.fullscreen)) ErrSdl();
@@ -918,7 +961,7 @@ void ResizeWindow()
 
 #ifndef USE_SDL1
 #ifdef USE_SDL3
-	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr);
+	SDL_SetWindowResizable(ghMainWnd, reincarnated::HasGpuPresenter());
 #else
 	SDL_SetWindowResizable(ghMainWnd, renderer != nullptr ? SDL_TRUE : SDL_FALSE);
 #endif
@@ -937,8 +980,11 @@ SDL_Surface *GetOutputSurface()
 		ErrSdl();
 	return ret;
 #else
-	if (renderer != nullptr)
-		return RendererTextureSurface.get();
+	#ifdef USE_SDL3
+    if (reincarnated::HasGpuPresenter()) return RendererTextureSurface.get();
+#endif
+    if (renderer != nullptr)
+        return RendererTextureSurface.get();
 	SDL_Surface *ret = SDL_GetWindowSurface(ghMainWnd);
 	if (ret == nullptr)
 		ErrSdl();

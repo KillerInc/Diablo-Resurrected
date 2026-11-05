@@ -11,6 +11,7 @@
 // #define DEBUG_RENDER_OFFSET_Y 5
 
 #include "engine/render/dun_render.hpp"
+#include "reincarnated/gpu_terrain.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -123,6 +124,7 @@ template <>
 DVL_ALWAYS_INLINE DVL_ATTRIBUTE_HOT void RenderLineOpaque<LightType::FullyDark>(uint8_t *DVL_RESTRICT dst, [[maybe_unused]] const uint8_t *DVL_RESTRICT src, uint_fast8_t n, [[maybe_unused]] const uint8_t *DVL_RESTRICT tbl, [[maybe_unused]] const Lightmap *lightmap)
 {
 	FillBytesUpTo32(dst, n, 0);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, n);
 }
 
 template <>
@@ -130,6 +132,7 @@ DVL_ALWAYS_INLINE DVL_ATTRIBUTE_HOT void RenderLineOpaque<LightType::FullyLit>(u
 {
 #ifndef DEBUG_RENDER_COLOR
 	CopyBytesUpTo32(dst, src, n);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, n);
 #else
 	BlitFillDirect(dst, n, DBGCOLOR);
 #endif
@@ -1040,6 +1043,9 @@ std::string_view MaskTypeToString(MaskType maskType)
 DVL_ATTRIBUTE_HOT void RenderTileFrame(const Surface &out, const Lightmap &lightmap, const Point &position, TileType tile, const uint8_t *src, int_fast16_t height,
     MaskType maskType, const uint8_t *tbl)
 {
+#ifdef USE_SDL3
+	reincarnated::GpuTerrainTileScope terrain(src, position.x + out.region.x, position.y + out.region.y, tile, height, lightmap, tbl);
+#endif
 #ifdef DEBUG_RENDER_OFFSET_X
 	position.x += DEBUG_RENDER_OFFSET_X;
 #endif
@@ -1056,6 +1062,9 @@ DVL_ATTRIBUTE_HOT void RenderTileFrame(const Surface &out, const Lightmap &light
 	++DunRenderStats[DunRenderType { tile, maskType }];
 #endif
 
+#ifdef USE_SDL3
+	if (!reincarnated::QueueGpuTerrainTile(out, maskType, tbl))
+#endif
 	switch (maskType) {
 	case MaskType::Solid:
 		RenderTileDispatch</*Transparent=*/false>(tile, dst, dstPitch, src, tbl, lightmap, clip);

@@ -1,0 +1,64 @@
+#pragma once
+#ifdef USE_SDL3
+#include <SDL3/SDL_gpu.h>
+#include <array>
+#include <memory>
+#include <vector>
+#include "sheet_source.hpp"
+namespace reincarnated {
+struct GpuUiPanel;
+struct GpuPage { SDL_GPUTexture *texture=nullptr; unsigned width=0,height=0; };
+struct GpuFrame { unsigned page=0,x=0,y=0,w=0,h=0,cropX=0,cropY=0; };
+struct GpuSheet {
+    SDL_GPUDevice *owner=nullptr;
+    unsigned density=0,columns=0,rows=0,width=0,height=0;
+    int anchorX=0,anchorY=0;
+    // Explicit root-layout marker; retain the native CEL animation clock.
+    bool authoredTowner=false;
+    size_t bytes=0;
+    std::vector<GpuPage> pages;
+    std::vector<GpuFrame> frames;
+    ~GpuSheet();
+};
+struct GpuSpriteDraw {
+    std::shared_ptr<GpuUiPanel> panel;
+    std::shared_ptr<GpuSheet> sheet, uiIndices;
+    bool ui = false, uiHd = false;
+    float uiX = 0, uiY = 0, uiScaleX = 1, uiScaleY = 1;
+    std::array<uint8_t, 256> uiTranslation {};
+    GpuFrame frame;
+    float x=0,y=0,w=0,h=0,alpha=1;
+    unsigned outlineRadius = 0;
+    std::array<float, 4> outlineColor {};
+    int maskX=0,maskY=0,maskW=0,maskH=0;
+    std::vector<unsigned char> coverage,lighting,palette,cursorCoverage;
+};
+struct GpuUiPanel {
+    std::vector<GpuSpriteDraw> commands;
+    std::shared_ptr<GpuSheet> composite;
+    std::array<SDL_Color, 256> palette {};
+    bool valid = false;
+};
+struct GpuSpriteStats { size_t sheets=0,playerSheets=0,bytes=0,cpuMaskBytes=0; uint64_t uploads=0,draws=0,renderPasses=0,paletteUploads=0,controlBytes=0; };
+void InitializeGpuSprites(SDL_GPUDevice *device);
+void DestroyGpuSprites();
+std::shared_ptr<GpuSheet> LoadGpuSheet(const SheetSource &source);
+void ReleaseGpuPlayerSheets();
+bool CanDrawGpuUi();
+std::shared_ptr<GpuSheet> CreateGpuUiIndices(unsigned width, unsigned height, const uint8_t *rgba);
+GpuSpriteStats GetGpuSpriteStats();
+void BeginGpuSpriteFrame();
+void QueueGpuSprite(GpuSpriteDraw draw);
+void MaskGpuSpritePixel(int x,int y,unsigned char r,unsigned char g,unsigned char b,unsigned alpha);
+// Opaque raster spans permanently hide earlier GPU pixels in their intersection.
+void MaskGpuSpriteOpaqueSpan(int x,int y,unsigned length);
+void MaskGpuSpriteBlendedSpan(int x,int y,const uint32_t *colors,unsigned length);
+void SaveGpuSpriteCursor();
+void RestoreGpuSpriteCursor();
+bool HasQueuedGpuSprites();
+bool GpuSpriteFrameReady();
+void SetGpuSpriteFrameReady(bool ready);
+void WarmGpuSpritePalette(const SDL_Color *palette);
+void RenderGpuSprites(SDL_GPUCommandBuffer *command,SDL_GPUTexture *target,int logicalWidth,int logicalHeight,int pixelWidth,int pixelHeight);
+}
+#endif

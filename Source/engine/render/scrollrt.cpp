@@ -1,3 +1,4 @@
+#include "reincarnated/performance_monitor.hpp"
 /**
  * @file scrollrt.cpp
  *
@@ -10,6 +11,7 @@
 #include <cstdint>
 
 #ifdef USE_SDL3
+#include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_timer.h>
@@ -28,6 +30,7 @@
 #include "diablo_msg.hpp"
 #include "doom.h"
 #include "engine/backbuffer_state.hpp"
+#include "engine/demomode.h"
 #include "engine/displacement.hpp"
 #include "engine/dx.h"
 #include "engine/point.hpp"
@@ -54,6 +57,9 @@
 #include "nthread.h"
 #include "options.h"
 #include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_terrain.hpp"
+#include "reincarnated/gpu_ui.hpp"
+#include "reincarnated/raster_bridge.hpp"
 #include "panels/charpanel.hpp"
 #include "panels/console.hpp"
 #include "panels/partypanel.hpp"
@@ -225,6 +231,9 @@ void BlitCursor(uint8_t *dst, uint32_t dstPitch, uint8_t *src, uint32_t srcPitch
  */
 void UndrawCursor(const Surface &out)
 {
+#ifdef USE_SDL3
+    reincarnated::RestoreHdCursorBackground();
+#endif
 	DrawnCursor &cursor = GetDrawnCursor();
 	BlitCursor(&out[cursor.rect.position], out.pitch(), cursor.behindBuffer, cursor.rect.size.width, cursor.rect.size.width, cursor.rect.size.height);
 	PrevCursorRect = cursor.rect;
@@ -327,6 +336,9 @@ void DrawCursor(const Surface &out)
 		return;
 
 	BlitCursor(cursor.behindBuffer, rect.size.width, &out[rect.position], out.pitch(), rect.size.width, rect.size.height);
+#ifdef USE_SDL3
+    reincarnated::SaveHdCursorBackground(rect.position.x, rect.position.y, rect.size.width, rect.size.height);
+#endif
 	DrawSoftwareCursor(out, cursPosition + Displacement { 0, cursSize.height - 1 }, pcurs);
 }
 
@@ -385,12 +397,19 @@ void DrawMonster(const Surface &out, Point tilePosition, Point targetBufferPosit
 
 	const ClxSprite sprite = monster.animInfo.currentSprite();
 #ifndef USE_SDL1
-	if (reincarnated::QueueHdMonster(static_cast<int>(monster.type().type),
+	const bool hdMonster =
+#ifdef USE_SDL3
+        !reincarnated::HasHdSheet(sprite) &&
+#endif
+        reincarnated::QueueHdMonster(static_cast<int>(monster.type().type),
 	        static_cast<int>(monster.direction),
 	        monster.animInfo.getFrameToUseForRendering(),
 	        targetBufferPosition.x, targetBufferPosition.y,
-	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1))
-		return;
+	        sprite.width(), sprite.height(), *GetOptions().Graphics.zoom ? 2 : 1);
+#ifndef USE_SDL3
+    if (hdMonster) return;
+#endif
+	reincarnated::ClassicSpriteScope hdMonsterScope(hdMonster);
 #endif
 
 	if (!IsTileLit(tilePosition)) {
@@ -474,6 +493,16 @@ uint8_t GetPlayerOutlineColor(int id)
  * @param tilePosition dPiece coordinates
  * @param targetBufferPosition Output buffer coordinates
  */
+bool DrawClassicUnderHd(bool hasReplacement)
+{
+#ifdef USE_SDL3
+    (void)hasReplacement;
+    return true;
+#else
+    return !hasReplacement;
+#endif
+}
+
 void DrawPlayer(const Surface &out, const Player &player, Point tilePosition, Point targetBufferPosition, int lightTableIndex)
 {
 	if (!IsTileLit(tilePosition) && !MyPlayer->_pInfraFlag && !MyPlayer->isOnArenaLevel() && leveltype != DTYPE_TOWN) {
@@ -484,7 +513,11 @@ void DrawPlayer(const Surface &out, const Player &player, Point tilePosition, Po
 	const Point spriteBufferPosition = targetBufferPosition + player.getRenderingOffset(sprite);
 bool hdSprite = false;
 #ifndef USE_SDL1
-	hdSprite = reincarnated::QueueHdPlayer(static_cast<int>(player._pClass),
+	hdSprite =
+#ifdef USE_SDL3
+        !reincarnated::HasHdSheet(sprite) &&
+#endif
+        reincarnated::QueueHdPlayer(static_cast<int>(player._pClass),
 	    static_cast<int>(player._pdir),
 	    player.AnimInfo.getFrameToUseForRendering(),
 	    spriteBufferPosition.x, spriteBufferPosition.y,
@@ -495,22 +528,19 @@ bool hdSprite = false;
 		ClxDrawOutlineSkipColorZero(out, GetPlayerOutlineColor(player.getId()), spriteBufferPosition, sprite);
 
 	if (&player == MyPlayer && IsNoneOf(leveltype, DTYPE_NEST, DTYPE_CRYPT)) {
-		if (!hdSprite)
-			ClxDraw(out, spriteBufferPosition, sprite);
+		if (DrawClassicUnderHd(hdSprite)) { reincarnated::ClassicSpriteScope scope(hdSprite); ClxDraw(out, spriteBufferPosition, sprite); }
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 		return;
 	}
 
 	if (!IsTileLit(tilePosition) || ((MyPlayer->_pInfraFlag || MyPlayer->isOnArenaLevel()) && lightTableIndex > 8)) {
-		if (!hdSprite)
-			ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN());
+		if (DrawClassicUnderHd(hdSprite)) { reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawTRN(out, spriteBufferPosition, sprite, GetInfravisionTRN()); }
 		DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/true, lightTableIndex);
 		return;
 	}
 
 	lightTableIndex = std::max(lightTableIndex - 5, 0);
-	if (!hdSprite)
-		ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex);
+	if (DrawClassicUnderHd(hdSprite)) { reincarnated::ClassicSpriteScope scope(hdSprite); ClxDrawLight(out, spriteBufferPosition, sprite, lightTableIndex); }
 	DrawPlayerIcons(out, player, targetBufferPosition, /*infraVision=*/false, lightTableIndex);
 }
 
@@ -569,11 +599,16 @@ static void DrawDungeon(const Surface & /*out*/, const Lightmap & /*lightmap*/, 
 void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, Point targetBufferPosition, int lightTableIndex)
 {
 	const uint16_t levelPieceId = dPiece[tilePosition.x][tilePosition.y];
-#ifndef USE_SDL1
-	reincarnated::QueueHdTile(static_cast<int>(leveltype), levelPieceId,
-	    targetBufferPosition.x, targetBufferPosition.y,
-	    TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
+#ifdef USE_SDL3
+	const reincarnated::GpuTerrainCellScope gpuCell(tilePosition.x, tilePosition.y, levelPieceId);
 #endif
+
+#if !defined(USE_SDL1) && !defined(USE_SDL3)
+    reincarnated::QueueHdTile(static_cast<int>(leveltype), levelPieceId,
+        targetBufferPosition.x, targetBufferPosition.y,
+        TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
+#endif
+
 	const MICROS *pMap = &DPieceMicros[levelPieceId];
 
 	const uint8_t *tbl = LightTables[lightTableIndex].data();
@@ -704,6 +739,13 @@ void DrawCell(const Surface &out, const Lightmap lightmap, Point tilePosition, P
  */
 void DrawFloorTile(const Surface &out, const Lightmap &lightmap, Point tilePosition, Point targetBufferPosition)
 {
+#ifdef USE_SDL3
+	const reincarnated::GpuTerrainCellScope gpuCell(tilePosition.x, tilePosition.y, dPiece[tilePosition.x][tilePosition.y]);
+    const bool hdFloor = reincarnated::QueueHdTile(static_cast<int>(leveltype), dPiece[tilePosition.x][tilePosition.y],
+        targetBufferPosition.x, targetBufferPosition.y, TILE_WIDTH, TILE_HEIGHT, *GetOptions().Graphics.zoom ? 2 : 1);
+    reincarnated::ClassicSpriteScope floorScope(hdFloor);
+#endif
+
 	const int lightTableIndex = dLight[tilePosition.x][tilePosition.y];
 
 	const uint8_t *tbl = LightTables[lightTableIndex].data();
@@ -765,6 +807,10 @@ void DrawMonsterHelper(const Surface &out, Point tilePosition, Point targetBuffe
 		auto &towner = Towners[mi];
 		const Point position = targetBufferPosition + towner.getRenderingOffset();
 		const ClxSprite sprite = towner.currentSprite();
+#ifdef USE_SDL3
+		if (mi == pcursmonst && reincarnated::DrawHdTownerWithOutline(out, position.x, position.y, sprite, OutlineColorsTowner))
+			return;
+#endif
 		if (mi == pcursmonst) {
 			ClxDrawOutlineSkipColorZero(out, OutlineColorsTowner, position, sprite);
 		}
@@ -808,7 +854,15 @@ void DrawDungeon(const Surface &out, const Lightmap &lightmap, Point tilePositio
 	assert(InDungeonBounds(tilePosition));
 	const int lightTableIndex = dLight[tilePosition.x][tilePosition.y];
 
-	DrawCell(out, lightmap, tilePosition, targetBufferPosition, lightTableIndex);
+#ifdef USE_SDL3
+	const bool rc2Rock = reincarnated::IsGpuRc2RockCell(tilePosition.x, tilePosition.y, dPiece[tilePosition.x][tilePosition.y]);
+	if (!rc2Rock || !reincarnated::HasGpuRc2RockGround())
+#endif
+		DrawCell(out, lightmap, tilePosition, targetBufferPosition, lightTableIndex);
+#ifdef USE_SDL3
+	if (rc2Rock)
+		reincarnated::QueueGpuRc2RockProp(targetBufferPosition.x + out.region.x, targetBufferPosition.y + out.region.y);
+#endif
 
 	const int8_t bDead = dCorpse[tilePosition.x][tilePosition.y];
 	const int8_t bMap = dTransVal[tilePosition.x][tilePosition.y];
@@ -983,6 +1037,13 @@ void DrawFloor(const Surface &out, const Lightmap &lightmap, Point tilePosition,
 		for (int j = 0; j < columns; j++, tilePosition += Direction::East, targetBufferPosition.x += TILE_WIDTH) {
 			if (!InDungeonBounds(tilePosition))
 				continue;
+#ifdef USE_SDL3
+			if (reincarnated::IsGpuRc2RockCell(tilePosition.x, tilePosition.y, dPiece[tilePosition.x][tilePosition.y])) {
+				DrawCell(out, lightmap, tilePosition, targetBufferPosition, dLight[tilePosition.x][tilePosition.y]);
+				reincarnated::SetGpuRc2RockGround(targetBufferPosition.x + out.region.x, targetBufferPosition.y + out.region.y);
+				continue;
+			}
+#endif
 			if (IsFloor(tilePosition)) {
 				DrawFloorTile(out, lightmap, tilePosition, targetBufferPosition);
 			}
@@ -1071,11 +1132,11 @@ void DrawTileContent(const Surface &out, const Lightmap &lightmap, Point tilePos
 
 void DrawDirtTile(const Surface &out, const Lightmap &lightmap, Point tilePosition, Point targetBufferPosition)
 {
-	// This should be the *top-left* of the 2×2 dirt pattern in the actual dungeon.
+	// This should be the *top-left* of the 2Ãƒâ€”2 dirt pattern in the actual dungeon.
 	// You might need to tweak these to where your dirt patch actually lives.
 	constexpr Point base { 0, 0 };
 
-	// Decide which of the 4 tiles of the 2×2 block to use,
+	// Decide which of the 4 tiles of the 2Ãƒâ€”2 block to use,
 	// based on where this OOB tile is in the world grid.
 	const int ox = (tilePosition.x & 1); // 0 or 1
 	const int oy = (tilePosition.y & 1); // 0 or 1
@@ -1253,6 +1314,9 @@ void CalcFirstTilePosition(Point &position, Displacement &offset)
  */
 void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 {
+#ifdef USE_SDL3
+	reincarnated::CpuStageScope setupProfile(reincarnated::CpuStage::WorldSetup);
+#endif
 	// Limit rendering to the view area
 	const Surface &out = !*GetOptions().Graphics.zoom
 	    ? fullOut.subregionY(0, gnViewportHeight)
@@ -1308,18 +1372,42 @@ void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 	DunRenderStats.clear();
 #endif
 
+#ifdef USE_SDL3
+	setupProfile.finish();
+	reincarnated::CpuStageScope lightProfile(reincarnated::CpuStage::Lighting);
+#endif
 	Lightmap lightmap = Lightmap::build(*GetOptions().Graphics.perPixelLighting, position, Point {} + offset,
 	    gnScreenWidth, gnViewportHeight, rows, columns,
 	    out.at(0, 0), out.pitch(), LightTables, FullyLitLightTable, FullyDarkLightTable,
 	    dLight, MicroTileLen);
 
+#ifdef USE_SDL3
+	lightProfile.finish();
+	reincarnated::CpuStageScope floorProfile(reincarnated::CpuStage::Floor);
+#endif
 	DrawFloor(out, lightmap, position, Point {} + offset, rows, columns);
+#ifdef USE_SDL3
+	reincarnated::QueueGpuRc2RockShadow();
+	floorProfile.finish();
+	reincarnated::CpuStageScope contentProfile(reincarnated::CpuStage::TileContent);
+#endif
 	DrawTileContent(out, lightmap, position, Point {} + offset, rows, columns);
+#ifdef USE_SDL3
+	contentProfile.finish();
+	reincarnated::CpuStageScope finishProfile(reincarnated::CpuStage::WorldFinish);
+#endif
 	DrawOOB(out, lightmap, position, Point {} + offset, rows, columns);
 
-	if (*GetOptions().Graphics.zoom) {
+	if (*GetOptions().Graphics.zoom
+#ifdef USE_SDL3
+	    && !reincarnated::GpuTerrainSkipsNativePainting()
+#endif
+	) {
 		Zoom(fullOut.subregionY(0, gnViewportHeight));
 	}
+#ifdef USE_SDL3
+	reincarnated::EndHdWorldFrame();
+#endif
 
 #ifdef DUN_RENDER_STATS
 	std::vector<std::pair<DunRenderType, size_t>> sortedStats(DunRenderStats.begin(), DunRenderStats.end());
@@ -1353,6 +1441,9 @@ void DrawView(const Surface &out, Point startPosition)
 	Displacement offset = {};
 	CalcFirstTilePosition(startPosition, offset);
 	DrawGame(out, startPosition, offset);
+#ifdef USE_SDL3
+	reincarnated::CpuStageScope viewUiProfile(reincarnated::CpuStage::ViewUi);
+#endif
 	if (AutomapActive) {
 		DrawAutomap(out.subregionY(0, gnViewportHeight));
 	}
@@ -1883,7 +1974,19 @@ void DrawAndBlit()
 
 	const Rectangle &mainPanel = GetMainPanel();
 
-	if (gnScreenWidth > mainPanel.size.width || IsRedrawEverything()) {
+	bool persistentHud = false;
+    bool gpuUiHud = false;
+	bool hudNeedsRedraw = false;
+#ifdef USE_SDL3
+	persistentHud = reincarnated::GetRendererSwitch().usesHdRenderer() && !reincarnated::GpuUiEnabled();
+    gpuUiHud = reincarnated::GpuUiEnabled();
+    if (gpuUiHud) hudNeedsRedraw = !reincarnated::PrepareGpuUiHudLayer(mainPanel.position.x, mainPanel.position.y, mainPanel.size.width, mainPanel.size.height);
+	if (persistentHud) {
+		hudNeedsRedraw = !reincarnated::PrepareHdHudLayer(mainPanel.position.x, mainPanel.position.y,
+		    mainPanel.size.width, mainPanel.size.height);
+	}
+#endif
+	if ((!persistentHud && !gpuUiHud && gnScreenWidth > mainPanel.size.width) || IsRedrawEverything() || hudNeedsRedraw) {
 		drawHealth = true;
 		drawMana = true;
 		drawControlButtons = true;
@@ -1896,6 +1999,10 @@ void DrawAndBlit()
 		drawCtrlPan = false;
 		hgt = gnViewportHeight;
 	}
+	// Widescreen still presents the complete world, including beside the HUD;
+	// it no longer forces unchanged HUD components to be drawn again.
+	if ((persistentHud || gpuUiHud) && gnScreenWidth > mainPanel.size.width)
+		hgt = gnScreenHeight;
 
 	const Surface &out = GlobalBackBuffer();
 	UndrawCursor(out);
@@ -1903,24 +2010,70 @@ void DrawAndBlit()
 	nthread_UpdateProgressToNextGameTick();
 
 	this_sdl_thread::yield();
-	DrawView(out, ViewPosition);
+#ifdef USE_SDL3
+    const uint64_t perfDrawStart = SDL_GetTicksNS();
+#endif
+	Point camera = ViewPosition;
+#ifdef USE_SDL3
+	// The isolated replay can frame the test patch without moving its hero.
+	if (leveltype == DTYPE_TOWN && demo::IsRunning() && SDL_getenv("D1R_HD_RC2_ROCK_CAMERA") != nullptr)
+		camera = { 87, 14 };
+	if (leveltype == DTYPE_TOWN && demo::IsRunning() && SDL_getenv("D1R_HD_RC2_WALK_REPLAY") != nullptr) {
+		static Point last { -1, -1 };
+		if (last != MyPlayer->position.tile) {
+			last = MyPlayer->position.tile;
+			Log("HD_RC2_WALK_REPLAY player=({}, {})", last.x, last.y);
+		}
+	}
+#endif
+	DrawView(out, camera);
+#ifdef USE_SDL3
+    reincarnated::GetPerformanceMonitor().drawMs = double(SDL_GetTicksNS() - perfDrawStart)/1e6;
+	reincarnated::CpuStageScope hudProfile(reincarnated::CpuStage::HudAndCursor);
+#endif
+	const Surface hudOut =
+#ifdef USE_SDL3
+	    reincarnated::HdHudLayerTarget(out);
+#else
+	    out;
+#endif
+#ifdef USE_SDL3
+    if(gpuUiHud){
+        if(reincarnated::BeginGpuUiHudComponent(0,drawCtrlPan)){DrawMainPanel(out);reincarnated::EndGpuUiHudComponent(0);}
+        if(reincarnated::BeginGpuUiHudComponent(1,drawHealth)){DrawLifeFlaskLower(out,true);reincarnated::EndGpuUiHudComponent(1);}
+        if(reincarnated::BeginGpuUiHudComponent(2,drawMana)){DrawManaFlaskLower(out,true);DrawSpell(out);reincarnated::EndGpuUiHudComponent(2);}
+        if(reincarnated::BeginGpuUiHudComponent(3,drawControlButtons)){DrawMainPanelButtons(out);reincarnated::EndGpuUiHudComponent(3);}
+        if(reincarnated::BeginGpuUiHudComponent(4,drawBelt)){DrawInvBelt(out);reincarnated::EndGpuUiHudComponent(4);}
+    } else
+#endif
+    {
 	if (drawCtrlPan) {
-		DrawMainPanel(out);
+		DrawMainPanel(hudOut);
 	}
 	if (drawHealth) {
-		DrawLifeFlaskLower(out, !drawCtrlPan);
+		DrawLifeFlaskLower(hudOut, !drawCtrlPan);
 	}
 	if (drawMana) {
-		DrawManaFlaskLower(out, !drawCtrlPan);
+		DrawManaFlaskLower(hudOut, !drawCtrlPan);
 
-		DrawSpell(out);
+		DrawSpell(hudOut);
 	}
 	if (drawControlButtons) {
-		DrawMainPanelButtons(out);
+		DrawMainPanelButtons(hudOut);
 	}
 	if (drawBelt) {
-		DrawInvBelt(out);
+		DrawInvBelt(hudOut);
 	}
+    }
+
+#ifdef USE_SDL3
+	if (gpuUiHud) DrawInfoBox(out);
+	if (persistentHud) {
+		reincarnated::CommitHdHudLayer(drawCtrlPan || drawHealth || drawMana || drawControlButtons || drawBelt);
+		// Text and transient overlays stay above the retained HUD background.
+		DrawInfoBox(out);
+	}
+#endif
 	if (drawChatInput) {
 		DrawChatBox(out);
 	}
@@ -1940,10 +2093,24 @@ void DrawAndBlit()
 	DrawCursor(out);
 
 	DrawFPS(out);
+#ifdef USE_SDL3
+    const auto &perf = reincarnated::GetPerformanceMonitor();
+    if (perf.visible) {
+        int y = 24;
+        for (const auto &line : perf.lines) {
+            DrawString(out, line, Point { 8, y }, { .flags = UiFlags::ColorWhite });
+            y += 14;
+        }
+    }
+#endif
 
 	lua::GameDrawComplete();
 
 	this_sdl_thread::yield();
+
+#ifdef USE_SDL3
+	hudProfile.finish();
+#endif
 	DrawMain(hgt, drawInfoBox, drawHealth, drawMana, drawBelt, drawControlButtons);
 
 #ifdef _DEBUG

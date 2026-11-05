@@ -1,3 +1,7 @@
+#ifdef USE_SDL3
+#include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_ui.hpp"
+#endif
 #include <memory>
 #include <optional>
 #include <vector>
@@ -78,16 +82,25 @@ Point GetPosition()
 
 void ProgressRenderBackground()
 {
+#ifdef USE_SDL3
+    reincarnated::BeginHdUiFrame(true);
+#endif
 	SDL_FillSurfaceRect(DiabloUiSurface(), nullptr, 0);
 
 	const Surface &out = Surface(DiabloUiSurface());
 	const Point position = GetPosition();
 	RenderClxSprite(out.subregion(position.x, position.y, 280, 140), (*ArtPopupSm)[0], { 0, 0 });
 	RenderClxSprite(out.subregion(GetCenterOffset(227), 0, 227, out.h()), (*ArtProgBG)[0], { 0, position.y + 52 });
+#ifdef USE_SDL3
+    reincarnated::SaveGpuUiScene();
+#endif
 }
 
 void ProgressRenderForeground(int progress)
 {
+#ifdef USE_SDL3
+    reincarnated::RestoreGpuUiScene();
+#endif
 	const Surface &out = Surface(DiabloUiSurface());
 	const Point position = GetPosition();
 	if (progress != 0) {
@@ -131,7 +144,7 @@ bool UiProgressDialog(int (*fnfunc)())
 	while (!endMenu && progress < 100) {
 		progress = fnfunc();
 		ProgressRenderForeground(progress);
-		UiRenderItems(vecProgress);
+		UiRenderItems(vecProgress, false);
 		DrawMouse();
 		UiFadeIn();
 

@@ -1,5 +1,6 @@
 // Compatibility wrappers for SDL 1 & 2.
 #pragma once
+#include "reincarnated/gpu_presenter.hpp"
 
 #ifdef USE_SDL3
 #include <SDL3/SDL_events.h>
@@ -409,9 +410,14 @@ inline bool SDLC_ConvertEventToRenderCoordinates(
     SDL_Event *event)
 {
 #ifdef USE_SDL3
-	if (renderer != nullptr) {
-		return SDL_ConvertEventToRenderCoordinates(renderer, event);
-	}
+    if (reincarnated::HasGpuPresenter()) {
+        if (event->type == SDL_EVENT_MOUSE_MOTION)
+            reincarnated::GpuWindowToLogical(event->motion.x, event->motion.y);
+        else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP)
+            reincarnated::GpuWindowToLogical(event->button.x, event->button.y);
+    } else if (renderer != nullptr) {
+        return SDL_ConvertEventToRenderCoordinates(renderer, event);
+    }
 #elif !defined(USE_SDL1)
 	// No-op in SDL2.
 #else

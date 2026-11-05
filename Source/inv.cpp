@@ -1,3 +1,6 @@
+#ifdef USE_SDL3
+#include "reincarnated/gpu_ui.hpp"
+#endif
 /**
  * @file inv.cpp
  *
@@ -1146,6 +1149,11 @@ void InvDrawSlotBack(const Surface &out, Point targetPosition, Size size, item_q
 		break;
 	}
 
+#ifdef USE_SDL3
+    std::array<uint8_t,256> translation;
+    for(unsigned i=0;i<256;++i)translation[i]=i>=PAL16_GRAY?uint8_t(i-colorShift):uint8_t(i);
+    if(reincarnated::TranslateGpuUiRect(out, {targetPosition.x,targetPosition.y-size.height+1,size.width,size.height}, translation.data()))return;
+#endif
 	uint8_t *dst = &out[targetPosition];
 	const auto dstPitch = out.pitch();
 	for (int y = size.height; y != 0; --y, dst -= dstPitch + size.width) {
@@ -1183,6 +1191,22 @@ void InitInv()
 
 void DrawInv(const Surface &out)
 {
+#ifdef USE_SDL3
+    if (reincarnated::GpuUiPhase()) {
+        const Player &player=*InspectPlayer;
+        std::string key;
+        auto add=[&](int value){key.append(reinterpret_cast<const char*>(&value),sizeof(value));};
+        const auto background=reinterpret_cast<uintptr_t>((*pInvCels)[0].pixelData());
+        key.append(reinterpret_cast<const char*>(&background),sizeof(background));
+        add(pcursinvitem);
+        auto item=[&](const Item &value){add(value.isEmpty());if(value.isEmpty())return;add(value._iCurs);add(value._iMagical);add(value._iStatFlag);add(IsInspectingPlayer()?player.CanUseItem(value):value._iStatFlag);add(GetOutlineColor(value,true));add(player.GetItemLocation(value)==ILOC_TWOHAND);};
+        for(const auto &value:player.InvBody)item(value);
+        for(int i=0;i<InventoryGridCells;++i){add(player.InvGrid[i]);if(player.InvGrid[i]>0)item(player.InvList[player.InvGrid[i]-1]);}
+        const auto position=GetPanelPosition(UiPanels::Inventory,{0,0});
+        if(reincarnated::BeginGpuUiPanel(out,{position.x,position.y,SidePanelSize.width,SidePanelSize.height},key))return;
+    }
+#endif
+
 	ClxDraw(out, GetPanelPosition(UiPanels::Inventory, { 0, 351 }), (*pInvCels)[0]);
 
 	const Size slotSize[] = {
@@ -1267,6 +1291,9 @@ void DrawInv(const Surface &out)
 			DrawItem(myPlayer.InvList[ii], out, position, sprite);
 		}
 	}
+#ifdef USE_SDL3
+    reincarnated::EndGpuUiPanel();
+#endif
 }
 
 void DrawInvBelt(const Surface &out)

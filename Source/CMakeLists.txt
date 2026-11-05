@@ -78,7 +78,17 @@ set(libdevilutionx_SRCS
   reincarnated/renderer_switch.cpp
   reincarnated/sprite_layout.cpp
   reincarnated/asset_provider.cpp
+  reincarnated/sheet_source.cpp
+  reincarnated/sheet_png.cpp
   reincarnated/hd_renderer.cpp
+  reincarnated/hd_renderer_sdl3.cpp
+  reincarnated/cpu_clock.cpp
+  reincarnated/gpu_timing.cpp
+  reincarnated/gpu_presenter.cpp
+  reincarnated/gpu_ui.cpp
+  reincarnated/world_sprite_indices.cpp
+  reincarnated/gpu_sprites.cpp
+  reincarnated/gpu_terrain.cpp
   engine/palette.cpp
   engine/sound_position.cpp
   engine/trn.cpp
@@ -1141,7 +1151,7 @@ endif()
 if(WIN32 AND USE_SDL3)
   # Keep upstream protocol/save format versions, but identify our executable.
   set(PROJECT_NAME "Diablo Reincarnated")
-  set(PROJECT_VERSION_WITH_SUFFIX "0.2.0-pre")
+  set(PROJECT_VERSION_WITH_SUFFIX "${REINCARNATED_DISPLAY_VERSION}")
 endif()
 file(GENERATE OUTPUT ${CONFIG_PATH} CONTENT
 "#pragma once
@@ -1170,7 +1180,42 @@ endif()
 if(USE_SDL1)
   # No need for SDL_image
 elseif(USE_SDL3)
-  target_link_libraries(libdevilutionx PUBLIC SDL3_image::SDL3_image)
+  find_package(PNG REQUIRED)
+  target_link_libraries(libdevilutionx PUBLIC SDL3_image::SDL3_image PNG::PNG)
+  add_executable(reincarnated_save_storage_tool EXCLUDE_FROM_ALL ../tools/save_storage_tool.cpp)
+  target_link_dependencies(reincarnated_save_storage_tool PRIVATE libdevilutionx)
+  add_executable(reincarnated_extract_mpq_art EXCLUDE_FROM_ALL ../tools/extract_mpq_art.cpp)
+  target_link_dependencies(reincarnated_extract_mpq_art PRIVATE libdevilutionx)
+  add_executable(reincarnated_verify_tile_export EXCLUDE_FROM_ALL ../tools/verify_tile_export.cpp)
+  target_link_dependencies(reincarnated_verify_tile_export PRIVATE libdevilutionx)
+  add_executable(reincarnated_verify_cel_export EXCLUDE_FROM_ALL ../tools/verify_cel_export.cpp)
+  target_link_dependencies(reincarnated_verify_cel_export PRIVATE libdevilutionx)
+  if(MSVC)
+    target_compile_options(reincarnated_save_storage_tool PRIVATE /EHsc)
+    target_compile_options(reincarnated_extract_mpq_art PRIVATE /EHsc)
+    target_compile_options(reincarnated_verify_tile_export PRIVATE /EHsc)
+    target_compile_options(reincarnated_verify_cel_export PRIVATE /EHsc)
+  endif()
+  add_executable(reincarnated_gpu_terrain_test EXCLUDE_FROM_ALL ../test/gpu_terrain_test.cpp)
+  target_link_dependencies(reincarnated_gpu_terrain_test PRIVATE libdevilutionx)
+  add_executable(reincarnated_gpu_ui_test EXCLUDE_FROM_ALL ../test/gpu_ui_test.cpp)
+  target_link_dependencies(reincarnated_gpu_ui_test PRIVATE libdevilutionx)
+  add_executable(reincarnated_gpu_sprite_test EXCLUDE_FROM_ALL ../test/gpu_sprite_test.cpp)
+  target_link_dependencies(reincarnated_gpu_sprite_test PRIVATE libdevilutionx)
+  add_executable(reincarnated_gpu_pack_upload_test EXCLUDE_FROM_ALL ../test/gpu_pack_upload_test.cpp)
+  target_link_dependencies(reincarnated_gpu_pack_upload_test PRIVATE libdevilutionx)
+  add_executable(reincarnated_render_mode_test EXCLUDE_FROM_ALL ../test/render_mode_test.cpp)
+  target_link_dependencies(reincarnated_render_mode_test PRIVATE libdevilutionx)
+  add_executable(reincarnated_asset_provider_test EXCLUDE_FROM_ALL reincarnated/asset_provider.cpp reincarnated/asset_provider_test.cpp)
+  if(MSVC)
+    target_compile_options(reincarnated_render_mode_test PRIVATE /EHsc)
+    target_compile_options(reincarnated_asset_provider_test PRIVATE /UNDEBUG /EHsc)
+  endif()
+  add_executable(reincarnated_sheet_test EXCLUDE_FROM_ALL ../test/hd_sheet_test.cpp)
+  target_link_dependencies(reincarnated_sheet_test PRIVATE libdevilutionx)
+  if(MSVC)
+    target_compile_options(reincarnated_sheet_test PRIVATE /EHsc)
+  endif()
 else()
   target_link_libraries(libdevilutionx PUBLIC SDL2::SDL2_image)
 endif()

@@ -538,6 +538,10 @@ struct GraphicsOptions : OptionCategoryBase {
 	std::vector<OptionEntryBase *> GetEntries() override;
 
 	OptionEntryResolution resolution;
+#ifdef USE_SDL3
+	/** @brief Last chosen HD/Classic rendering mode. */
+	OptionEntryBoolean hdGraphics;
+#endif
 	/** @brief Run in fullscreen or windowed mode. */
 	OptionEntryBoolean fullscreen;
 #if !defined(USE_SDL1) || defined(__3DS__)

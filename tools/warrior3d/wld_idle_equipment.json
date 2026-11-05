@@ -1,0 +1,54 @@
+{
+  "native_clip": "palM_1hsShd_nav_idle",
+  "sword": {
+    "bone": "hand.R",
+    "orientation_socket": "weapon.R",
+    "grip": [
+      0,
+      0.075,
+      0
+    ],
+    "hand_point": [
+      0.0425,
+      0.0825,
+      -0.002
+    ],
+    "scale": 0.75,
+    "axis_rotation_z": -90,
+    "filename": "sword_base00.glb"
+  },
+  "shield": {
+    "bone": "forearm.L",
+    "grip": [
+      0.23,
+      0.0,
+      -0.1
+    ],
+    "hand_point": [
+      0,
+      0.05,
+      0
+    ],
+    "grip_target_bone": "hand.L",
+    "local_basis": [
+      [
+        0.017321554742457963,
+        0.002940961911101988,
+        0.9998456453294884
+      ],
+      [
+        0.9998499702917589,
+        -2.5472982306213844e-05,
+        -0.017321554742457963
+      ],
+      [
+        -2.5472982306213844e-05,
+        0.9999956750377297,
+        -0.002940961911101988
+      ]
+    ],
+    "scale": 0.92,
+    "filename": "Shield_S15_Warrior_Red.glb",
+    "shield_grip_revision": "small-handgrip-180-v1"
+  }
+}

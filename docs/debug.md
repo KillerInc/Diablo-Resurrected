@@ -1,5 +1,9 @@
 ## Introduction
 
+For the current Diablo Reincarnated Windows build, use the separate
+[Debug companion and Lua console](debug-companion.md). The chat-command examples
+below describe an older upstream interface.
+
 If you compile the game in debug, you have multiple debug features available.
 
 ## Debug commands

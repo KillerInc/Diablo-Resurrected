@@ -1,4 +1,5 @@
 #include "levels/dun_tile_data.hpp"
+#include "reincarnated/gpu_terrain.hpp"
 
 #include <array>
 #include <cstddef>
@@ -200,6 +201,9 @@ void SetDungeonMicros(std::unique_ptr<std::byte[]> &dungeonCels, uint_fast8_t &m
 		return a.first < b.first;
 	});
 	ReencodeDungeonCels(dungeonCels, frameToTypeList);
+#ifdef USE_SDL3
+	reincarnated::RegisterGpuTerrain(dungeonCels.get(), frameToTypeList);
+#endif
 
 	std::vector<std::pair<uint16_t, uint16_t>> celBlockAdjustments = ComputeCelBlockAdjustments(frameToTypeList);
 	if (celBlockAdjustments.size() == 0) return;

@@ -25,6 +25,8 @@ public:
 	    std::span<const std::array<uint8_t, LightTableSize>, NumLightingLevels> lightTables,
 	    const uint8_t *fullyLitLightTable, const uint8_t *fullyDarkLightTable);
 
+	[[nodiscard]] const uint8_t *getLightTable(uint8_t level) const { return lightTables[level].data(); }
+
 	[[nodiscard]] uint8_t adjustColor(uint8_t color, uint8_t lightLevel) const
 	{
 		return lightTables[lightLevel][color];

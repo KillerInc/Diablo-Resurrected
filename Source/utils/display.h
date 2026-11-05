@@ -17,6 +17,7 @@
 #endif
 #endif
 
+#include "reincarnated/gpu_presenter.hpp"
 #include "utils/attributes.h"
 #include "utils/log.hpp"
 #include "utils/sdl_ptrs.h"
@@ -66,15 +67,10 @@ template <
 void OutputToLogical(T *x, T *y)
 {
 #ifdef USE_SDL3
-	if (renderer == nullptr) return;
-	float outX, outY;
-	if (!SDL_RenderCoordinatesFromWindow(renderer, *x, *y, &outX, &outY)) {
-		LogError("SDL_RenderCoordinatesFromWindow: {}", SDL_GetError());
-		SDL_ClearError();
-		return;
-	}
-	*x = static_cast<T>(outX);
-	*y = static_cast<T>(outY);
+    if (!reincarnated::HasGpuPresenter()) return;
+    float outX = static_cast<float>(*x), outY = static_cast<float>(*y);
+    reincarnated::GpuWindowToLogical(outX, outY, false);
+    *x = static_cast<T>(outX); *y = static_cast<T>(outY);
 #elif !defined(USE_SDL1)
 	if (renderer == nullptr) return;
 	float scaleX;
@@ -103,15 +99,10 @@ template <
 void LogicalToOutput(T *x, T *y)
 {
 #ifdef USE_SDL3
-	if (renderer == nullptr) return;
-	float outX, outY;
-	if (!SDL_RenderCoordinatesToWindow(renderer, *x, *y, &outX, &outY)) {
-		LogError("SDL_RenderCoordinatesFromWindow: {}", SDL_GetError());
-		SDL_ClearError();
-		return;
-	}
-	*x = static_cast<T>(outX);
-	*y = static_cast<T>(outY);
+    if (!reincarnated::HasGpuPresenter()) return;
+    float outX = static_cast<float>(*x), outY = static_cast<float>(*y);
+    reincarnated::GpuWindowToLogical(outX, outY, true);
+    *x = static_cast<T>(outX); *y = static_cast<T>(outY);
 #elif !defined(USE_SDL1)
 	if (renderer == nullptr) return;
 	SDL_Rect view;

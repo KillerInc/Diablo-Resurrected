@@ -1,3 +1,5 @@
+> Current metadata format: 0.4.3-pre uses only `HD/layouts.csv`, cached until game exit. Individual sidecar references below describe earlier builds. See [HD sprite sheets](HD_SPRITE_SHEETS.md).
+
 # F10 HD renderer: first integrated pass
 
 The classic DevilutionX software renderer stays the default. F10 switches to a transitional GPU overlay mode with a small green bar in the upper-left corner as a visible indicator. Gameplay state is unchanged. Repeated key-down events are ignored. F10 is no longer the default Quick Message 2 shortcut, but the action remains configurable.

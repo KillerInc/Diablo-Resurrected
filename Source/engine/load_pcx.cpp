@@ -19,6 +19,7 @@
 #endif
 
 #include "mpq/mpq_common.hpp"
+#include "reincarnated/sheet_source.hpp"
 #include "utils/log.hpp"
 #include "utils/str_cat.hpp"
 
@@ -79,7 +80,7 @@ OptionalOwnedClxSpriteList LoadPcxSpriteList(const char *filename, int numFrames
 		LogError("Failed to load {}: {}", path, result.error());
 		return std::nullopt;
 	}
-	return std::move(result).value();
+	return reincarnated::AnnotateSheetSource(OwnedClxSpriteListOrSheet(std::move(result).value()), filename, true).list();
 #endif
 }
 

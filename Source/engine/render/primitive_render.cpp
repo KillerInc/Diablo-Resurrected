@@ -1,4 +1,5 @@
 #include "engine/render/primitive_render.hpp"
+#include "reincarnated/gpu_ui.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -81,6 +82,10 @@ void DrawHalfTransparentBlendedRectTo(const Surface &out, unsigned sx, unsigned 
 
 void FillRect(const Surface &out, int x, int y, int width, int height, uint8_t colorIndex)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, x, y, width, height, colorIndex)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	for (int j = 0; j < height; j++) {
 		DrawHorizontalLine(out, { x, y + j }, width, colorIndex);
 	}
@@ -101,7 +106,12 @@ void DrawHorizontalLine(const Surface &out, Point from, int width, std::uint8_t 
 
 void UnsafeDrawHorizontalLine(const Surface &out, Point from, int width, std::uint8_t colorIndex)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, from.x, from.y, width, 1, colorIndex)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	std::memset(&out[from], colorIndex, width);
+	if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(&out[from], width);
 }
 
 void DrawVerticalLine(const Surface &out, Point from, int height, std::uint8_t colorIndex)
@@ -119,10 +129,15 @@ void DrawVerticalLine(const Surface &out, Point from, int height, std::uint8_t c
 
 void UnsafeDrawVerticalLine(const Surface &out, Point from, int height, std::uint8_t colorIndex)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, from.x, from.y, 1, height, colorIndex)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	auto *dst = &out[from];
 	const auto pitch = out.pitch();
 	while (height-- > 0) {
 		*dst = colorIndex;
+		if (reincarnated::HdCaptureActive) reincarnated::MirrorOpaque(dst, 1);
 		dst += pitch;
 	}
 }
@@ -158,6 +173,10 @@ void DrawHalfTransparentVerticalLine(const Surface &out, Point from, int height,
 
 void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, int height)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, sx, sy, width, height, 0, true)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	if (sx + width < 0)
 		return;
 	if (sy + height < 0)
@@ -181,11 +200,17 @@ void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, in
 		height = out.h() - sy;
 	}
 
+    if (reincarnated::HdCaptureActive && width > 0 && height > 0)
+        for (int y = sy; y < sy + height; ++y) reincarnated::MirrorBlend(out.at(sx, y), width, nullptr, 0);
 	DrawHalfTransparentBlendedRectTo(out, sx, sy, width, height);
 }
 
 void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, int height, uint8_t color)
 {
+#ifdef USE_SDL3
+    if (reincarnated::DrawGpuUiRect(out, sx, sy, width, height, color, true)) return;
+    reincarnated::MarkGpuUiSurfaceDirty(out);
+#endif
 	if (sx + width < 0)
 		return;
 	if (sy + height < 0)
@@ -209,6 +234,8 @@ void DrawHalfTransparentRectTo(const Surface &out, int sx, int sy, int width, in
 		height = out.h() - sy;
 	}
 
+    if (reincarnated::HdCaptureActive && width > 0 && height > 0)
+        for (int y = sy; y < sy + height; ++y) reincarnated::MirrorBlend(out.at(sx, y), width, nullptr, color);
 	DrawHalfTransparentUnalignedBlendedRectTo(out, sx, sy, width, height, color);
 }
 
@@ -216,6 +243,7 @@ void SetHalfTransparentPixel(const Surface &out, Point position, uint8_t color)
 {
 	if (out.InBounds(position)) {
 		uint8_t *pix = out.at(position.x, position.y);
+		if (reincarnated::HdCaptureActive) reincarnated::MirrorBlend(pix, 1, nullptr, color);
 		const auto &lookupTable = paletteTransparencyLookup[color];
 		*pix = lookupTable[*pix];
 	}

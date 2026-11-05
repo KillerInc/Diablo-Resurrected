@@ -1,0 +1,110 @@
+name: Publish validated Windows SDL3 v0.3
+
+on:
+  push:
+    branches: [feature/windows-x64-sdlgpu-v0.3]
+    paths: [.github/release-validation/v0.3.json]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-v0.3
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check validation record and source build
+        id: validation
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $record = Get-Content '.github/release-validation/v0.3.json' -Raw | ConvertFrom-Json
+          if ($record.schema -ne 1 -or $record.tag -ne 'v0.3-pre') { throw 'Invalid validation record' }
+          foreach ($test in @('rendererTests', 'packagedStartup', 'warriorReplay', 'classicHdMenuVisual', 'layeredUiVisual', 'foregroundOcclusionVisual', 'ddsFallback', 'gpuReadback', 'hudPersistence', 'existingDataUnchanged')) {
+            if ($record.tests.$test -ne $true) { throw "Required validation missing: $test" }
+          }
+          # Tag the publication-record commit. Its game/build inputs must be
+          # identical to the independently game-tested source artifact.
+          $changed = @(git diff --name-only $record.sourceSha HEAD)
+          if ($LASTEXITCODE -ne 0) { throw 'Could not compare validated source inputs' }
+          $unvalidated = @($changed | Where-Object {
+            $_ -notmatch '^(docs/|\.github/release-validation/|\.github/workflows/publish-v0\.3\.yml$|tools/validate_hd_frame_captures\.py$)'
+          })
+          if ($unvalidated.Count -ne 0) { throw "Game/build inputs differ from tested source: $unvalidated" }
+          $run = gh api "repos/${{ github.repository }}/actions/runs/$($record.runId)" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read source build' }
+          if ($run.status -ne 'completed' -or $run.conclusion -ne 'success' -or $run.head_sha -ne $record.sourceSha) {
+            throw 'Source build did not pass at the validated commit'
+          }
+          $artifact = gh api "repos/${{ github.repository }}/actions/artifacts/$($record.artifactId)" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read validated artifact' }
+          if ($artifact.expired -or $artifact.workflow_run.id -ne $record.runId -or $artifact.name -ne 'Diablo Reincarnated v0.3') {
+            throw 'Artifact does not belong to the validated build'
+          }
+          if ($artifact.digest -ne $record.artifactDigest) { throw 'Artifact archive digest changed' }
+          "run_id=$($record.runId)" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: Diablo Reincarnated v0.3
+          run-id: ${{ steps.validation.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: release-content
+
+      - name: Verify tested files and publish candidate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $record = Get-Content '.github/release-validation/v0.3.json' -Raw | ConvertFrom-Json
+          $root = Join-Path $PWD 'release-content'
+          $actual = @(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object {
+            [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
+          } | Sort-Object)
+          $expected = @($record.files.PSObject.Properties.Name | Sort-Object)
+          if (@(Compare-Object $expected $actual).Count -ne 0) { throw 'Package file list differs from tested artifact' }
+          foreach ($relative in $expected) {
+            if ($relative.Contains('..') -or [IO.Path]::IsPathRooted($relative)) { throw 'Invalid package path' }
+            $hash = (Get-FileHash -LiteralPath (Join-Path $root $relative) -Algorithm SHA256).Hash
+            if ($hash -ne $record.files.$relative) { throw "Untested artifact contents: $relative" }
+            if ($relative -match '(?i)(diabdat\.mpq|spawn\.mpq|\.h?sv$|diablo\.ini$)') { throw 'Game data or user state found in release' }
+          }
+          $folder = Join-Path $root 'Diablo Reincarnated v0.3'
+          foreach ($required in @('Diablo Reincarnated.exe', 'd1reincarnated.mpq', 'hd/players/0.png', 'LICENSE.md', 'README-Windows.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $folder $required))) { throw "Required package file missing: $required" }
+          }
+          $zip = Join-Path $PWD 'Diablo Reincarnated v0.3.zip'
+          Compress-Archive -LiteralPath $folder -DestinationPath $zip -CompressionLevel Optimal
+          $zipHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $notes = @"
+          Windows 11 x64 SDL3 pre-release of the independent Diablo Reincarnated executable.
+
+          - Preserves the Classic CPU software renderer and F10 Classic/experimental HD switching.
+          - Includes the synthetic HD Warrior, matching d1reincarnated.mpq and isolated saves/config.
+          - Validated: Windows x64 build, four renderer tests, packaged game launch, GPU readback images, HD menus/panels/zoom, foreground occlusion, DDS fallback and gameplay replay.
+          - Original upstream Warrior gameplay replay matched its reference final save state.
+          - Original Diablo DIABDAT.MPQ is required and is NOT included.
+          - CPU truecolor world/UI composition follows Classic traversal; SDL_GPU handles upload, scaling and presentation. Replacement artwork/lighting remain experimental.
+
+          Validated game source: $($record.sourceSha)
+          Publication record: $env:GITHUB_SHA
+          Build: https://github.com/${{ github.repository }}/actions/runs/$($record.runId)
+          SHA256 (ZIP): $zipHash
+          "@
+          $notes | Set-Content release-notes.md -Encoding utf8
+          # Never overwrite an existing v0.3 candidate or touch v0.1.
+          gh release create v0.3-pre $zip --target $env:GITHUB_SHA `
+            --title 'Diablo Reincarnated v0.3 - Windows 11 x64 SDL_GPU (Pre-release)' `
+            --prerelease --latest=false --notes-file release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing v0.3 pre-release failed' }

@@ -15,16 +15,14 @@ struct PresentationTransform {
     float offsetY = 0.0f;
 };
 
-// A secondary tie-breaker after ground depth. Stable submission order handles
-// identical depth and role. This is an HD-only first pass at scene ordering.
+// Roles describe commands for diagnostics; they never reorder the Classic traversal.
 enum class SceneRole : uint8_t { Terrain = 0, Actor = 1, Foreground = 2 };
 
-// A temporary UI-depth policy until the classic UI is a separate composited
-// GPU pass: an in-game menu must always be above world graphics.
-// Return false to draw the original classic world sprite under the menu.
+// UI composition is above the HD world, so opening a menu keeps HD active.
 [[nodiscard]] constexpr bool ShouldDrawHdWorld(bool hdMode, bool menuOpen) noexcept
 {
-    return hdMode && !menuOpen;
+    (void)menuOpen;
+    return hdMode;
 }
 
 struct HdDrawCommand {
@@ -64,12 +62,8 @@ public:
 
     void sortForPresentation()
     {
-        std::stable_sort(commands_.begin(), commands_.end(),
-            [](const HdDrawCommand &a, const HdDrawCommand &b) {
-                if (a.groundDepthY != b.groundDepthY)
-                    return a.groundDepthY < b.groundDepthY;
-                return a.role < b.role;
-            });
+        // Already in Classic traversal order; never globally sort by depth.
+
     }
 
     void clear() noexcept { commands_.clear(); }

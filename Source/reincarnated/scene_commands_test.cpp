@@ -7,11 +7,11 @@ static bool near(float a,float b) { return std::abs(a-b) < 0.001f; }
 
 int main()
 {
-    // Escape/options menus have to own the foreground draw layer.
+    // Opening a menu must preserve HD; the UI owns its own foreground layer.
     assert(!ShouldDrawHdWorld(false, false));
     assert(!ShouldDrawHdWorld(false, true));
     assert(ShouldDrawHdWorld(true, false));
-    assert(!ShouldDrawHdWorld(true, true));
+    assert(ShouldDrawHdWorld(true, true));
 
     HdSceneCommands q;
     // Sprite source resolution does not affect its logical draw rectangle.
@@ -33,12 +33,13 @@ int main()
     assert(q.append(3, {0,0,64,64}, 300, SceneRole::Terrain, {}));
     assert(q.append(4, {0,0,64,64}, 300, SceneRole::Foreground, {}));
     assert(q.append(5, {0,0,64,64}, 300, SceneRole::Actor, {}));
+    // A foreground command at smaller ground Y must not jump behind an actor.
     q.sortForPresentation();
     const auto &v = q.items();
     assert(v.size() == 5);
-    assert(v[0].textureIndex == 2 && v[1].textureIndex == 3);
-    assert(v[2].textureIndex == 1 && v[3].textureIndex == 5);
-    assert(v[4].textureIndex == 4);
+    assert(v[0].textureIndex == 1 && v[1].textureIndex == 2);
+    assert(v[2].textureIndex == 3 && v[3].textureIndex == 4);
+    assert(v[4].textureIndex == 5);
 
     assert(!q.append(7, {0,0,-2,20}, 10, SceneRole::Actor, {}));
     assert(!q.append(7, {0,0,20,20}, 10, SceneRole::Actor, {0,0,0}));

@@ -1,0 +1,182 @@
+{
+  "schema": 1,
+  "armor": "heavy",
+  "status": "approved_installed",
+  "source_file": "D1 Warrior Heavy Colour.glb",
+  "source_sha256": "237560feae8e8e5e22dd133d6405ed0e6b8e6fade25f372429dd0c1e04753d22",
+  "has_embedded_textures": true,
+  "has_original_animation_clips": false,
+  "idle_motion_compatible": true,
+  "animated_bones_matched": 193,
+  "max_rest_matrix_difference": 0,
+  "mesh_skin_and_nodes_unchanged": false,
+  "preview_hidden_material_tokens": [
+    "cape_sim",
+    "skirt_sim",
+    "loin_sim"
+  ],
+  "source_file_modified": false,
+  "installed_heavy_sheets_unchanged": false,
+  "previewed_on": "2026-10-31",
+  "preview_material_pass": {
+    "supplied_materials_preserved": false,
+    "source_colour_file_preserved": true,
+    "armor_base_color_exposure_stops": 1.0,
+    "normal_metallic_roughness_maps_unchanged": true,
+    "front_cloth_removed": true,
+    "status": "approved_installed"
+  },
+  "approved_on": "2026-10-31",
+  "shadow_material_tokens": [
+    "P00_BOD",
+    "P00_HED",
+    "HLM",
+    "sets57_TRS_mat",
+    "sets57_GLV",
+    "sets57_LEG_mat",
+    "sets57_BTS"
+  ],
+  "shadow_anatomy_count": 7,
+  "front_cloth_removed": true,
+  "front_cloth_removed_vertices": 633,
+  "front_cloth_removed_components": 9,
+  "remaining_geometry_uv_weights_unchanged": true,
+  "mesh_change": "detached front cloth removed; waist armor and leg plates retained",
+  "black_variant_selected": "user-supplied updated black model",
+  "black_options": [
+    "undersuit",
+    "plates",
+    "both"
+  ],
+  "heavy_sheets_installed": false,
+  "previous_preview_source": {
+    "source_file": "D1 Warrior Heavy.glb",
+    "source_sha256": "f590eddf72033434d8ab3ce726e820271b8e5fc5067249add7196aefb009cced"
+  },
+  "previous_preview_material_pass": {
+    "script": "tint_heavy_warrior.py",
+    "red_armor": "dark gray",
+    "gold_trim_preserved": false,
+    "source_file_unchanged": true,
+    "status": "awaiting_black_selection",
+    "gold_trim": "dark silver",
+    "gold_to_silver": true,
+    "normal_maps_unchanged": true,
+    "trim_metallic": 0.95,
+    "trim_roughness": 0.28,
+    "trim_color": "brighter cool silver with metallic reflections",
+    "helm_to_silver": true,
+    "helm_finish": "same metallic silver as trim"
+  },
+  "previous_generated_model_sha256": "AA31CDA058D3A2C5E979DC45DDD74187F718ABEF62B01728391320D6DEE6925B",
+  "source_mesh_count": 15,
+  "recolor_options_superseded": true,
+  "approved_model_sha256": "304F2A3C0022E07CB35C06595638C393ACAEE3E15D1667080ECF208B71BBAF85",
+  "planned_sheet_count": 85,
+  "prepared_motion_models": 39,
+  "equipped_sequences_head_clear": 66,
+  "supplied_materials_preserved": true,
+  "installed_on": "2026-10-31",
+  "replacement_sheets_installed": true,
+  "graphics_revision": "heavy-colour-v2",
+  "heavy_sheet_count": 85,
+  "runtime": {
+    "engine_version": "0.4.7-pre",
+    "executable_unchanged": true,
+    "gpu_density": 4,
+    "class_sheet_count": 255,
+    "class_gpu_pages": 897,
+    "class_gpu_texture_bytes": 3024617472,
+    "class_pack_revision": "heavy-colour-v2"
+  },
+  "installation_validation": {
+    "installed_sheets": 85,
+    "preserved_sheets": 170,
+    "all_gpu_hashes_verified": true,
+    "all_png_hashes_verified": true,
+    "user_state_unchanged": true,
+    "executable_unchanged": true,
+    "reference_outcome_same": true,
+    "gpu_sheets": 255,
+    "gpu_pages": 897,
+    "gpu_texture_bytes": 3024617472,
+    "cpu_player_png_decodes": 0,
+    "warm_gpu_uploads": 0,
+    "runtime_indexes": 1,
+    "individual_layouts": 0
+  },
+  "candidate_review": {
+    "source_file": "D1 Warrior Heavy Colour.glb",
+    "source_sha256": "237560FEAE8E8E5E22DD133D6405ED0E6B8E6FADE25F372429DD0C1E04753D22",
+    "preview_model_sha256": "2F998E5D9C142B319EA3EC0128AF977331DB6DDA204134FECC010BFDD8A8CD15",
+    "reviewed_on": "2026-10-31",
+    "status": "approved_installed",
+    "animated_bones_matched": 193,
+    "max_rest_matrix_difference": 0,
+    "supplied_materials_preserved": true,
+    "front_cloth_removed": true,
+    "mace_idle_directional_frames": 80,
+    "base_color_images_changed": [
+      "helmet",
+      "torso"
+    ],
+    "base_color_images_unchanged": [
+      "gloves",
+      "legs",
+      "boots"
+    ],
+    "extra_brightness_pass_applied": false,
+    "brightness_preview": {
+      "status": "approved_installed",
+      "exposure_stops": 1.0,
+      "model_sha256": "304F2A3C0022E07CB35C06595638C393ACAEE3E15D1667080ECF208B71BBAF85",
+      "armor_base_color_materials": 5,
+      "geometry_alpha_normals_surface_maps_unchanged": true,
+      "skin_equipment_lighting_shadows_unchanged": true,
+      "mace_idle_directional_frames": 80,
+      "source_exposure_stops": 0,
+      "added_since_previous": 0.5
+    },
+    "brightness_preview_history": [
+      {
+        "status": "preview_only_not_installed",
+        "exposure_stops": 0.5,
+        "model_sha256": "CD65CCCB6BDDC9AB386FF48DB4650226551BC241A4DD9144E374843A1AEEB4D1",
+        "armor_base_color_materials": 5,
+        "geometry_alpha_normals_surface_maps_unchanged": true,
+        "skin_equipment_lighting_shadows_unchanged": true,
+        "mace_idle_directional_frames": 80
+      }
+    ]
+  },
+  "previous_installed_revision": {
+    "source_file": "D1 Warrior Heavy black.glb",
+    "source_sha256": "0cf8fc155da79f91b2225e7475e735a41bae9f7b9cbb4e7a261b81937d3debcc",
+    "approved_model_sha256": "EF5937A6DC823A572ADA322932FEA6F9135ED55062B660183971928D0BB0359E",
+    "graphics_revision": "heavy-v1",
+    "installed_on": "2026-10-31"
+  },
+  "approved_replacement": {
+    "revision": "heavy-colour-v2",
+    "approved_on": "2026-10-31",
+    "model_sha256": "304F2A3C0022E07CB35C06595638C393ACAEE3E15D1667080ECF208B71BBAF85",
+    "original_source_sha256": "237560FEAE8E8E5E22DD133D6405ED0E6B8E6FADE25F372429DD0C1E04753D22",
+    "exposure_stops": 1.0,
+    "status": "approved_installed",
+    "sheets": 85,
+    "unique_motion_models": 39,
+    "mesh_geometry_weights_bindings_unchanged": true,
+    "all_599_node_transforms_unchanged": true,
+    "shadow_rasters_reused": true,
+    "protected_light_medium_sheets": 170
+  },
+  "animation_validation": {
+    "motion_models": 39,
+    "animated_bones_matched": 193,
+    "rest_matrix_max_error": 0,
+    "equipped_sequences_head_clear": 66,
+    "directional_frames": 9408,
+    "mesh_weights_bindings_and_all_599_node_transforms_match_previous": true,
+    "shadow_rasters_reused": true
+  }
+}

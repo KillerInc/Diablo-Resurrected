@@ -30,6 +30,7 @@
 #include "utils/surface_to_png.hpp"
 #endif
 
+#include "reincarnated/gpu_terrain.hpp"
 #include "engine/backbuffer_state.hpp"
 #include "engine/dx.h"
 #include "engine/palette.h"
@@ -84,6 +85,9 @@ void RedPalette()
 
 void CaptureScreen()
 {
+#ifdef USE_SDL3
+	reincarnated::GpuTerrainNativeCaptureScope nativeCapture;
+#endif
 	std::string fileName;
 	const uint32_t startTime = SDL_GetTicks();
 

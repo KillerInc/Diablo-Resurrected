@@ -1,0 +1,14 @@
+{
+  "Reconstructed closed torso back": {
+    "closed_manifold_edges": true,
+    "back_rays_hit": 3
+  },
+  "Reconstructed neck": {
+    "closed_manifold_edges": true,
+    "back_rays_hit": 1
+  },
+  "Reconstructed skull beneath hair": {
+    "closed_manifold_edges": true,
+    "back_rays_hit": 1
+  }
+}

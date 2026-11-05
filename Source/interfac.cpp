@@ -1,3 +1,10 @@
+#ifdef USE_SDL3
+#include "reincarnated/gpu_ui.hpp"
+#endif
+#include "reincarnated/performance_monitor.hpp"
+#include "reincarnated/gpu_sprites.hpp"
+#include "reincarnated/hd_renderer.hpp"
+#include "reincarnated/gpu_terrain.hpp"
 /**
  * @file interfac.cpp
  *
@@ -5,6 +12,8 @@
  */
 
 #include <cstdint>
+#include <atomic>
+#include <algorithm>
 #include <expected>
 #include <optional>
 #include <string>
@@ -62,7 +71,11 @@ constexpr uint32_t ProgressStepSize = 23;
 OptionalOwnedClxSpriteList sgpBackCel;
 
 bool IsProgress;
-uint32_t sgdwProgress;
+std::atomic<uint32_t> sgdwProgress;
+#ifdef USE_SDL3
+bool heroPreloadScheduled = false;
+std::atomic<uint32_t> heroPreloadProgress {0};
+#endif
 int progress_id;
 
 /** The color used for the progress bar as an index into the palette. */
@@ -224,6 +237,9 @@ void FreeCutsceneBackground()
 
 void DrawCutsceneBackground()
 {
+#ifdef USE_SDL3
+    reincarnated::BeginHdUiFrame(true);
+#endif
 	const Rectangle &uiRectangle = GetUIRectangle();
 	const Surface &out = GlobalBackBuffer();
 	SDL_FillSurfaceRect(out.surface, nullptr, 0);
@@ -232,19 +248,44 @@ void DrawCutsceneBackground()
 		RenderClxSprite(out, sprite, { uiRectangle.position.x - ((sprite.width() - uiRectangle.size.width) / 2), uiRectangle.position.y });
 	}
 	ClxDraw(out, { uiRectangle.position.x, 480 - 1 + uiRectangle.position.y }, (*sgpBackCel)[0]);
+#ifdef USE_SDL3
+    reincarnated::SaveGpuUiScene();
+#endif
+}
+
+uint32_t DisplayedLoadingProgress()
+{
+#ifdef USE_SDL3
+    if (heroPreloadScheduled) {
+        const uint32_t hero = heroPreloadProgress;
+        return hero ? hero : sgdwProgress.load() / 2;
+    }
+#endif
+    return sgdwProgress;
 }
 
 void DrawCutsceneForeground()
 {
+#ifdef USE_SDL3
+    reincarnated::RestoreGpuUiScene();
+#endif
+    const uint32_t progress = DisplayedLoadingProgress();
 	const Rectangle &uiRectangle = GetUIRectangle();
 	const Surface &out = GlobalBackBuffer();
 	constexpr int ProgressHeight = 22;
 	SDL_Rect rect = MakeSdlRect(
 	    out.region.x + BarPos[progress_id][0] + uiRectangle.position.x,
 	    out.region.y + BarPos[progress_id][1] + uiRectangle.position.y,
-	    sgdwProgress,
+	    progress,
 	    ProgressHeight);
-	SDL_FillSurfaceRect(out.surface, &rect, BarColor[progress_id]);
+	// Queue above the retained HD background; direct surface fills are hidden
+	// beneath GPU UI commands. FillRect keeps the native path for Classic.
+	FillRect(out, rect.x - out.region.x, rect.y - out.region.y,
+	    rect.w, rect.h, BarColor[progress_id]);
+#ifdef USE_SDL3
+    if (SDL_getenv("D1R_TRACE_LOADING"))
+        Log("LOADING_BAR pixels={} gpu_ui={}", progress, reincarnated::GpuUiPhase());
+#endif
 
 	if (DiabloUiSurface() == PalSurface)
 		BltFast(&rect, &rect);
@@ -296,7 +337,7 @@ void CheckShouldSkipRendering()
 bool HandleProgressBarUpdate()
 {
 	CheckShouldSkipRendering();
-	SDL_Event event;
+	SDL_Event event {};
 	// We use the real `PollEvent` here instead of `FetchMessage`
 	// to process real events rather than the recorded ones in demo mode.
 	while (PollEvent(&event)) {
@@ -308,6 +349,19 @@ bool HandleProgressBarUpdate()
 	}
 	return true;
 }
+
+#ifdef USE_SDL3
+void SetHeroPreloadProgress(size_t done, size_t total)
+{
+    heroPreloadProgress = MaxProgress / 2 + static_cast<uint32_t>((MaxProgress / 2) * done / std::max(size_t(1), total));
+    SDL_Event event {};
+    CustomEventToSdlEvent(event, WM_PROGRESS);
+    if (!SDLC_PushEvent(&event)) SDL_ClearError();
+#ifdef LOAD_ON_MAIN_THREAD
+    HandleProgressBarUpdate();
+#endif
+}
+#endif
 
 void DoLoad(interface_mode uMsg)
 {
@@ -468,7 +522,7 @@ void DoLoad(interface_mode uMsg)
 	}
 
 	if (!loadResult.has_value()) {
-		SDL_Event event;
+		SDL_Event event {};
 		CustomEventToSdlEvent(event, WM_ERROR);
 		event.user.data1 = new std::string(std::move(loadResult).error());
 		if (!SDLC_PushEvent(&event)) {
@@ -481,7 +535,13 @@ void DoLoad(interface_mode uMsg)
 		return;
 	}
 
-	SDL_Event event;
+#ifdef USE_SDL3
+    if (!HeadlessMode && (uMsg == WM_DIABLOADGAME || uMsg == WM_DIABNEWGAME)) {
+        PreloadPlayerHdSprites(myPlayer, SetHeroPreloadProgress);
+        SetHeroPreloadProgress(1, 1);
+    }
+#endif
+	SDL_Event event {};
 	CustomEventToSdlEvent(event, WM_DONE);
 	if (!SDLC_PushEvent(&event)) {
 		LogError("Failed to send WM_DONE {}", SDL_GetError());
@@ -500,9 +560,9 @@ void ProgressEventHandler(const SDL_Event &event, uint16_t modState)
 	const interface_mode customEvent = GetCustomEvent(event);
 	switch (customEvent) {
 	case WM_PROGRESS:
-		if (!HeadlessMode && ProgressEventHandlerState.drawnProgress != sgdwProgress && !ProgressEventHandlerState.skipRendering) {
+		if (!HeadlessMode && ProgressEventHandlerState.drawnProgress != DisplayedLoadingProgress() && !ProgressEventHandlerState.skipRendering) {
 			DrawCutsceneForeground();
-			ProgressEventHandlerState.drawnProgress = sgdwProgress;
+			ProgressEventHandlerState.drawnProgress = DisplayedLoadingProgress();
 		}
 		break;
 	case WM_ERROR:
@@ -595,7 +655,7 @@ void CustomEventToSdlEvent(SDL_Event &event, interface_mode eventType)
 
 void interface_msg_pump()
 {
-	SDL_Event event;
+	SDL_Event event {};
 	uint16_t modState;
 	while (FetchMessage(&event, &modState)) {
 		if (event.type != SDL_EVENT_QUIT) {
@@ -613,7 +673,7 @@ void IncProgress(uint32_t steps)
 	if (sgdwProgress > MaxProgress)
 		sgdwProgress = MaxProgress;
 	if (!HeadlessMode && sgdwProgress != prevProgress) {
-		SDL_Event event;
+		SDL_Event event {};
 		CustomEventToSdlEvent(event, WM_PROGRESS);
 		if (!SDLC_PushEvent(&event)) {
 			LogError("Failed to send WM_PROGRESS {}", SDL_GetError());
@@ -643,7 +703,16 @@ void CompleteProgress()
 
 void ShowProgress(interface_mode uMsg)
 {
+#ifdef USE_SDL3
+    heroPreloadScheduled = !HeadlessMode && (uMsg == WM_DIABLOADGAME || uMsg == WM_DIABNEWGAME);
+    heroPreloadProgress = 0;
+#endif
 	IsProgress = true;
+#ifdef USE_SDL3
+    reincarnated::ResetHdAssets();
+    reincarnated::GetPerformanceMonitor().loading = true;
+    reincarnated::GetPerformanceMonitor().resetWindow();
+#endif
 	gbSomebodyWonGameKludge = false;
 
 	ProgressEventHandlerState.loadStartedAt = SDL_GetTicks();
@@ -692,6 +761,12 @@ void ShowProgress(interface_mode uMsg)
 	});
 	while (HandleProgressBarUpdate()) { }
 	loadThread.join();
+#endif
+#ifdef USE_SDL3
+    reincarnated::WarmGpuSpritePalette(logical_palette.data());
+    reincarnated::WarmGpuTerrain();
+    reincarnated::GetPerformanceMonitor().loading = false;
+    reincarnated::GetPerformanceMonitor().resetWindow();
 #endif
 }
 

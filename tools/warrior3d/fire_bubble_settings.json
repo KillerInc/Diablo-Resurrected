@@ -1,0 +1,12 @@
+{
+  "revision": "fire-bubble-v2",
+  "style": "bubble",
+  "seed": 2718,
+  "anchor_mode": "cast_start",
+  "bubble_noise_scale": 1.45,
+  "bubble_noise_detail": 2,
+  "bubble_band_half_width": 0.012,
+  "bubble_band_gain": 0.55,
+  "bubble_interior_fill": 0.2,
+  "bubble_wobble": 0
+}
