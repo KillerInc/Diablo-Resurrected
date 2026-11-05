@@ -425,13 +425,13 @@ between the restored installation and that candidate. Several house views
 reference those same native fragments, so independently painted house previews
 must not be treated as independent runtime textures.
 
-Repair the assembled Gillian/player-house roof in one view, register the RGB
+Repair the assembled Gillian house roof in one view, register the RGB
 against its unchanged source projection, and gather through the combined scene
 owner map with an explicit roof-plane mask. Preserve the ridge, eaves, dormer,
 wall/door/light pixels outside that mask and all native alpha. Write each
 canonical source pixel once, propagating to every use. The private repair
 changes 385,553 pixels across 47 existing frames; no MIN/SOL/map/frame/layout
-change. Check assembled player, northern and southeastern houses at gameplay
+change. Check assembled Gillian, northern and southeastern houses at gameplay
 scale and native 4x resolution; also review surrounding shared uses in the cabin,
 Pepin, tavern, smithy, cathedral and Adria regions. Keep the artwork and owner
 maps private.
@@ -446,3 +446,11 @@ Root index, layouts, foreground, NPCs, normal saves/settings and executable
 hashes remain unchanged. No executable version bump for an artwork-only fix.
 The sharper ground candidate remains uninstalled; a private PNG layers this
 same roof repair onto it for any later approved ground rebuild.
+
+The player's starting house is the east riverside cabin. Its central roof
+patch interrupted the diagonal shingle courses. The cabin repair registers
+one coherent shingle plane, masks the ridge and building edges, and applies
+512,013 RGB pixel changes across 50 canonical frames. Assembled comparisons
+cover the east cabin, west cabin and smithy view. The installed BC7 pack passed
+all 3,584 frame checks and Direct3D12 upload with the existing layout. The
+installation has a verified rollback backup.
