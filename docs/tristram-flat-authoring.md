@@ -377,3 +377,42 @@ was visually reviewed. Installed four terrain pages and the viewing PNG with
 verified private backups. Post-install hashes match the tested pack. Root index,
 layout CSV, foreground sheet, NPC artwork, executable, normal saves and settings
 are unchanged. No executable build/version change for this material-only update.
+
+
+### Detail regression: restored installation; candidate review required
+
+The natural-soil release above was rejected for blurry grass and dirt. Its
+technical checks did not establish visual quality. Restored the exact pre-blur
+four terrain pages and viewing PNG from verified backups, retaining the other
+town corrections, current NPCs, root index, layout, executable, saves and settings.
+The rejected installed files were backed up privately. Do not describe that
+rejected material release as the currently installed ground.
+
+The material sampler now retains a 128x128 source crop at 1:1 instead of shrinking
+a 512px crop into 128px. Spatial detail must survive material preparation, UV
+sampling, BC7 encoding and actual gameplay-scale drawing. A synthetic random
+large-input test checks that interior source texels survive channel-wide colour
+normalisation without spatial reduction. Both native source-alpha/UV compatibility
+and visual assembled-scene checks remain necessary.
+
+The new candidate remains private and uninstalled pending user review. Review
+buildings, paths, grass, soil, shadows, foreground leaves and coloured light in
+the same assembled view, against the restored ground and rejected blur. Provide
+a gameplay-scale view and a full-resolution close view. Normal GPU terrain uses
+point sampling; the existing Zoom=1 option means 2x logical pixels, so do not
+silently substitute a downscaled smoothed contact sheet as proof of sharpness.
+
+The review candidate also protects hash-bound canonical source pixels for prior
+stump/root, tree/trunk, rock-fragment and bank repairs. Native ground eligibility
+alone is insufficient: an eligible frame may contain subsequently authored
+object bases. The optional NPZ mask must match the initial PNG SHA-256 and atlas
+geometry; protected RGBA is copied exactly and exported cells follow the final
+atlas. This private mask preserves 1,772,802 authored pixels in this review.
+
+Validation: 46 town-tool tests passed. All 3,584 BC7 frames retain installed
+metadata, with RGB mean absolute error 0.578/255, maximum alpha error 1/255 and
+zero alpha-threshold crossings. A real Direct3D12 upload passed using four BC7
+pages (62,455,808 bytes), without PNG input. Both assembled review scenes include
+the installed foreground sheet; gameplay views use nearest sampling and full
+4x source views are provided separately. These checks do not constitute user
+art approval. The candidate is not installed; no executable/version change.

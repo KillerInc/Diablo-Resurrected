@@ -49,3 +49,5 @@
 - NPC ground shadows must follow the player camera-relative sun (3,-4,6), independent of NPC facing/camera yaw. Use 70% opacity and the equivalent player blur (1 pixel at density 4); exclude alpha hair/face/effect planes. Rebuild shadows beneath approved bodies without recolouring, rescaling, moving anchors or changing native frames. Validate opaque body equality, full cell bounds and BC7 GPU loading. See docs/npc-shadow-policy.md.
 
 - Town artwork review must compose both `town` terrain and `towns` foreground leaves in native delayed draw order. Source-pixel coverage alone is not visual approval. Check repeated occurrences and close in-game views for mixed old/new foliage, object fragments, texture softness and bank joins before calling a town pass complete.
+
+- New ground artwork requires user review of an assembled town scene at gameplay scale and a full-resolution close view before installation. Tile samples, atlas dimensions and passing decoder tests do not establish visual detail. Keep candidates in private test packs until approved.

@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from PIL import Image
-from replace_ground_materials import phase, periodic_material, sample, replace
+from replace_ground_materials import phase, periodic_material, sample, replace, preserve_authored_pixels
 
 
 class MaterialTests(unittest.TestCase):
@@ -26,6 +26,23 @@ class MaterialTests(unittest.TestCase):
         image=Image.fromarray(rng.integers(20,80,(128,128,3),dtype=np.uint8))
         material=periodic_material(image,(45,35,25))
         self.assertFalse(np.allclose(material[16:64,16:64],material[16:64,64:112][:,::-1]))
+
+    def test_large_material_retains_native_texels_without_reduction(self):
+        rng=np.random.default_rng(23)
+        source=rng.integers(20,90,(512,512,3),dtype=np.uint8)
+        expected=source[192:320,192:320].astype(np.float32)
+        # Normalisation is channel-wide: it must not remove spatial detail.
+        actual=periodic_material(Image.fromarray(source),(45,35,25))
+        ratio=actual[16,16]/expected[16,16]
+        np.testing.assert_allclose(actual[8:120,8:120],expected[8:120,8:120]*ratio,rtol=1e-6)
+
+    def test_painted_object_base_survives_ground_replacement(self):
+        original=np.full((4,4,4),[70,40,20,255],np.uint8)
+        ground=np.full_like(original,[25,30,15,255]);mask=np.zeros((4,4),bool);mask[1:3,1:3]=True
+        result=preserve_authored_pixels(original,ground,mask)
+        np.testing.assert_array_equal(result[mask],original[mask])
+        np.testing.assert_array_equal(result[~mask],ground[~mask])
+        with self.assertRaises(ValueError):preserve_authored_pixels(original,ground,np.zeros((3,3),bool))
 
     def test_replacement_changes_rgb_preserves_mask_and_hidden_pixels(self):
         src=np.full((128,128,4),[55,42,48,0],dtype=np.uint8);src[10:118,10:118,3]=255

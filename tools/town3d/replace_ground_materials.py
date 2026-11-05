@@ -6,6 +6,7 @@ phase across every occurrence. No per-location override or runtime change.
 """
 import argparse
 from collections import defaultdict
+import hashlib
 import json
 from pathlib import Path
 
@@ -23,9 +24,15 @@ def phase(world):
 def periodic_material(image,target_mean):
     # Keep the original stochastic arrangement instead of reflecting a small
     # sample into four quadrants, which creates conspicuous curls/rosettes.
-    image=image.convert('RGB');side=min(512,image.width,image.height)
+    # A generated high-resolution material is not automatically a detailed
+    # runtime tile: shrinking a 512px sample to 128px discards its fine grit.
+    # Retain one source texel per material texel. Small synthetic inputs may
+    # still be enlarged for offline tests; production materials are >=128px.
+    image=image.convert('RGB');side=min(128,image.width,image.height)
     left=(image.width-side)//2;top=(image.height-side)//2
-    result=np.asarray(image.crop((left,top,left+side,top+side)).resize((128,128),Image.Resampling.LANCZOS)).astype(np.float32).copy()
+    patch=image.crop((left,top,left+side,top+side))
+    if patch.size!=(128,128):patch=patch.resize((128,128),Image.Resampling.LANCZOS)
+    result=np.asarray(patch).astype(np.float32).copy()
     for axis in (0,1):
         view=np.swapaxes(result,0,axis)
         edge=(view[0]+view[-1])*.5
@@ -76,6 +83,14 @@ def replace(original,dirt,grass,uv_phase):
     return Image.fromarray(result)
 
 
+def preserve_authored_pixels(before,after,protected):
+    """Ground-eligible native cells can contain subsequently painted objects."""
+    if before.shape!=after.shape or protected.shape!=before.shape[:2]:
+        raise ValueError('Authored protection geometry changed')
+    result=after.copy();result[protected]=before[protected]
+    return result
+
+
 def build(args):
     if args.output.exists():raise ValueError('Use a new output directory')
     project=args.project.resolve();meta=json.loads((project/'project.json').read_text())
@@ -111,7 +126,22 @@ def build(args):
         tile=replace(original,dirt,grass,next(iter(phases[f])))
         tile.save(args.output/f'frames/{f:04}.png');col,row=divmod(f-1,meta['rows'])
         atlas.paste(tile,(col*128,row*128))
-    after=np.asarray(atlas);assert np.array_equal(before[:,:,3],after[:,:,3])
+    after=np.asarray(atlas)
+    protected_count=0
+    if getattr(args,'protected_pixels',None):
+        with np.load(args.protected_pixels,allow_pickle=False) as protection:
+            initial=Path(getattr(args,'initial_atlas',None) or project/'base-atlas.png')
+            if str(protection['source_sha256'])!=hashlib.sha256(initial.read_bytes()).hexdigest():
+                raise ValueError('Authored protection belongs to a different initial atlas')
+            protected=protection['protected'].astype(bool)
+        after=preserve_authored_pixels(before,after,protected)
+        protected_count=int((protected&(before[:,:,3]>0)).sum())
+        atlas=Image.fromarray(after)
+        # Exported cells must describe the protected final atlas too.
+        for f in frames:
+            c,r=divmod(f-1,meta['rows'])
+            atlas.crop((c*128,r*128,(c+1)*128,(r+1)*128)).save(args.output/f'frames/{f:04}.png')
+    assert np.array_equal(before[:,:,3],after[:,:,3])
     for f in range(1,meta['columns']*meta['rows']+1):
         if f in frames:continue
         c,r=divmod(f-1,meta['rows']);assert np.array_equal(before[r*128:(r+1)*128,c*128:(c+1)*128],after[r*128:(r+1)*128,c*128:(c+1)*128])
@@ -120,7 +150,7 @@ def build(args):
                 alpha_exact=True,unselected_rgba_exact=True,shared_frame_phases_validated=True,
                 edge_policy='New RGB allowed; repeated material phase and native alpha preserved',
                 material_mapping='Inverse native isometric projection, periodic world X/Z',
-                per_instance_overrides=0,installed=False)
+                per_instance_overrides=0,protected_authored_pixels=protected_count,installed=False)
     (args.output/'validation.json').write_text(json.dumps(report,indent=2));print(json.dumps({k:v for k,v in report.items() if k!='replaced_frames'}))
 
 
@@ -128,4 +158,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('project','plan','minimum','sol','dirt','grass','output'):p.add_argument(name,type=Path)
     p.add_argument('--initial-atlas',type=Path,help='Preserve already approved buildings/scenery while replacing selected ground')
+    p.add_argument('--protected-pixels',type=Path,help='Hash-bound native source-pixel mask for painted object bases/repairs')
     args=p.parse_args();build(args)
