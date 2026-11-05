@@ -116,3 +116,15 @@ the transparent prop sheet also match their previous verified packs.
 RC1 and RC2 replays took the same 11 moves from `(25, 50)` behind the west
 cabin to `(31, 50)` beside its front door. The RC2 log recorded a private
 west cabin frame, and both replays exited normally.
+
+The full town test has 3,179 private bindings. `pack_town_landmarks.py`
+builds the table for the authored regions and native fountain and entrance
+variants. Each replacement retains the native draw slot and matches the
+active piece. All original and private frames passed BC7 readback. The
+combined and west routes matched their previous replays. The terrain atlas
+uses eight GPU pages. The private launcher uses a separate profile.
+
+The south rock is the only prop with independent ground, shadow and rock
+draws so far. Tree foliage still uses its native foreground sheet. Alternate
+state frames were checked against map data and BC7 readback. The replays
+do not advance quests.
