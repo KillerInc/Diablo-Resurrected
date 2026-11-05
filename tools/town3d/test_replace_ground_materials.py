@@ -21,6 +21,12 @@ class MaterialTests(unittest.TestCase):
         b=sample(material,phase((0,-31)),cell=128)
         np.testing.assert_allclose(a[:128,128:],b)
 
+    def test_material_does_not_reflect_quadrants(self):
+        rng=np.random.default_rng(7)
+        image=Image.fromarray(rng.integers(20,80,(128,128,3),dtype=np.uint8))
+        material=periodic_material(image,(45,35,25))
+        self.assertFalse(np.allclose(material[16:64,16:64],material[16:64,64:112][:,::-1]))
+
     def test_replacement_changes_rgb_preserves_mask_and_hidden_pixels(self):
         src=np.full((128,128,4),[55,42,48,0],dtype=np.uint8);src[10:118,10:118,3]=255
         dirt=np.full((128,128,3),[52,43,32],dtype=float);grass=np.full((128,128,3),[28,35,23],dtype=float)

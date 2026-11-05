@@ -345,3 +345,35 @@ unused original frames 3/4/5 remain in the 18-frame sheet. Native geometry and
 frame numbering are preserved. Fine native silhouette edges and some texture
 joins can still benefit from further artistic refinement; this pass does not
 claim geometrically seamless generated artwork everywhere.
+
+
+### Natural soil material correction
+
+The repeated curled/rosette appearance came from the tangled grass material and
+mirroring a small material quarter into a symmetric tile. Replace both soil and
+its sparse-grass blend with restrained irregular compacted earth, fine angular
+grit and short straight dead blades. `periodic_material` now samples an unreflected
+512px material crop into a 128px field. Match only opposing boundary samples;
+wide feather strips lower variance and produce an isometric crosshatch.
+
+Use `replace_ground_materials.py --initial-atlas CURRENT_APPROVED_ATLAS` so the
+selected native ground frames change while recent cathedral, tree, bank, stump
+and rock corrections remain byte-exact elsewhere. Native source frames still
+supply the broad dirt/grass transition, shadows and coloured window light.
+All selected source-frame UV phases are checked against every MIN use, including
+warp-state tiles absent from the base town. No per-location overrides or map
+changes. Native density remains four (16 times the vanilla pixel count).
+
+The private material release replaces the existing ground-frame selection at
+11,699 world occurrences, preserving native alpha and every unselected RGBA
+pixel. Rebuilt terrain retains identical frame/page records and 62,455,808 GPU
+bytes. All 3,584 frames were decoded: RGB MAE 0.459/255, maximum alpha error one,
+zero outline-threshold crossings. Real D3D12 upload passed with no PNG input;
+44 town-tool tests passed. Review both the combined foreground scene and close
+views around the fountain, houses, Adria and the cathedral light spill.
+
+The muted normal-executable soil replay completed with exit 0 and its capture
+was visually reviewed. Installed four terrain pages and the viewing PNG with
+verified private backups. Post-install hashes match the tested pack. Root index,
+layout CSV, foreground sheet, NPC artwork, executable, normal saves and settings
+are unchanged. No executable build/version change for this material-only update.

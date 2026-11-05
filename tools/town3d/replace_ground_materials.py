@@ -21,16 +21,17 @@ def phase(world):
 
 
 def periodic_material(image,target_mean):
-    # Reflection joins have identical opposing edge pixels, independent of
-    # whether a generated source is perfectly seamless at its outer border.
-    image=image.convert('RGB')
-    # The source covers several metres; one repeating native tile needs a
-    # close material sample, otherwise all stones collapse into fine noise.
-    side=min(256,image.width,image.height)
+    # Keep the original stochastic arrangement instead of reflecting a small
+    # sample into four quadrants, which creates conspicuous curls/rosettes.
+    image=image.convert('RGB');side=min(512,image.width,image.height)
     left=(image.width-side)//2;top=(image.height-side)//2
-    quarter=np.asarray(image.crop((left,top,left+side,top+side)).resize((64,64),Image.Resampling.LANCZOS)).astype(np.float32)
-    top=np.concatenate((quarter,quarter[:,::-1]),axis=1)
-    result=np.concatenate((top,top[::-1]),axis=0)
+    result=np.asarray(image.crop((left,top,left+side,top+side)).resize((128,128),Image.Resampling.LANCZOS)).astype(np.float32).copy()
+    for axis in (0,1):
+        view=np.swapaxes(result,0,axis)
+        edge=(view[0]+view[-1])*.5
+        # Match only the boundary sample. Wide feather strips reduce local
+        # variance and read as a regular crosshatch under isometric projection.
+        view[0]=edge;view[-1]=edge
     result*=np.asarray(target_mean)/np.maximum(result.mean(axis=(0,1)),1)
     return np.clip(result,0,255)
 
@@ -99,7 +100,10 @@ def build(args):
         raise ValueError('A shared frame requires conflicting material phases')
     dirt=periodic_material(Image.open(args.dirt),(52,43,32))
     grass=periodic_material(Image.open(args.grass),(33,32,26))
-    atlas=Image.open(project/'base-atlas.png').convert('RGBA');before=np.asarray(atlas).copy()
+    atlas=Image.open(getattr(args,'initial_atlas',None) or project/'base-atlas.png').convert('RGBA');before=np.asarray(atlas).copy()
+    native=Image.open(project/'base-atlas.png').convert('RGBA')
+    if atlas.size!=native.size or not np.array_equal(np.asarray(native)[:,:,3],before[:,:,3]):
+        raise ValueError('Initial atlas changed native geometry or alpha')
     if atlas.size!=(3584,16384):raise ValueError('Expected native-density-four town atlas')
     args.output.mkdir(parents=True);(args.output/'frames').mkdir()
     for f in sorted(frames):
@@ -123,4 +127,5 @@ def build(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('project','plan','minimum','sol','dirt','grass','output'):p.add_argument(name,type=Path)
+    p.add_argument('--initial-atlas',type=Path,help='Preserve already approved buildings/scenery while replacing selected ground')
     args=p.parse_args();build(args)
