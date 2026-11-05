@@ -2609,8 +2609,9 @@ void InitPlayer(Player &player, bool firstTime)
 			player.position.tile = ViewPosition;
 		}
 #ifdef USE_SDL3
-		if (&player == MyPlayer && firstTime && leveltype == DTYPE_TOWN && demo::IsRunning() && SDL_getenv("D1R_HD_RC2_WALK_REPLAY") != nullptr) {
-			player.position.tile = { 76, 76 };
+		if (const char *replay = SDL_getenv("D1R_HD_RC2_WALK_REPLAY");
+		    replay != nullptr && &player == MyPlayer && firstTime && leveltype == DTYPE_TOWN && demo::IsRunning()) {
+			player.position.tile = SDL_strcmp(replay, "house") == 0 ? WorldTilePosition { 69, 68 } : WorldTilePosition { 76, 76 };
 			ViewPosition = player.position.tile;
 		}
 #endif

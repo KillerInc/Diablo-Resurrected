@@ -82,3 +82,18 @@ center cell. Both muted runs exited normally, and the RC2 GPU captures show
 the hero on each side. The rebuilt GPU terrain regression test and BC7 pack
 upload also passed. The installed RC1 executable, index and town atlas match
 the frozen snapshot. This verifies one rock in the test build.
+
+The riverside house runtime test uses `D1R_HD_RC2_HOUSE_TEST=1`. The
+`clone_town_instances.py` tool appends 76 private house frames to the test
+atlas and writes a versioned binding file. The loader selects replacements
+only when the world cell, native piece and original frame agree. This lets
+the east house use its own artwork while the west cabin keeps the shared
+frames. Each private frame still draws at the original native depth slot.
+
+All 3,584 original BC7 frames and 76 private copies decode pixel for pixel
+to their RC1 originals. Two isolated replays used the same click input,
+starting at `(69, 68)` behind the house and finishing at `(75, 68)` beside
+its front door. Both took the same 11 moves around the house. The captures
+show the roof covering the hero from behind and the hero visible at the
+door. This test is private and opt-in. The installed RC1 files still match
+the frozen snapshot.

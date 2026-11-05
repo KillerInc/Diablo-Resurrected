@@ -48,6 +48,8 @@ std::shared_ptr<GpuSheet> material;
 std::string materialPath, palettePath;
 bool rockPreview = false;
 bool layeredRockPreview = false;
+bool housePreview = false;
+std::map<std::tuple<int, int, unsigned, unsigned>, unsigned> houseBindings;
 std::shared_ptr<GpuSheet> rockLayers;
 std::optional<std::pair<int, int>> rockGround;
 int cellX = -1, cellZ = -1;
@@ -55,11 +57,11 @@ unsigned cellPiece = 0;
 
 // Test atlas bindings are limited to the riverside rock and its ground patch.
 // Match the native piece and frame so a changed map retains its native art.
-struct RockBinding {
+struct TownBinding {
 	int x, z;
 	unsigned piece, original, replacement;
 };
-constexpr RockBinding RockBindings[] = {
+constexpr TownBinding RockBindings[] = {
 	{ 87, 12, 362, 840, 3585 }, { 87, 12, 362, 841, 3586 },
 	{ 87, 13, 364, 849, 3587 }, { 88, 12, 217, 511, 3588 },
 	{ 88, 12, 217, 50, 3589 }, { 88, 13, 218, 512, 3590 },
@@ -67,7 +69,7 @@ constexpr RockBinding RockBindings[] = {
 	{ 88, 14, 24, 50, 3593 }, { 89, 13, 27, 55, 3594 },
 	{ 89, 13, 27, 56, 3595 },
 };
-constexpr RockBinding WalkRockBindings[] = {
+constexpr TownBinding WalkRockBindings[] = {
 	{ 75, 76, 101, 203, 3585 }, { 75, 76, 101, 204, 3586 },
 	{ 75, 77, 103, 208, 3587 }, { 76, 76, 217, 511, 3588 },
 	{ 76, 76, 217, 50, 3589 }, { 76, 77, 218, 512, 3590 },
@@ -228,6 +230,32 @@ bool Warm()
 	warmed = true;
 	if (!pipeline || materialPath.empty()) return false;
 	AssetBytes bytes, layout;
+	if (housePreview) {
+		AssetBytes bindingBytes;
+		if (GetHdAssetStore().read("hd/levels/towndata/town-rc2-house.bindings", bindingBytes)) {
+			std::istringstream bindings(std::string(bindingBytes.begin(), bindingBytes.end()));
+			std::string header;
+			std::getline(bindings, header);
+			if (!header.empty() && header.back() == '\r') header.pop_back();
+			if (header == "D1R_TOWN_INSTANCE_V1") {
+				TownBinding binding;
+				while (bindings >> std::ws && !bindings.eof()) {
+					if (!(bindings >> binding.x >> binding.z >> binding.piece >> binding.original >> binding.replacement)
+					    || binding.x < 0 || binding.x >= MAXDUNX || binding.z < 0 || binding.z >= MAXDUNY
+					    || binding.original == 0 || binding.original > 3584 || binding.replacement < 3585 || binding.replacement > 3712
+					    || houseBindings.size() >= 128
+					    || !houseBindings.emplace(std::make_tuple(binding.x, binding.z, binding.piece, binding.original), binding.replacement - 1).second) {
+						houseBindings.clear();
+						break;
+					}
+				}
+			}
+		}
+		if (houseBindings.empty()) {
+			housePreview = false;
+			materialPath = "hd/levels/towndata/town.png";
+		}
+	}
 	if (layeredRockPreview) {
 		rockLayers = LoadGpuSheet({ "hd/levels/towndata/town-rc2-prop.png", 2, 1, 176 });
 		if (!rockLayers || rockLayers->frames.size() != 2) {
@@ -236,9 +264,11 @@ bool Warm()
 		}
 	}
 	if (!GetHdAssetStore().readGpuWithLayout(materialPath, bytes, layout)) {
-		if (!rockPreview && !layeredRockPreview) return false;
+		if (!rockPreview && !layeredRockPreview && !housePreview) return false;
 		rockPreview = false;
 		layeredRockPreview = false;
+		housePreview = false;
+		houseBindings.clear();
 		rockLayers.reset();
 		materialPath = "hd/levels/towndata/town.png";
 		if (!GetHdAssetStore().readGpuWithLayout(materialPath, bytes, layout)) return false;
@@ -350,6 +380,8 @@ void ReleaseGpuTerrainLevel()
 	materialPath.clear();
 	rockPreview = false;
 	layeredRockPreview = false;
+	housePreview = false;
+	houseBindings.clear();
 	rockLayers.reset();
 	warmed = false;
 	ResetGpuTerrainFrame();
@@ -397,11 +429,20 @@ void RegisterGpuTerrain(const std::byte *cells, std::span<const std::pair<uint16
 	const char *preview = SDL_getenv("D1R_HD_RC2_ROCK_TEST");
 	rockPreview = leveltype == DTYPE_TOWN && preview != nullptr && std::strcmp(preview, "1") == 0;
 	layeredRockPreview = leveltype == DTYPE_TOWN && preview != nullptr && std::strcmp(preview, "2") == 0;
+	const char *house = SDL_getenv("D1R_HD_RC2_HOUSE_TEST");
+	housePreview = leveltype == DTYPE_TOWN && house != nullptr && std::strcmp(house, "1") == 0;
+	houseBindings.clear();
+	if (housePreview) {
+		rockPreview = false;
+		layeredRockPreview = false;
+	}
 	rockLayers.reset();
 	if (rockPreview)
 		materialPath = "hd/levels/towndata/town-rc2-rock.png";
 	if (layeredRockPreview)
 		materialPath = "hd/levels/towndata/town-rc2-walk.png";
+	if (housePreview)
+		materialPath = "hd/levels/towndata/town-rc2-house.png";
 	palettePath = std::string("levels/") + stem + (leveltype == DTYPE_HELL ? "_1.pal" : ".pal");
 	for (size_t i = 0; i < frames.size(); ++i) {
 		const auto *source = GetDunFrame(cells, uint32_t(i + 1));
@@ -540,10 +581,21 @@ uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilutio
 	if (found == sources.end()) return previous;
 	const auto &info = found->second;
 	unsigned frameIndex = info.frame;
+	if (housePreview) {
+		const auto binding = houseBindings.find({ cellX, cellZ, cellPiece, info.frame + 1 });
+		if (binding != houseBindings.end() && binding->second < material->frames.size()) {
+			frameIndex = binding->second;
+			static bool logged = false;
+			if (!logged) {
+				logged = true;
+				devilution::Log("HD_RC2_HOUSE_DRAW bindings={} cell=({}, {}) native_frame={} private_frame={}", houseBindings.size(), cellX, cellZ, info.frame + 1, frameIndex + 1);
+			}
+		}
+	}
 	const bool nearRiver = rockPreview && cellX >= 87 && cellX <= 89 && cellZ >= 12 && cellZ <= 14;
 	const bool nearWalkRock = layeredRockPreview && cellX >= 75 && cellX <= 77 && cellZ >= 76 && cellZ <= 78;
 	if (nearRiver || nearWalkRock) {
-		const std::span<const RockBinding> bindings = nearWalkRock ? std::span<const RockBinding>(WalkRockBindings) : std::span<const RockBinding>(RockBindings);
+		const std::span<const TownBinding> bindings = nearWalkRock ? std::span<const TownBinding>(WalkRockBindings) : std::span<const TownBinding>(RockBindings);
 		for (const auto &binding : bindings) {
 			if (binding.x == cellX && binding.z == cellZ && binding.piece == cellPiece && binding.original == info.frame + 1 && binding.replacement <= material->frames.size()) {
 				frameIndex = binding.replacement - 1;
