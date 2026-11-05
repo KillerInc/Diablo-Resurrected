@@ -51,6 +51,11 @@
 #include "objects.h"
 #include "options.h"
 #include "player.h"
+
+#ifdef USE_SDL3
+#include <SDL3/SDL_stdinc.h>
+#include "engine/demomode.h"
+#endif
 #include "qol/autopickup.h"
 #include "qol/stash.h"
 #include "spells.h"
@@ -2603,6 +2608,12 @@ void InitPlayer(Player &player, bool firstTime)
 		if (&player == MyPlayer && (!firstTime || leveltype != DTYPE_TOWN)) {
 			player.position.tile = ViewPosition;
 		}
+#ifdef USE_SDL3
+		if (&player == MyPlayer && firstTime && leveltype == DTYPE_TOWN && demo::IsRunning() && SDL_getenv("D1R_HD_RC2_WALK_REPLAY") != nullptr) {
+			player.position.tile = { 76, 76 };
+			ViewPosition = player.position.tile;
+		}
+#endif
 
 		SetPlayerOld(player);
 		player.walkpath[0] = WALK_NONE;

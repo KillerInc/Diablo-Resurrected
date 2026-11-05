@@ -854,7 +854,15 @@ void DrawDungeon(const Surface &out, const Lightmap &lightmap, Point tilePositio
 	assert(InDungeonBounds(tilePosition));
 	const int lightTableIndex = dLight[tilePosition.x][tilePosition.y];
 
-	DrawCell(out, lightmap, tilePosition, targetBufferPosition, lightTableIndex);
+#ifdef USE_SDL3
+	const bool rc2Rock = reincarnated::IsGpuRc2RockCell(tilePosition.x, tilePosition.y, dPiece[tilePosition.x][tilePosition.y]);
+	if (!rc2Rock || !reincarnated::HasGpuRc2RockGround())
+#endif
+		DrawCell(out, lightmap, tilePosition, targetBufferPosition, lightTableIndex);
+#ifdef USE_SDL3
+	if (rc2Rock)
+		reincarnated::QueueGpuRc2RockProp(targetBufferPosition.x + out.region.x, targetBufferPosition.y + out.region.y);
+#endif
 
 	const int8_t bDead = dCorpse[tilePosition.x][tilePosition.y];
 	const int8_t bMap = dTransVal[tilePosition.x][tilePosition.y];
@@ -1029,6 +1037,13 @@ void DrawFloor(const Surface &out, const Lightmap &lightmap, Point tilePosition,
 		for (int j = 0; j < columns; j++, tilePosition += Direction::East, targetBufferPosition.x += TILE_WIDTH) {
 			if (!InDungeonBounds(tilePosition))
 				continue;
+#ifdef USE_SDL3
+			if (reincarnated::IsGpuRc2RockCell(tilePosition.x, tilePosition.y, dPiece[tilePosition.x][tilePosition.y])) {
+				DrawCell(out, lightmap, tilePosition, targetBufferPosition, dLight[tilePosition.x][tilePosition.y]);
+				reincarnated::SetGpuRc2RockGround(targetBufferPosition.x + out.region.x, targetBufferPosition.y + out.region.y);
+				continue;
+			}
+#endif
 			if (IsFloor(tilePosition)) {
 				DrawFloorTile(out, lightmap, tilePosition, targetBufferPosition);
 			}
@@ -1372,6 +1387,7 @@ void DrawGame(const Surface &fullOut, Point position, Displacement offset)
 #endif
 	DrawFloor(out, lightmap, position, Point {} + offset, rows, columns);
 #ifdef USE_SDL3
+	reincarnated::QueueGpuRc2RockShadow();
 	floorProfile.finish();
 	reincarnated::CpuStageScope contentProfile(reincarnated::CpuStage::TileContent);
 #endif
@@ -2002,6 +2018,13 @@ void DrawAndBlit()
 	// The isolated replay can frame the test patch without moving its hero.
 	if (leveltype == DTYPE_TOWN && demo::IsRunning() && SDL_getenv("D1R_HD_RC2_ROCK_CAMERA") != nullptr)
 		camera = { 87, 14 };
+	if (leveltype == DTYPE_TOWN && demo::IsRunning() && SDL_getenv("D1R_HD_RC2_WALK_REPLAY") != nullptr) {
+		static Point last { -1, -1 };
+		if (last != MyPlayer->position.tile) {
+			last = MyPlayer->position.tile;
+			Log("HD_RC2_WALK_REPLAY player=({}, {})", last.x, last.y);
+		}
+	}
 #endif
 	DrawView(out, camera);
 #ifdef USE_SDL3

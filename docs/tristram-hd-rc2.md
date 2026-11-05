@@ -66,3 +66,19 @@ For an isolated demo capture, set `D1R_HD_RC2_ROCK_CAMERA=1` to frame the river
 patch. This camera setting only applies during town replay and does not move
 the player. The river restricts movement around this particular rock, so use a
 different, reachable prop for the full front-and-behind walk test.
+
+The walk test uses `D1R_HD_RC2_ROCK_TEST=2` and a reachable copy at `(76, 77)`,
+south of the player house. It draws the reconstructed ground in the floor
+pass, queues the shadow after the floor, and queues the transparent rock at
+the solid cell's normal content position. The prop and shadow use separate
+frames of the same BC7 sheet. The native solid flag and actor traversal still
+control movement and depth. The replacement ground atlas has 14 instance
+bindings covering the rock and its immediate surroundings.
+
+`D1R_HD_RC2_WALK_REPLAY` places a fresh isolated demo hero at `(76, 76)`.
+The identical click input with RC1 and RC2 produced the same route through
+`(75, 76)`, `(75, 77)`, and `(75, 78)` to `(76, 78)`, bypassing the solid
+center cell. Both muted runs exited normally, and the RC2 GPU captures show
+the hero on each side. The rebuilt GPU terrain regression test and BC7 pack
+upload also passed. The installed RC1 executable, index and town atlas match
+the frozen snapshot. This verifies one rock in the test build.

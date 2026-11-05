@@ -24,6 +24,11 @@ bool GpuTerrainReady();
 bool GpuTerrainUsesIndexedPresent();
 bool GpuTerrainNeedsCpuCanvas();
 bool GpuTerrainSkipsNativePainting();
+bool IsGpuRc2RockCell(int x, int z, unsigned piece);
+void SetGpuRc2RockGround(int left, int bottom);
+bool HasGpuRc2RockGround();
+void QueueGpuRc2RockShadow();
+void QueueGpuRc2RockProp(int left, int bottom);
 void SetGpuTerrainCell(int x, int z, unsigned piece);
 class GpuTerrainCellScope {
 public:

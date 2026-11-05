@@ -14,8 +14,10 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <tuple>
 #include <unordered_map>
@@ -45,6 +47,9 @@ std::unordered_map<const uint8_t *, Source> sources;
 std::shared_ptr<GpuSheet> material;
 std::string materialPath, palettePath;
 bool rockPreview = false;
+bool layeredRockPreview = false;
+std::shared_ptr<GpuSheet> rockLayers;
+std::optional<std::pair<int, int>> rockGround;
 int cellX = -1, cellZ = -1;
 unsigned cellPiece = 0;
 
@@ -61,6 +66,15 @@ constexpr RockBinding RockBindings[] = {
 	{ 88, 13, 218, 513, 3591 }, { 89, 12, 25, 51, 3592 },
 	{ 88, 14, 24, 50, 3593 }, { 89, 13, 27, 55, 3594 },
 	{ 89, 13, 27, 56, 3595 },
+};
+constexpr RockBinding WalkRockBindings[] = {
+	{ 75, 76, 101, 203, 3585 }, { 75, 76, 101, 204, 3586 },
+	{ 75, 77, 103, 208, 3587 }, { 76, 76, 217, 511, 3588 },
+	{ 76, 76, 217, 50, 3589 }, { 76, 77, 218, 512, 3590 },
+	{ 76, 77, 218, 513, 3591 }, { 77, 76, 25, 51, 3592 },
+	{ 76, 78, 110, 222, 3593 }, { 77, 77, 27, 55, 3594 },
+	{ 77, 77, 27, 56, 3595 }, { 77, 78, 111, 224, 3596 },
+	{ 77, 78, 111, 225, 3597 }, { 77, 78, 111, 223, 3598 },
 };
 std::array<SDL_Color, 256> originalPalette {};
 std::vector<uint16_t> ownerPixels;
@@ -214,9 +228,18 @@ bool Warm()
 	warmed = true;
 	if (!pipeline || materialPath.empty()) return false;
 	AssetBytes bytes, layout;
+	if (layeredRockPreview) {
+		rockLayers = LoadGpuSheet({ "hd/levels/towndata/town-rc2-prop.png", 2, 1, 176 });
+		if (!rockLayers || rockLayers->frames.size() != 2) {
+			layeredRockPreview = false;
+			materialPath = "hd/levels/towndata/town.png";
+		}
+	}
 	if (!GetHdAssetStore().readGpuWithLayout(materialPath, bytes, layout)) {
-		if (!rockPreview) return false;
+		if (!rockPreview && !layeredRockPreview) return false;
 		rockPreview = false;
+		layeredRockPreview = false;
+		rockLayers.reset();
 		materialPath = "hd/levels/towndata/town.png";
 		if (!GetHdAssetStore().readGpuWithLayout(materialPath, bytes, layout)) return false;
 	}
@@ -326,6 +349,8 @@ void ReleaseGpuTerrainLevel()
 	originals.clear();
 	materialPath.clear();
 	rockPreview = false;
+	layeredRockPreview = false;
+	rockLayers.reset();
 	warmed = false;
 	ResetGpuTerrainFrame();
 }
@@ -371,8 +396,12 @@ void RegisterGpuTerrain(const std::byte *cells, std::span<const std::pair<uint16
 	materialPath = std::string("hd/levels/") + stem + ".png";
 	const char *preview = SDL_getenv("D1R_HD_RC2_ROCK_TEST");
 	rockPreview = leveltype == DTYPE_TOWN && preview != nullptr && std::strcmp(preview, "1") == 0;
+	layeredRockPreview = leveltype == DTYPE_TOWN && preview != nullptr && std::strcmp(preview, "2") == 0;
+	rockLayers.reset();
 	if (rockPreview)
 		materialPath = "hd/levels/towndata/town-rc2-rock.png";
+	if (layeredRockPreview)
+		materialPath = "hd/levels/towndata/town-rc2-walk.png";
 	palettePath = std::string("levels/") + stem + (leveltype == DTYPE_HELL ? "_1.pal" : ".pal");
 	for (size_t i = 0; i < frames.size(); ++i) {
 		const auto *source = GetDunFrame(cells, uint32_t(i + 1));
@@ -424,6 +453,7 @@ bool BeginGpuTerrainFrame(int scale, int offset, int clipX, int clipWidth, int c
 void EndGpuTerrainFrame() { ready = active; }
 void ResetGpuTerrainFrame()
 {
+	rockGround.reset();
 	active = ready = false;
 	current = 0;
 	commands.clear();
@@ -438,6 +468,63 @@ bool GpuTerrainReady() { return ready && active; }
 bool GpuTerrainUsesIndexedPresent() { return GpuTerrainReady() && indexedPresent; }
 bool GpuTerrainNeedsCpuCanvas() { return !active || !indexedPresent; }
 bool GpuTerrainSkipsNativePainting() { return active && directTiles && !nativeCapture; }
+bool IsGpuRc2RockCell(int x, int z, unsigned piece)
+{
+	return active && !nativeCapture && !nativeOnly && layeredRockPreview && rockLayers && x == 76 && z == 77 && piece == 218;
+}
+
+void SetGpuRc2RockGround(int left, int bottom) { rockGround.emplace(left, bottom); }
+bool HasGpuRc2RockGround() { return rockGround.has_value(); }
+
+static void QueueRockLayer(unsigned index, int left, int bottom)
+{
+	const auto &frame = rockLayers->frames[index];
+	if (frame.w == 0 || frame.h == 0) return;
+	const float scale = float(zoom) / rockLayers->density;
+	GpuSpriteDraw draw;
+	draw.sheet = rockLayers;
+	draw.frame = frame;
+	draw.x = float((left - 56) * zoom + offsetX) + float(frame.cropX) * scale;
+	draw.y = float((bottom - 96) * zoom) + float(frame.cropY) * scale;
+	draw.w = float(frame.w) * scale;
+	draw.h = float(frame.h) * scale;
+	draw.maskX = std::max(int(std::floor(draw.x)), clip.x);
+	draw.maskY = std::max(int(std::floor(draw.y)), 0);
+	draw.maskW = std::min(int(std::ceil(draw.x + draw.w)), clip.x + clip.w) - draw.maskX;
+	draw.maskH = std::min(int(std::ceil(draw.y + draw.h)), clip.h) - draw.maskY;
+	if (draw.maskW <= 0 || draw.maskH <= 0) return;
+	const size_t pixels = size_t(draw.maskW) * draw.maskH;
+	draw.coverage.assign(pixels * 4, 0);
+	for (size_t i = 3; i < draw.coverage.size(); i += 4) draw.coverage[i] = 255;
+	draw.lighting.assign(pixels, 0);
+	draw.palette.resize(256 * 17 * 4);
+	for (unsigned level = 0; level < 17; ++level) {
+		for (unsigned i = 0; i < 256; ++i) {
+			const auto color = originalPalette[i];
+			auto *dst = draw.palette.data() + (level * 256 + i) * 4;
+			dst[0] = color.r;
+			dst[1] = color.g;
+			dst[2] = color.b;
+			dst[3] = 255;
+		}
+	}
+	QueueGpuSprite(std::move(draw));
+}
+
+void QueueGpuRc2RockShadow()
+{
+	if (rockGround) QueueRockLayer(0, rockGround->first, rockGround->second);
+}
+
+void QueueGpuRc2RockProp(int left, int bottom)
+{
+	QueueRockLayer(1, left, bottom);
+	static bool logged = false;
+	if (!logged) {
+		logged = true;
+		devilution::Log("HD_RC2_ROCK_PROP independent_ground={} cell=(76, 77)", HasGpuRc2RockGround());
+	}
+}
 void SetGpuTerrainCell(int x, int z, unsigned piece)
 {
 	cellX = x;
@@ -453,8 +540,11 @@ uint16_t EnterGpuTerrainTile(const uint8_t *source, int x, int bottom, devilutio
 	if (found == sources.end()) return previous;
 	const auto &info = found->second;
 	unsigned frameIndex = info.frame;
-	if (rockPreview && cellX >= 87 && cellX <= 89 && cellZ >= 12 && cellZ <= 14) {
-		for (const auto &binding : RockBindings) {
+	const bool nearRiver = rockPreview && cellX >= 87 && cellX <= 89 && cellZ >= 12 && cellZ <= 14;
+	const bool nearWalkRock = layeredRockPreview && cellX >= 75 && cellX <= 77 && cellZ >= 76 && cellZ <= 78;
+	if (nearRiver || nearWalkRock) {
+		const std::span<const RockBinding> bindings = nearWalkRock ? std::span<const RockBinding>(WalkRockBindings) : std::span<const RockBinding>(RockBindings);
+		for (const auto &binding : bindings) {
 			if (binding.x == cellX && binding.z == cellZ && binding.piece == cellPiece && binding.original == info.frame + 1 && binding.replacement <= material->frames.size()) {
 				frameIndex = binding.replacement - 1;
 				static bool logged = false;
