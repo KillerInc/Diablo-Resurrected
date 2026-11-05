@@ -459,3 +459,9 @@ At the user's request, the earlier Gillian roof pass was rolled back across
 its shared tiles. The riverside cabin roof repair was preserved pixel for
 pixel in the source atlas. The rebuilt BC7 pack passed all frame checks and
 Direct3D12 upload before installation with a verified backup.
+
+The first riverside cabin pass made too much of the roof look uniform. The
+refinement restores the original weathered shingles around the damaged patch
+and blends only the interrupted center courses into their neighbors. The
+localized repair touches 22 canonical frames. Review the east and west cabins
+in assembled views because they share some of those frames.
