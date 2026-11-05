@@ -18,11 +18,13 @@ def special_layers(layers):
             for (x,z),p in cells.items() if p in SPECIAL]
 
 
-def scene_region(meta,atlas,special,rect):
+def scene_region(meta,atlas,special,rect,*,instance_tiles=None):
     """Return RGBA and canonical pixel owners for BOTH installed town sheets.
 
     Owner 0 is unpaintable; terrain uses its ordinary linear atlas address +1;
     special sprites follow the terrain atlas in the same address space.
+    Instance tiles are preview-only RGBA replacements keyed by (x, z, block).
+    Their pixels have no canonical source address in the shared atlas.
     """
     density=meta['density'];cell=meta['cell'];rows=meta['rows']
     if special.size!=(64*density,224*density*18):raise ValueError('Invalid towns geometry')
@@ -43,9 +45,16 @@ def scene_region(meta,atlas,special,rect):
             src=atlas;offset=0
         x0,y0=max(0,x),max(0,y);x1,y1=min(image.width,x+w),min(image.height,y+h)
         if x1<=x0 or y1<=y0:continue
-        sx,sy=x0-x,y0-y;tile=src.crop((ax+sx,ay+sy,ax+sx+x1-x0,ay+sy+y1-y0))
+        sx,sy=x0-x,y0-y
+        override = None if not instance_tiles or l.get('special') else instance_tiles.get((*l['cell'],l['block']))
+        if override is not None:
+            tile=override.crop((sx,sy,sx+x1-x0,sy+y1-y0))
+        else:
+            tile=src.crop((ax+sx,ay+sy,ax+sx+x1-x0,ay+sy+y1-y0))
         image.alpha_composite(tile,(x0,y0));alpha=np.asarray(tile)[:,:,3]
         yy,xx=np.mgrid[ay+sy:ay+sy+y1-y0,ax+sx:ax+sx+x1-x0]
         address=offset+yy*src.width+xx+1;dest=owners[y0:y1,x0:x1]
-        dest[alpha>0]=0;opaque=alpha==255;dest[opaque]=address[opaque]
+        dest[alpha>0]=0
+        if override is None:
+            opaque=alpha==255;dest[opaque]=address[opaque]
     return image,owners
