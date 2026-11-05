@@ -454,3 +454,8 @@ one coherent shingle plane, masks the ridge and building edges, and applies
 cover the east cabin, west cabin and smithy view. The installed BC7 pack passed
 all 3,584 frame checks and Direct3D12 upload with the existing layout. The
 installation has a verified rollback backup.
+
+At the user's request, the earlier Gillian roof pass was rolled back across
+its shared tiles. The riverside cabin roof repair was preserved pixel for
+pixel in the source atlas. The rebuilt BC7 pack passed all frame checks and
+Direct3D12 upload before installation with a verified backup.
