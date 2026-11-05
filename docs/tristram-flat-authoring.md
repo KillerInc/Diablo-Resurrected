@@ -416,3 +416,33 @@ pages (62,455,808 bytes), without PNG input. Both assembled review scenes includ
 the installed foreground sheet; gameplay views use nearest sampling and full
 4x source views are provided separately. These checks do not constitute user
 art approval. The candidate is not installed; no executable/version change.
+
+### Shared house-roof repair
+
+The house roof contained pale diagonal fragments and inconsistent shingle
+patches before the ground candidate. Frames 1230, 1231 and 1241 were identical
+between the restored installation and that candidate. Several house views
+reference those same native fragments, so independently painted house previews
+must not be treated as independent runtime textures.
+
+Repair the assembled Gillian/player-house roof in one view, register the RGB
+against its unchanged source projection, and gather through the combined scene
+owner map with an explicit roof-plane mask. Preserve the ridge, eaves, dormer,
+wall/door/light pixels outside that mask and all native alpha. Write each
+canonical source pixel once, propagating to every use. The private repair
+changes 385,553 pixels across 47 existing frames; no MIN/SOL/map/frame/layout
+change. Check assembled player, northern and southeastern houses at gameplay
+scale and native 4x resolution; also review surrounding shared uses in the cabin,
+Pepin, tavern, smithy, cathedral and Adria regions. Keep the artwork and owner
+maps private.
+
+All 3,584 BC7 frames were decoded: RGB MAE 0.526/255, maximum alpha error 1/255,
+zero alpha-threshold crossings, and identical installed frame/page metadata.
+Real D3D12 loading passed with four pages and 62,455,808 GPU bytes. A muted
+normal-executable fresh-town replay finished with exit 0 and its capture was
+reviewed; this inactive capture run is not an FPS benchmark. Installed the
+roof-only terrain PNG and four BC7 pages with verified rollback backups.
+Root index, layouts, foreground, NPCs, normal saves/settings and executable
+hashes remain unchanged. No executable version bump for an artwork-only fix.
+The sharper ground candidate remains uninstalled; a private PNG layers this
+same roof repair onto it for any later approved ground rebuild.
