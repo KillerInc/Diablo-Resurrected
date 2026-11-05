@@ -43,3 +43,13 @@ into their current art. Keep native gameplay collision independent of alpha.
    and fountain tiles before expanding across Tristram.
 
 The first proof is offline. It does not change the executable or install art.
+
+The riverside rock proof exports three private images at the same projection
+and origin. The reconstructed grass and dirt are fully opaque. The rock keeps
+its RC1 pixels inside an authored silhouette and has transparent surroundings.
+Its contact shadow has a separate alpha mask. The comparison shows RC1, clean
+ground alone, and the three layers assembled. The native slot audit records
+which cell/block positions contributed to the rock silhouette. Several of the
+rock pixels come from blocks 0 and 1, so block number alone cannot distinguish
+ground from a prop. Use the native floor and cell rendering rules when adding
+runtime bindings. Walkability and actor occlusion still need an in-game test.
